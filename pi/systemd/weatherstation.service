@@ -1,0 +1,15 @@
+[Unit]
+Description=mipi weather station collector
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/mipi-weather-station/pi
+ExecStart=/home/pi/mipi-weather-station/pi/.venv/bin/weatherstation
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

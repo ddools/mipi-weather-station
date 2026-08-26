@@ -1,0 +1,39 @@
+# Copy to config.yaml and edit. Secrets go in .env, NOT here.
+
+station:
+  name: "Dublin Weather Station"
+  latitude: 53.35        # decimal degrees
+  longitude: -6.26
+  elevation_m: 20        # metres above sea level (for sea-level pressure)
+
+sampling:
+  wind_sample_s: 5       # how often to sample wind for gust detection
+  archive_interval_s: 60 # one archive record per minute
+
+pins:                    # BCM numbering
+  anemometer: 5
+  rain_gauge: 6
+  wind_vane_adc_channel: 0   # MCP3008 channel
+
+calibration:
+  anemometer_radius_cm: 9.0
+  anemometer_adjustment: 1.18   # Foundation/BYOWS default factor
+  rain_bucket_mm: 0.2794        # mm per bucket tip
+  # 16-position vane: ADC value (0-1) -> degrees. Tune for YOUR unit.
+  vane_table:
+    0.0: 112.5   # placeholder — run `weatherstation --calibrate-vane` to map yours
+
+storage:
+  sqlite_path: "data/weather.sqlite3"
+  retention_days: 0      # 0 = keep forever locally
+
+uploaders:
+  supabase:
+    enabled: true
+    table: "readings"
+  wunderground:
+    enabled: false
+    station_id: ""       # e.g. IDUBLIN123
+  windy:
+    enabled: false
+    station_id: 0

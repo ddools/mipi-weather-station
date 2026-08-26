@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mipi-weatherstation"
+version = "0.1.0"
+description = "Collector for the Oracle Raspberry Pi Weather Station kit"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Dermot Dooley" }]
+dependencies = [
+    "pyyaml>=6.0",
+    "requests>=2.31",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+# Hardware libs — install on the Pi only
+pi = [
+    "gpiozero>=2.0",
+    "adafruit-circuitpython-bme280>=2.6",
+    "RPi.GPIO; platform_machine=='armv7l' or platform_machine=='aarch64'",
+]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+weatherstation = "weatherstation.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
