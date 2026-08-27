@@ -15,7 +15,7 @@ def build_uploaders(cfg: Config) -> list:
         from .wunderground import WundergroundUploader
 
         ups.append(WundergroundUploader(cfg))
-    if u.windy.enabled and cfg.env.windy_key:
+    if u.windy.enabled and cfg.env.windy_station_password:
         from .windy import WindyUploader
 
         ups.append(WindyUploader(cfg))

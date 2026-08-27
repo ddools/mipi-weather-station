@@ -1,10 +1,14 @@
 """Weather Underground PWS upload (imperial units, GET updateweatherstation.php)."""
 from __future__ import annotations
 
+import logging
+
 import requests
 
 from ..core import units
 from .base import Uploader
+
+log = logging.getLogger(__name__)
 
 _URL = "https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php"
 
@@ -41,4 +45,7 @@ class WundergroundUploader(Uploader):
             params["dewptf"] = round(units.c_to_f(record["dewpoint_c"]), 1)
 
         r = requests.get(_URL, params=params, timeout=15)
-        return r.ok and "success" in r.text.lower()
+        ok = r.ok and "success" in r.text.lower()
+        if not ok:
+            log.warning("wunderground: HTTP %d, body=%r", r.status_code, r.text[:200])
+        return ok

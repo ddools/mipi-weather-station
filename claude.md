@@ -92,7 +92,13 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   in WU's dashboard; after that, uploads succeed immediately. The live
   "current conditions" tile still shows "Offline" — believed to be normal
   new-station dashboard lag, not a real failure (see TODO.md).
-- Windy uploader written but **never run against live services** (no key yet).
+- **Windy live** (2026-08-27), station `C9fexco`. `upload/windy.py` was
+  substantially wrong (POST/JSON to a made-up endpoint) and got rewritten
+  against Windy's real API reference — real endpoint is
+  `GET /api/v2/observation/update`, auth is the **station password**
+  (`WINDY_STATION_PASSWORD`, not an "API key" — that's a different, account-
+  level concept in Windy's API). Windy also rate-limits to once per 5 min per
+  station, handled client-side in the uploader. See TODO.md for the full story.
 - **Astro site live in `web/`** (2026-08-27) — full dashboard with server
   islands, ECharts, shadcn/ui, Meteocons, tides. Not yet deployed to Vercel.
 - No CI yet. No CWOP uploader. TGS2600 air quality and DS18B20 ground-temp
@@ -130,12 +136,22 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
    Details in `web/README.md` and TODO.md.
 4. ~~**Weather Underground**~~ — done 2026-08-27: station live, `success`
    responses confirmed, real data visible in WU's history table.
-5. **Windy v2** — register at stations.windy.com, same pattern.
+5. ~~**Windy v2**~~ — done 2026-08-27, see above.
 6. **Polish** — gauge dials, retention/downsampling job in Supabase,
    GitHub Actions CI (ruff + pytest), CWOP uploader, README screenshots.
 
 ## Gotchas
 
+- **Windy's API reference is a JS-rendered SPA** — plain `curl`/WebFetch on
+  `stations.windy.com/api-reference` returns an empty shell; need a headless
+  browser (or similar) to actually read the endpoint docs. Key facts once
+  rendered: upload is `GET /api/v2/observation/update` (WU-protocol-compatible
+  query params), NOT `POST /api/v2/observations` with JSON (an earlier,
+  unverified guess). Auth is the **station password** (My Stations page), a
+  distinct concept from the account-level "API key" (for `/api/v2/pws`
+  management) — don't confuse the two. Uploads are rate-limited to once per
+  5 minutes per station; our 60s archive interval means the uploader must
+  self-throttle client-side or it'll just collect 429s.
 - A **freshly-created WU device** may return a bare `unauthorized` on upload
   even with correct ID/key copied straight from the dashboard. Fix: Edit →
   Save the device in WU's member dashboard (re-triggers provisioning), then

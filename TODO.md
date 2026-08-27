@@ -155,12 +155,32 @@ one exists.
 
 ## 4. Windy Stations API v2 upload (plan.MD Details/D)
 
-- [ ] Register a station at stations.windy.com for an API key
-- [ ] Add `WINDY_API_KEY` to `.env`, station ID to `config.yaml`
-      (`uploaders.windy.station_id`), set `enabled: true`
-- [ ] `upload/windy.py` is already written (v2 API, pressure sent in Pa) — verify
-      against the live endpoint
-- [ ] Confirm data appears on the station's Windy dashboard
+- [x] Registered — station ID `C9fexco`
+- [x] **`upload/windy.py` was substantially wrong and got rewritten from
+      scratch** (2026-08-27) after checking Windy's actual current API
+      reference (a JS-rendered SPA — `curl` alone shows nothing; had to render
+      it with the headless browser to get the real endpoint spec):
+  - Endpoint was `POST /api/v2/observations` with a JSON body — real one is
+    **`GET /api/v2/observation/update`** with query params (WU-protocol-
+    compatible shape).
+  - Auth field was named `WINDY_API_KEY`/`windy_key` — that's actually a
+    *different* Windy concept (account-level, for managing stations via
+    `/api/v2/pws`). Uploads authenticate with the **station password**
+    (per-station, shown on the station's page in My Stations). Renamed
+    throughout to `WINDY_STATION_PASSWORD`/`windy_station_password`.
+  - **Windy rate-limits uploads to once per 5 minutes per station** — not
+    documented anywhere we'd looked before, and much slower than our 60s
+    archive interval. `WindyUploader` now tracks `_last_sent_at` in memory and
+    returns success-without-a-request when called inside that window, instead
+    of hammering the endpoint into repeated 429s.
+- [x] Added HTTP-status+body logging on rejection to all three uploaders
+      (Supabase/WU/Windy), not just Windy — `upload/base.py`'s generic
+      "rejected" warning (added for the WU debugging session) said nothing
+      about *why*; now each uploader logs the actual response.
+- [x] Confirmed live: real archive records uploading successfully with no
+      rejections once past the 5-minute window (verified via `journalctl`
+      after deploy, plus a direct `curl` against the real endpoint with the
+      real credentials before wiring it in — both returned clean `200`s).
 
 ## 5. Polish (plan.MD Recommendations #5, Details/E)
 

@@ -1,9 +1,13 @@
 """Insert archive records into a Supabase (Postgres) table via PostgREST."""
 from __future__ import annotations
 
+import logging
+
 import requests
 
 from .base import Uploader
+
+log = logging.getLogger(__name__)
 
 
 class SupabaseUploader(Uploader):
@@ -21,4 +25,7 @@ class SupabaseUploader(Uploader):
     def send(self, record: dict) -> bool:
         r = requests.post(self._url, json=record, headers=self._headers, timeout=15)
         # 409 = duplicate (already inserted on a previous retry) — treat as sent
-        return r.status_code in (200, 201, 409)
+        ok = r.status_code in (200, 201, 409)
+        if not ok:
+            log.warning("supabase: HTTP %d, body=%r", r.status_code, r.text[:200])
+        return ok

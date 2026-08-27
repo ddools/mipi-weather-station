@@ -54,4 +54,4 @@ uploaders:
     station_id: ""       # e.g. IDUBLIN123
   windy:
     enabled: false
-    station_id: 0
+    station_id: ""       # e.g. C9fexco — password goes in .env, not here

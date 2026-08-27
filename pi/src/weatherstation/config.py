@@ -33,7 +33,7 @@ def load(path: str | Path = "config.yaml") -> Config:
         supabase_url=os.getenv("SUPABASE_URL", ""),
         supabase_key=os.getenv("SUPABASE_SERVICE_KEY", ""),
         wu_key=os.getenv("WU_STATION_KEY", ""),
-        windy_key=os.getenv("WINDY_API_KEY", ""),
+        windy_station_password=os.getenv("WINDY_STATION_PASSWORD", ""),
     )
     return cfg
 
