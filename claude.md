@@ -79,7 +79,14 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   BMP085 and HTU21D return plausible live readings; wind vane tracks physical
   rotation across the full 16-point compass; anemometer and rain gauge both
   register GPIO pulses when triggered by hand. See [docs/sensors.md](docs/sensors.md).
-- Uploaders written but **never run against live services** (no keys yet).
+- **Supabase live** (2026-08-27): project created, schema applied, real sensor
+  data confirmed flowing end-to-end (sensors → SQLite → Supabase). RLS verified
+  via direct REST calls (publishable key can SELECT, can't INSERT). Collector
+  runs as a systemd service on the Pi (`ddools` user), enabled on boot.
+  Store-and-forward soak test (24h, network-unplug) not yet done — needs elapsed
+  real time, not blocked on anything.
+- WU and Windy uploaders written but **never run against live services** (no
+  keys yet — Supabase now has keys, WU/Windy don't).
 - No CI yet. No CWOP uploader. No Astro components written yet. TGS2600 air
   quality and DS18B20 ground-temp sensors are present on the kit but not
   implemented (see docs/sensors.md "Not implemented").
@@ -105,8 +112,9 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
    changed (real chips are BMP085/HTU21D/MCP342X, not BME280/MCP3008 as first
    planned) and the provisioning steps (I2C/SPI enable, `swig`/`liblgpio-dev` for
    gpiozero's `lgpio` backend on trixie).
-2. **Supabase live** — create project, run `docs/supabase-schema.sql`, add keys to
-   `.env`, verify inserts + backlog replay (unplug-network test: 24h no gaps).
+2. ~~**Supabase live**~~ — done 2026-08-27: project created, schema applied, keys
+   in `.env`, real data flowing, RLS verified, systemd service enabled and running.
+   Remaining: the 24h network-unplug soak test (needs elapsed time, not blocked).
 3. **Astro site in `web/`** — standalone site, own Vercel project, domain TBD:
    scaffold Astro + `@astrojs/vercel` + `@astrojs/react`; `npx shadcn init` +
    add components; server-island live panel; `/api/history` with hourly
@@ -121,6 +129,17 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
 
 ## Gotchas
 
+- Supabase's **direct connection** DB host (`db.<ref>.supabase.co`) is IPv6-only;
+  if `psql` fails with "could not translate host name" it's almost always missing
+  IPv6 route, not bad credentials. Use the **session pooler** host instead
+  (`aws-<n>-<region>.pooler.supabase.com:5432`, user `postgres.<ref>`) — it's
+  IPv4-compatible and free. The paid "dedicated IPv4" add-on ($4/mo) is only for
+  the direct/dedicated-pooler endpoints, not needed for this project.
+- Supabase now issues `sb_publishable_...`/`sb_secret_...` API keys instead of
+  the old anon/service_role JWTs. Same roles (publishable = client-safe + RLS,
+  secret = full server-side access) — `.env`'s `SUPABASE_SERVICE_KEY` holds the
+  secret key; the eventual Astro site's `PUBLIC_SUPABASE_ANON_KEY` will hold the
+  publishable key.
 - Real hardware is the official Oracle/Foundation HAT (BMP085 + HTU21D + MCP342X),
   not generic BYOWS parts (BME280 + MCP3008/SPI) — see docs/sensors.md before
   touching any sensor driver.

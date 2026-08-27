@@ -3,6 +3,10 @@ Description=mipi weather station collector
 Wants=network-online.target
 After=network-online.target
 
+# Defaults below assume the standard Raspberry Pi OS "pi" user cloned to its
+# home directory. If your setup differs, edit User/WorkingDirectory/ExecStart
+# to match before installing (or generate a substituted copy — don't just
+# `sudo cp` this file unedited if you're not using the default account).
 [Service]
 Type=simple
 User=pi

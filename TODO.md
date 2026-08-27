@@ -13,28 +13,39 @@ one exists.
 - [x] SQLite-first local buffer with per-uploader cursors (`store/local_buffer.py`)
 - [x] Uploader code for Supabase, Weather Underground, Windy v2 — written, unit
       tested, but **never run against live services** (no keys yet)
-- [x] `docs/supabase-schema.sql` written (not yet run against a real project)
-- [x] systemd unit file scaffolded (`pi/systemd/weatherstation.service`) — **needs
-      a fix before use**: hardcodes `User=pi` and `/home/pi/...` paths, but the
-      real Pi's user is `ddools` and the repo lives at `/home/ddools/mipi-weather-station`
+- [x] `docs/supabase-schema.sql` run against the real project (2026-08-27) —
+      `readings` table, indexes, and RLS public-read policy all confirmed live
+- [x] systemd service deployed and running on the Pi as `ddools` (2026-08-27) —
+      `enabled`, survives the current boot; template in the repo still says `User=pi`
+      as a documented default for other users, with a comment explaining to adjust it
 
 ## 1. Supabase live (plan.MD Details/B)
 
-- [ ] Create a Supabase project; grab project URL + service-role key + anon key
-- [ ] Run `docs/supabase-schema.sql` in the Supabase SQL editor (creates `readings`
-      table + RLS policy for anonymous read-only `SELECT`)
-- [ ] Copy `pi/.env.example` → `pi/.env` on the Pi, fill in `SUPABASE_URL` /
-      `SUPABASE_SERVICE_KEY`
-- [ ] Confirm `uploaders.supabase.enabled: true` in `config.yaml` (default is already on)
-- [ ] Run `weatherstation` for real (not `WS_MOCK_SENSORS=1`) on the Pi and confirm
-      rows land in Supabase
-- [ ] Verify RLS: anonymous `SELECT` works from a plain REST call; an anon-key
-      `INSERT` is rejected
-- [ ] Store-and-forward soak test: unplug the Pi's network for a while, reconnect,
-      confirm the backlog replays with **no gaps** (target: 24h continuous)
-- [ ] Fix `pi/systemd/weatherstation.service` (`User=ddools`,
-      `WorkingDirectory=/home/ddools/mipi-weather-station/pi`, matching `ExecStart`
-      path), then `sudo cp` it in, `systemctl enable --now`, confirm it survives a reboot
+- [x] Create a Supabase project; grab project URL + keys — done 2026-08-27.
+      Note: Supabase now issues `sb_publishable_...`/`sb_secret_...` keys instead
+      of the old anon/service_role JWTs — functionally the same roles (publishable
+      = client-safe/RLS-respecting, secret = full-access server-side), just new
+      naming. `SUPABASE_SERVICE_KEY` in `.env` holds the secret key.
+- [x] Run `docs/supabase-schema.sql` — done via `psql` against the **session
+      pooler** (`aws-1-eu-west-1.pooler.supabase.com:5432`), not the direct
+      connection host — that host is IPv6-only and this network has no IPv6
+      route. The pooler is free or the direct/dedicated IPv4 add-on is $4/mo —
+      use the pooler, no need to pay for the add-on.
+- [x] `pi/.env` written on the Pi with `SUPABASE_URL` / `SUPABASE_SERVICE_KEY`,
+      permissions locked to `600`
+- [x] `uploaders.supabase.enabled: true` confirmed in `config.yaml`
+- [x] Ran `weatherstation` for real (not mock) on the Pi — one archive record
+      (28.4°C / 37.8% / 1006.53 hPa / vane 180°) flowed sensors → SQLite →
+      Supabase and was confirmed present via direct query
+- [x] Verified RLS via the REST API directly: publishable-key `SELECT` returns
+      data (200), publishable-key `INSERT` is rejected (401)
+- [x] systemd service installed, enabled, and running as `ddools` — confirmed
+      `active (running)`, `enabled` (starts on boot)
+- [ ] Store-and-forward soak test: **in progress, passive** — service has been
+      running continuously since 2026-08-27 11:01 BST; check back around
+      2026-08-28 11:01 BST and confirm no gaps in `readings.recorded_at` (a
+      deliberate network-unplug test was considered but skipped in favor of
+      just letting it run)
 
 ## 2. Astro standalone site with shadcn/ui (plan.MD Details/C — now lives in this repo's `web/`)
 
