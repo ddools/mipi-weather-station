@@ -134,14 +134,24 @@ one exists.
 
 ## 3. Weather Underground upload (plan.MD Details/D)
 
-- [ ] Register a free PWS at wunderground.com → My Devices → Add a New PWS; note
-      Station ID + Station Key
-- [ ] Add `WU_STATION_KEY` to `.env`, station ID to `config.yaml`
-      (`uploaders.wunderground.station_id`), set `enabled: true`
-- [ ] `upload/wunderground.py` is already written (imperial unit conversion,
-      `updateweatherstation.php` GET) — just needs a real key to verify against
-- [ ] Confirm the response body contains `success`; station shows live data on
-      wunderground.com
+- [x] Registered — station "DDools Pi Station" (Holmpatrick), ID `IHOLMP2`
+- [x] `WU_STATION_KEY` in `.env`, `station_id: "IHOLMP2"` +
+      `enabled: true` in `config.yaml` on the Pi; service restarted, confirmed
+      startup log lists `uploaders=['supabase', 'wunderground']`
+- [x] Confirmed `success` response and real data landing on WU (2026-08-27) —
+      **gotcha hit along the way**: a freshly-created device initially returned
+      a bare `unauthorized` (not the documented `INVALIDPASSWORDID|...`) even
+      with correct ID/key copied straight from the dashboard. Fix was
+      Edit → Save on the device in WU's dashboard (https://preview.wunderground.com/member/devices)
+      — re-triggers provisioning. After that, `curl`ing the exact ID/key
+      returned `success` immediately.
+- [x] Verified real data arriving: the **history table**
+      (`/dashboard/pws/IHOLMP2/table/<date>/<date>/daily`) shows the actual Pi's
+      archived readings, matching our Supabase rows unit-converted (83.1°F/38%
+      ≈ our 28.4°C/38%). The **live "current conditions" tile still shows
+      "Offline"** — this looks like normal dashboard-activation lag for a new
+      station (ingest clearly works; the front-end tile hasn't caught up yet).
+      Worth a follow-up check in a day to confirm the badge flips to online.
 
 ## 4. Windy Stations API v2 upload (plan.MD Details/D)
 

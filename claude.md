@@ -85,11 +85,19 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   runs as a systemd service on the Pi (`ddools` user), enabled on boot.
   Store-and-forward soak test (24h, network-unplug) not yet done — needs elapsed
   real time, not blocked on anything.
-- WU and Windy uploaders written but **never run against live services** (no
-  keys yet — Supabase now has keys, WU/Windy don't).
-- No CI yet. No CWOP uploader. No Astro components written yet. TGS2600 air
-  quality and DS18B20 ground-temp sensors are present on the kit but not
-  implemented (see docs/sensors.md "Not implemented").
+- **Weather Underground live** (2026-08-27): station "DDools Pi Station"
+  (Holmpatrick), ID `IHOLMP2`. Real data confirmed landing via WU's history
+  table. Hit and resolved a gotcha: a freshly-created device returned a bare
+  `unauthorized` even with correct credentials until Edit→Save on the device
+  in WU's dashboard; after that, uploads succeed immediately. The live
+  "current conditions" tile still shows "Offline" — believed to be normal
+  new-station dashboard lag, not a real failure (see TODO.md).
+- Windy uploader written but **never run against live services** (no key yet).
+- **Astro site live in `web/`** (2026-08-27) — full dashboard with server
+  islands, ECharts, shadcn/ui, Meteocons, tides. Not yet deployed to Vercel.
+- No CI yet. No CWOP uploader. TGS2600 air quality and DS18B20 ground-temp
+  sensors are present on the kit but not implemented (see docs/sensors.md
+  "Not implemented").
 
 ## Dev conventions
 
@@ -115,20 +123,32 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
 2. ~~**Supabase live**~~ — done 2026-08-27: project created, schema applied, keys
    in `.env`, real data flowing, RLS verified, systemd service enabled and running.
    Remaining: the 24h network-unplug soak test (needs elapsed time, not blocked).
-3. **Astro site in `web/`** — standalone site, own Vercel project, domain TBD:
-   scaffold Astro + `@astrojs/vercel` + `@astrojs/react`; `npx shadcn init` +
-   add components; server-island live panel; `/api/history` with hourly
-   downsampling for 7d/30d; ECharts charts; responsive CSS grid, dark mode; env
-   vars `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY` in Vercel. Details in
-   `web/README.md`. Target: mobile Lighthouse ≥ 90.
-4. **Weather Underground** — register PWS at wunderground.com → My Devices, put
-   station ID in config + key in `.env`, enable, confirm `success` responses.
+3. ~~**Astro site in `web/`**~~ — done 2026-08-27: server-island live panel,
+   `/api/history` (24h raw, 7d/30d hourly-bucketed), ECharts charts + wind rose,
+   shadcn/ui, Meteocons icons, Tides section, dark mode. Not yet deployed —
+   still needs a domain (undecided) and a Vercel project wired to `web/`.
+   Details in `web/README.md` and TODO.md.
+4. ~~**Weather Underground**~~ — done 2026-08-27: station live, `success`
+   responses confirmed, real data visible in WU's history table.
 5. **Windy v2** — register at stations.windy.com, same pattern.
-6. **Polish** — wind rose + gauges, retention/downsampling job in Supabase,
+6. **Polish** — gauge dials, retention/downsampling job in Supabase,
    GitHub Actions CI (ruff + pytest), CWOP uploader, README screenshots.
 
 ## Gotchas
 
+- A **freshly-created WU device** may return a bare `unauthorized` on upload
+  even with correct ID/key copied straight from the dashboard. Fix: Edit →
+  Save the device in WU's member dashboard (re-triggers provisioning), then
+  retry — no code or credential change needed. The dashboard's live "current
+  conditions" tile can also keep showing "Offline" for a while after uploads
+  are genuinely succeeding; check the **history table**
+  (`/dashboard/pws/<ID>/table/<date>/<date>/daily`) to verify real data
+  landing, don't trust the tile alone.
+- `upload/base.py`'s `flush()` only logs on an **exception** — a normal `False`
+  return from `send()` (e.g. the destination rejects the request without
+  erroring) fails silently, no log line at all. Worth knowing when a service
+  looks "fine" in `journalctl` but data isn't actually arriving somewhere;
+  verify against the destination directly rather than trusting silence.
 - Supabase's **direct connection** DB host (`db.<ref>.supabase.co`) is IPv6-only;
   if `psql` fails with "could not translate host name" it's almost always missing
   IPv6 route, not bad credentials. Use the **session pooler** host instead

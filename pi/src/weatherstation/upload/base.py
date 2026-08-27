@@ -24,5 +24,6 @@ class Uploader:
                 log.exception("%s: send failed", self.name)
                 ok = False
             if not ok:
+                log.warning("%s: rejected record %s, will retry next tick", self.name, row_id)
                 break
             buffer.mark_sent(self.name, row_id)
