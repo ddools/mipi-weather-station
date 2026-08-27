@@ -9,9 +9,12 @@ Dermot and his son in Dublin, Ireland. Two deliverables:
 
 1. **Pi collector** (`pi/`) — Python service reading the kit's sensors, buffering
    locally, pushing to cloud + weather services.
-2. **Public dashboard** at **dermotdooley.com/weather** — built in **Astro**, hosted
-   on **Vercel**, in the user's existing site repo (NOT this repo; `web/` here holds
-   reusable pieces + integration notes only).
+2. **Public dashboard** — a **standalone site on its own domain** (name TBD, not
+   yet registered — was originally planned as dermotdooley.com/weather, changed
+   2026-08-27). Built in **Astro** with **shadcn/ui** (React/Tailwind/Radix
+   components mounted as Astro React islands), hosted on **Vercel** as its own
+   project. The Astro app lives fully in **this repo's `web/`** — it's the real
+   deployable project now, not integration notes for another repo.
 
 Repo: https://github.com/ddools/mipi-weather-station (public, MIT).
 
@@ -34,6 +37,10 @@ Key decisions already made — do not re-litigate without asking:
 - **Astro**: static shell + server island (`server:defer`) live panel + SSR API routes
   (`/api/current`, `/api/history`, `prerender = false`) + **ECharts** client island for
   charts (lines, rain bars, wind rose, gauges). `@astrojs/vercel` adapter.
+- **UI**: **shadcn/ui** (changed 2026-08-27) — React components (Tailwind + Radix)
+  vendored into `web/src/components/ui/` via the shadcn CLI, mounted as Astro React
+  islands (`@astrojs/react`). Not shadcn's native pairing (that's Next.js), but
+  works fine as islands in an otherwise-static Astro site.
 - **Weather services**: WU first (free, imperial units, GET updateweatherstation.php),
   then Windy **v2 API only** (legacy dies end of 2026; pressure in **Pascals**), then
   CWOP (APRS to cwop.aprs.net:14580 — not yet implemented).
@@ -100,11 +107,12 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
    gpiozero's `lgpio` backend on trixie).
 2. **Supabase live** — create project, run `docs/supabase-schema.sql`, add keys to
    `.env`, verify inserts + backlog replay (unplug-network test: 24h no gaps).
-3. **Astro /weather page** — in the dermotdooley.com repo: `npx astro add vercel`;
-   server-island live panel; `/api/history` with hourly downsampling for 7d/30d;
-   ECharts charts; responsive CSS grid, dark mode; env vars `PUBLIC_SUPABASE_URL`,
-   `PUBLIC_SUPABASE_ANON_KEY` in Vercel. Details in `web/README.md`.
-   Target: mobile Lighthouse ≥ 90.
+3. **Astro site in `web/`** — standalone site, own Vercel project, domain TBD:
+   scaffold Astro + `@astrojs/vercel` + `@astrojs/react`; `npx shadcn init` +
+   add components; server-island live panel; `/api/history` with hourly
+   downsampling for 7d/30d; ECharts charts; responsive CSS grid, dark mode; env
+   vars `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY` in Vercel. Details in
+   `web/README.md`. Target: mobile Lighthouse ≥ 90.
 4. **Weather Underground** — register PWS at wunderground.com → My Devices, put
    station ID in config + key in `.env`, enable, confirm `success` responses.
 5. **Windy v2** — register at stations.windy.com, same pattern.

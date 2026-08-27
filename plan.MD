@@ -1,4 +1,14 @@
-# Building the Software for a Raspberry Pi Weather Station (Oracle Kit → dermotdooley.com/weather)
+# Building the Software for a Raspberry Pi Weather Station (Oracle Kit → standalone site, domain TBD)
+
+> **Update (2026-08-27):** the site plan changed from a `/weather` page bolted
+> onto the existing dermotdooley.com site to a **standalone site on its own
+> domain** (name not yet decided — placeholder used below). Its Astro app now
+> lives fully in this repo's `web/` directory as its own deployable project
+> (its own Vercel project), not just integration notes for another repo. UI
+> components use **[shadcn/ui](https://ui.shadcn.com)** (React, Tailwind, Radix)
+> mounted as Astro React islands — Astro itself is unchanged; shadcn is an
+> unusual pairing with Astro (it's built for React meta-frameworks like Next.js)
+> but works via Astro's `@astrojs/react` integration. See Details/C below.
 
 > **Errata (2026-08-27):** the "Sensor reading specifics" section below described
 > generic BYOWS (Build-Your-Own-Weather-Station) hardware — BME280 + MCP3008 SPI
@@ -7,21 +17,30 @@
 > BMP085/BMP180 + HTU21D (I2C) for temp/humidity/pressure, and an MCP342X I2C ADC
 > (not SPI) for the wind vane. The anemometer calibration factor was also wrong
 > (1.18, should be 2.36). Corrected below inline; full verified reference is
-> **[docs/sensors.md](docs/sensors.md)**. The rest of this plan (cloud/web/upload
-> architecture) is unaffected.
+> **[docs/sensors.md](docs/sensors.md)**. The cloud/upload architecture is
+> unaffected; the web/site plan changed separately — see the update note above.
 
 ## TL;DR
 - **Build a small, custom Python service on the Pi** (BMP085 + HTU21D over I2C for temp/humidity/pressure, anemometer/rain gauge via GPIO pulse counting, wind vane via an MCP342X I2C ADC — see [docs/sensors.md](docs/sensors.md) for the verified chip set) that logs to a local SQLite buffer and pushes readings to a free-tier **Supabase (Postgres) cloud database**; your Astro site on Vercel reads from Supabase via a server island / SSR API route and renders live conditions + history charts with **ECharts or Chart.js**. This is the most practical, publishable architecture for a father-son project.
 - **For weather-service sharing, prioritise Weather Underground** (still free for PWS uploads in 2026 via `weatherstation.wunderground.com/weatherstation/updateweatherstation.php`), plus **CWOP** (feeds NOAA MADIS) and **Windy** (new Stations API v2, effective January 2026). Do **not** build around Met Office/Met Éireann WOW — it is being **decommissioned in late 2026**.
-- **Publish as open source from day one** with a clean monorepo (`/pi` Python collector, `/web` Astro app, `/docs`), an OSI licence (MIT for maximum reuse, or GPLv3 to match the existing Pi Foundation code lineage), and a strong README. Build in stages: sensors → local logging → cloud push → website → weather-service uploads → polish.
+- **Publish as open source from day one** with a clean monorepo (`/pi` Python collector, `/web` Astro app, `/docs`), an OSI licence (**MIT**, already chosen), and a strong README. Build in stages: sensors → local logging → cloud push → website → weather-service uploads → polish.
 
 ## Key Findings
 
 ### The existing official software is dated and the Oracle backend is effectively dead
 The official Raspberry Pi Foundation code (`github.com/RaspberryPiFoundation/weather-station`) is a data-logging stack built around a **local MariaDB/MySQL database** with Python sensor scripts, uploading to a central **Oracle Apex database**. The Raspberry Pi Learning setup guide itself warns: "The SD card that was originally shipped with the Weather Station kit contains a version of Raspbian… which is now extremely out of date and should not be used." Community reports confirm the Oracle crowd-sourcing backend is unresponsive — one teacher reported trying to register and "never heard back." **Conclusion: treat the official code as a reference for sensor math (anemometer radius, bucket size, wind-vane voltage mapping) but rewrite the stack.**
 
-### There is a mature open-source path: WeeWX with a Build-Your-Own-Weather-Station (BYOWS) driver
-`jardiamj/BYOWS_RPi` is a WeeWX driver (GPLv3) written specifically for the Raspberry Pi BYOWS hardware — the same BME280 + GPIO + MCP3008 sensor set. WeeWX is described as "the most mature open-source weather station software for Linux," handles archiving, unit conversion, report generation and — crucially — has built-in "StdRESTful" uploaders for Weather Underground, PWSweather, CWOP, Windy and (formerly) WOW, plus an MQTT publish extension. This is a genuine fork in the road for the project (see Recommendations).
+### WeeWX + BYOWS is a mature path — but for different hardware than this kit has
+`jardiamj/BYOWS_RPi` is a WeeWX driver (GPLv3) written for the *generic*
+Build-Your-Own-Weather-Station hardware — BME280 + GPIO + MCP3008 (SPI). WeeWX
+itself is described as "the most mature open-source weather station software for
+Linux," with built-in "StdRESTful" uploaders for Weather Underground, PWSweather,
+CWOP, Windy and (formerly) WOW, plus an MQTT publish extension — genuinely good
+software. But bringing the actual sensors up (see
+[docs/sensors.md](docs/sensors.md)) showed this specific kit uses different chips
+(BMP085/BMP180 + HTU21D + MCP342X), which `BYOWS_RPi` doesn't support. There's no
+existing WeeWX driver for this exact chip set, so WeeWX is no longer a fork in the
+road for this project — see "Alternative architecture" in Details/A below.
 
 ### Sensor reading specifics (confirmed on real hardware, 2026-08-27)
 - **Temp/pressure — BMP085/BMP180**, not BME280: I2C, fixed address `0x77`, chip ID
@@ -98,10 +117,22 @@ Structure the collector as a small package rather than one script:
 
 **Store-and-forward detail:** because home broadband and power are not 100% reliable, the SQLite-first design means the Pi keeps logging locally even when offline, and each uploader replays the backlog when connectivity returns — the same principle WeeWX uses when it catches up its database and re-emits records.
 
-**Alternative architecture (WeeWX + BYOWS driver — the fast path)**
-Install WeeWX, install the `BYOWS_RPi` driver, set `station_type = BYOWS`, and configure the `[BYOWS]` stanza for your GPIO pins and ADC channel. You immediately get: archiving, unit conversion, a local web report, built-in WU/PWSweather/CWOP/Windy uploaders, and the `weewx-mqtt` publish extension. You would then feed your Astro site either by (a) adding a small WeeWX "uploader" that POSTs archive records to Supabase, or (b) MQTT → a bridge that writes to Supabase.
+**Alternative architecture (WeeWX + BYOWS driver — no longer applicable)**
+An earlier draft of this plan proposed `BYOWS_RPi` as a "fast path" WeeWX driver
+shortcut. That driver is written for BME280 + MCP3008 hardware, which is **not**
+what's on this board (see [docs/sensors.md](docs/sensors.md): real chips are
+BMP085/BMP180 + HTU21D + MCP342X). Using it would require writing a new WeeWX
+driver for the real chip set from scratch — strictly more work than the custom
+Python service already built and verified on real hardware, not a shortcut. There
+is no existing WeeWX driver (or other library) for this exact combination of
+chips; the closest prior art is the official
+[RaspberryPiFoundation/weather-station](https://github.com/RaspberryPiFoundation/weather-station)
+repo itself, which is what the current sensor drivers were ported from.
 
-**Which to choose?** If the primary goal is *learning and a clean public repo of your own*, build the custom Python service (you own every line, and it's the more interesting father-son project). If the primary goal is *reliable data and weather-service uploads with least effort*, use WeeWX and publish your BYOWS configuration + Supabase uploader as the open-source contribution. A strong middle path: **prototype quickly with WeeWX to validate the hardware and get onto WU/CWOP within a weekend, then rebuild as custom Python** once you understand the data, keeping WeeWX as the reference implementation.
+**Which to choose?** Custom Python — this is now the only realistic path for this
+hardware, not one option among several. It's also already done: all four sensors
+are implemented, verified on real hardware, and committed. See
+[TODO.md](TODO.md) for what's left to deliver the rest of the plan.
 
 ### B. Cloud / data layer setup (Supabase)
 1. Create a Supabase project; note the project URL and keys (Settings → API). Store the **service role key only on the Pi** (never in the front end); use the **anon key with Row Level Security** for the website's read path.
@@ -110,12 +141,46 @@ Install WeeWX, install the `BYOWS_RPi` driver, set `station_type = BYOWS`, and c
 4. The Pi's `upload/supabase.py` inserts new rows via the Python client or a REST POST; batch-insert backlog rows after outages.
 5. Optional retention: a scheduled SQL job to downsample rows older than N months (e.g. keep 1-minute data for 90 days, hourly averages forever) to stay within the 500 MB free tier.
 
-### C. Astro weather page at /weather (impressive, responsive)
-1. Add the adapter: `npx astro add vercel`; set the dynamic routes to on-demand rendering.
-2. **Live conditions panel** as a **server island** (`server:defer`): a `.astro` component that queries Supabase for the newest row on the server, with a static fallback skeleton shown instantly. Add a light client-side `fetch` on a timer (e.g. every 30–60 s) to a `/api/current` route for live refresh without a full reload.
-3. **History charts** as a client component: an API route `src/pages/api/history.ts` (`export const prerender = false`) returns JSON for a requested range (24 h / 7 d / 30 d), and ECharts/Chart.js renders line charts (temp, pressure, humidity, rain), a **wind rose** (ECharts polar bar), and **gauge dials** for current temp/wind.
-4. **Design for impact + responsiveness:** a CSS grid dashboard that reflows from multi-column (desktop) to single-column (mobile); large "hero" current-temperature card; card-based tiles; dark-mode support; use `PUBLIC_`-prefixed env vars only for the anon key, keep secrets server-side. Keep the static shell CDN-cached and defer only the data panels for fast Lighthouse scores.
-5. Store secrets in Vercel project environment variables; the anon key + RLS means the browser can safely read data.
+### C. Astro site on its own domain (impressive, responsive)
+
+**Changed 2026-08-27:** this is now a standalone site at its own domain (not yet
+registered — TBD), not a `/weather` page inside the dermotdooley.com repo. The
+Astro app lives fully in **this repo's `web/`**, deployed as its own Vercel
+project. UI components use **shadcn/ui** (React + Tailwind + Radix, copied into
+the repo rather than installed as an opaque dependency — that's how shadcn
+works: `npx shadcn add <component>` vendors the component source into `web/`).
+
+1. Scaffold: `npm create astro@latest` in `web/`; add the adapter
+   (`npx astro add vercel`) and React support (`npx astro add react`) since
+   shadcn/ui components are React, mounted as **client islands**
+   (`client:load`/`client:visible`) inside otherwise-static `.astro` pages.
+2. `npx shadcn init` inside `web/` (needs Tailwind, which its init sets up);
+   add components as needed (`card`, `tabs`, `button`, a theme/dark-mode toggle,
+   etc.) — each pulls the component source into `web/src/components/ui/`, so it's
+   yours to edit, not a black-box dependency.
+3. **Live conditions panel** as a **server island** (`server:defer`): a `.astro`
+   component that queries Supabase for the newest row on the server, with a
+   static fallback skeleton shown instantly, styled with shadcn `Card`
+   components. Add a light client-side `fetch` on a timer (e.g. every 30–60 s)
+   to a `/api/current` route for live refresh without a full reload.
+4. **History charts** as a client island: an API route `src/pages/api/history.ts`
+   (`export const prerender = false`) returns JSON for a requested range
+   (24 h / 7 d / 30 d), and ECharts/Chart.js renders line charts (temp, pressure,
+   humidity, rain), a **wind rose** (ECharts polar bar), and **gauge dials** for
+   current temp/wind. shadcn's `Tabs` component is a natural fit for switching
+   between ranges.
+5. **Design for impact + responsiveness:** a CSS grid dashboard (shadcn ships
+   Tailwind utility classes, which compose naturally with a grid layout) that
+   reflows from multi-column (desktop) to single-column (mobile); large "hero"
+   current-temperature card; card-based tiles; dark-mode support (shadcn has a
+   documented dark-mode pattern via a `ThemeProvider` + CSS variables — reuse it
+   rather than hand-rolling one); use `PUBLIC_`-prefixed env vars only for the
+   anon key, keep secrets server-side. Keep the static shell CDN-cached and defer
+   only the data panels for fast Lighthouse scores.
+6. Store secrets in Vercel project environment variables; the anon key + RLS
+   means the browser can safely read data.
+7. Once the domain is decided: register it, add it as a custom domain on the
+   Vercel project, point DNS (Vercel's dashboard gives the exact records).
 
 ### D. Weather-service integration (concrete)
 **Weather Underground (do first — biggest audience, free):**
@@ -145,14 +210,17 @@ Design the uploaders as pluggable modules so adding/removing a service is a conf
   │   ├── tests/
   │   ├── config.example.yaml
   │   └── pyproject.toml
-  ├── web/                # Astro app for /weather
+  ├── web/                # Astro app — full standalone site, own Vercel project
   ├── docs/               # setup guide, wiring, architecture diagram
   ├── LICENSE
   ├── README.md
   ├── CONTRIBUTING.md
   └── .github/            # issue templates, CI
   ```
-- **Licensing:** **MIT** for maximum adoption and simplicity; choose **GPLv3** if you want derivatives to stay open and to align with the lineage of the Foundation/BYOWS code (the BYOWS WeeWX driver is GPLv3). Add the `LICENSE` file via GitHub's licence picker.
+- **Licensing:** **MIT** (already chosen — see LICENSE). The official Foundation
+  driver this project's sensor code was ported from is BSD-style licensed
+  (Adafruit/Raspberry Pi Foundation), which is compatible with MIT; no GPLv3
+  entanglement since the project doesn't use the GPLv3-licensed BYOWS driver.
 - **Documentation:** a copy-paste-ready README (what it is, wiring diagram, install commands, config, screenshots of the dashboard), plus `docs/` for the deeper build. Add badges (licence, build). Keep secrets in `.env`/Vercel env vars, commit only `config.example.yaml`.
 - **Quality:** PEP 8 / a formatter (Black/Ruff), a `tests/` folder mirroring the package, and GitHub Actions CI. Separate source from tests; keep config files at the root.
 - **Publish incrementally:** it's fine to open the repo early with a clear roadmap; a short, clear README beats none.
@@ -162,10 +230,18 @@ Design the uploaders as pluggable modules so adding/removing a service is a conf
    (BMP085, HTU21D, anemometer, rain gauge, wind vane) verified returning plausible
    values on real hardware. See [docs/sensors.md](docs/sensors.md).
 2. **Weekend 2 — local logging + cloud push.** Write the SQLite-first collector and the Supabase uploader; get one row/minute landing in Postgres with RLS read-only. *Benchmark:* 24 h of continuous rows with no gaps after a deliberate network-unplug test (store-and-forward works).
-3. **Weekend 3 — the website.** Ship `/weather` on Vercel: server-island live panel + one history chart. *Benchmark:* live value updates within 60 s; mobile Lighthouse ≥ 90.
+3. **Weekend 3 — the website.** Ship the standalone site on Vercel (domain TBD):
+   Astro + shadcn/ui, server-island live panel + one history chart. *Benchmark:*
+   live value updates within 60 s; mobile Lighthouse ≥ 90.
 4. **Weekend 4 — weather services.** Add Weather Underground first, then CWOP, then Windy. *Benchmark:* your station visible on the wunderground.com dashboard and findU (CWOP).
 5. **Ongoing — polish + open source.** Add wind rose + gauges, dark mode, retention/downsampling, README + licence, CI.
-- **Decision thresholds:** If maintaining custom sensor code becomes a time sink, fall back to WeeWX as the engine and keep your repo as "WeeWX config + Supabase uploader + Astro dashboard." If Supabase's free tier limits bite (unlikely at this volume), switch the uploader target to Neon (pure Postgres) — the Astro read layer barely changes.
+- **Decision thresholds:** the WeeWX fallback originally suggested here no longer
+  applies — no WeeWX driver exists for this kit's real chips (BMP085/HTU21D/MCP342X),
+  so "falling back to WeeWX" would mean writing a new WeeWX driver, not adopting an
+  existing one. If the sensor layer becomes a time sink, the sensors already work
+  (see docs/sensors.md) so there's little left to fall back from. If Supabase's
+  free tier limits bite (unlikely at this volume), switch the uploader target to
+  Neon (pure Postgres) — the Astro read layer barely changes.
 
 ## Caveats
 - **WOW is going away:** any plan that centres on Met Office/Met Éireann WOW will break in late 2026. Use WU/CWOP/Windy; consider WOW-BE only if you specifically want a European public map.

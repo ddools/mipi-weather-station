@@ -4,7 +4,7 @@ Open-source software for the **Oracle Raspberry Pi Weather Station** kit — a f
 build in Dublin, Ireland. Rewritten from scratch to replace the (now defunct) official
 Oracle/Raspberry Pi Foundation stack.
 
-Live at: **[dermotdooley.com/weather](https://dermotdooley.com/weather)**
+Live at: **a standalone domain (TBD — not yet registered)**
 
 ## What it does
 
@@ -43,7 +43,7 @@ Live at: **[dermotdooley.com/weather](https://dermotdooley.com/weather)**
 
 ```
 pi/     Python collector package (runs on the Pi)
-web/    Astro components/notes for the /weather page
+web/    Astro + shadcn/ui site — the full standalone dashboard project
 docs/   Wiring, setup, architecture
 ```
 
@@ -86,7 +86,7 @@ WS_MOCK_SENSORS=1 weatherstation
 - [x] Repo scaffold, package structure
 - [x] Sensor bring-up & calibration (air sensor → wind → rain → vane)
 - [ ] SQLite buffer + Supabase uploader (store-and-forward)
-- [ ] Astro `/weather` page: server-island live panel + history charts
+- [ ] Astro site (own domain, shadcn/ui): server-island live panel + history charts
 - [ ] Weather Underground upload
 - [ ] Windy Stations API v2 upload
 - [ ] Wind rose, gauges, dark mode
