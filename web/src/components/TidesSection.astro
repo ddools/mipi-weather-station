@@ -9,9 +9,12 @@ const icon = status?.trend === "rising" ? tideHighIcon : tideLowIcon;
 
 function formatTime(iso: string | undefined): string {
   if (!iso) return "—";
-  return new Date(iso + "Z").toLocaleTimeString(undefined, {
+  // Server islands render in the deploy region's zone (UTC on Vercel), so the
+  // zone must be pinned explicitly or the times read an hour off in summer.
+  return new Date(iso).toLocaleTimeString("en-IE", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Europe/Dublin",
   });
 }
 ---
@@ -19,7 +22,7 @@ function formatTime(iso: string | undefined): string {
 <Card>
   <CardHeader className="flex items-center gap-2">
     <img src={icon} alt="" class="h-10 w-10" />
-    <CardTitle>Tides — Balbriggan</CardTitle>
+    <CardTitle>Tides — Skerries</CardTitle>
   </CardHeader>
   <CardContent>
     {
@@ -48,7 +51,8 @@ function formatTime(iso: string | undefined): string {
             </div>
           </div>
           <p class="mt-3 text-xs text-muted-foreground">
-            Approximate — modeled sea level, not an official tide-gauge prediction.
+            Approximate — an ocean model calibrated to Skerries Harbour, usually
+            within ~15 min of the official prediction. Not for navigation.
           </p>
         </>
       ) : (

@@ -1,0 +1,44 @@
+---
+// Zero-JS 24h trend line for the stat cards. Rendered server-side as a plain
+// inline SVG path — no chart library, no client island.
+interface Props {
+  values: (number | null)[];
+  color?: string;
+  width?: number;
+  height?: number;
+  class?: string;
+}
+const { values, color = "currentColor", width = 120, height = 32, class: klass = "" } = Astro.props;
+
+const pts = values
+  .map((v, i) => ({ v, i }))
+  .filter((p): p is { v: number; i: number } => p.v !== null && !Number.isNaN(p.v));
+
+let d = "";
+if (pts.length >= 2) {
+  const xs = values.length - 1;
+  const lo = Math.min(...pts.map((p) => p.v));
+  const hi = Math.max(...pts.map((p) => p.v));
+  const span = hi - lo || 1;
+  const pad = 2;
+  const x = (i: number) => pad + (i / xs) * (width - 2 * pad);
+  const y = (v: number) => pad + (1 - (v - lo) / span) * (height - 2 * pad);
+  d = pts.map((p, k) => `${k === 0 ? "M" : "L"}${x(p.i).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" ");
+}
+---
+
+{
+  d && (
+    <svg
+      class={klass}
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      fill="none"
+      aria-hidden="true"
+      preserveAspectRatio="none"
+    >
+      <path d={d} stroke={color} stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  )
+}

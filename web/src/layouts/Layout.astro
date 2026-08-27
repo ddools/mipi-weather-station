@@ -5,6 +5,10 @@ interface Props {
   title?: string;
 }
 const { title = "Skerries Weather Station" } = Astro.props;
+const description =
+  "Live weather from a Raspberry Pi weather station in Skerries, Co. Dublin — " +
+  "temperature, wind, pressure, humidity and rainfall, updated every minute.";
+const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://weather.dermotdooley.com");
 ---
 
 <!doctype html>
@@ -14,7 +18,17 @@ const { title = "Skerries Weather Station" } = Astro.props;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="alternate icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="canonical" href={canonical.href} />
     <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Skerries Weather Station" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical.href} />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
     <script is:inline>
       // Runs before paint to avoid a flash of the wrong theme.
       (function () {
@@ -26,9 +40,14 @@ const { title = "Skerries Weather Station" } = Astro.props;
       })();
     </script>
   </head>
-  <body class="min-h-screen bg-background text-foreground">
-    <header class="mx-auto flex max-w-6xl items-center justify-between px-4 py-6 sm:px-6">
-      <h1 class="text-lg font-semibold">{title}</h1>
+  <body class="flex min-h-screen flex-col bg-background text-foreground">
+    <header class="mx-auto flex w-full max-w-6xl items-start justify-between px-4 py-6 sm:px-6">
+      <div>
+        <h1 class="text-lg font-semibold">{title}</h1>
+        <p class="mt-0.5 text-xs text-muted-foreground tabular-nums">
+          Skerries, Co. Dublin · 53.58°N 6.11°W · readings every 60s
+        </p>
+      </div>
       <button
         id="theme-toggle"
         aria-label="Toggle dark mode"
@@ -37,9 +56,23 @@ const { title = "Skerries Weather Station" } = Astro.props;
         <span id="theme-icon">🌙</span>
       </button>
     </header>
-    <main class="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
+    <main class="mx-auto w-full max-w-6xl flex-1 px-4 pb-16 sm:px-6">
       <slot />
     </main>
+    <footer class="mx-auto w-full max-w-6xl px-4 pb-10 text-xs text-muted-foreground sm:px-6">
+      <p>
+        A Raspberry Pi weather station built by Dermot &amp; his son in Dublin.
+        Open source —
+        <a
+          class="underline underline-offset-2 hover:text-foreground"
+          href="https://github.com/ddools/mipi-weather-station"
+          rel="noopener">github.com/ddools/mipi-weather-station</a
+        >.
+      </p>
+      <p class="mt-1">
+        Tide figures are a coarse ocean-model estimate, not an official prediction.
+      </p>
+    </footer>
     <script is:inline>
       (function () {
         const button = document.getElementById("theme-toggle");
