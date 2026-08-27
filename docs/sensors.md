@@ -79,14 +79,34 @@ for BMP085/180 (a BME280 would read `0x60`, a BMP280 `0x58`).
 - Verified on real hardware 2026-08-27: probe `28-000006e2639a`, `t=18875`
   (18.9 °C) against a true ~17 °C.
 
-## MCP342X (I2C ADC, used for the wind vane)
+## MCP342X (I2C ADC — wind vane and air quality)
 
 - **Not** an MCP3008 (that's SPI; this kit's ADC is I2C). Two instances exist on the
   bus at different fixed addresses: `0x69` (wind vane, on the main board) and `0x6A`
-  (air quality, on the detachable board).
+  (air quality, on the detachable board). `sensors/mcp342x.py` is shared by both.
 - 15-bit resolution (`max = 32767`, `vref = 2.048V`), ~300ms conversion time.
 - Same raw-I2C caveat as the HTU21D: read the 3-byte result via `i2c_msg`, not
   `read_i2c_block_data`, or the write-cmd-then-read sequence restarts the conversion.
+
+## TGS2600 air quality
+
+- Figaro **TGS2600** tin-dioxide (SnO₂) gas sensor on the **snap-off daughterboard**,
+  read via the second MCP342X ADC at `0x6A`, channel 0. `i2cdetect -y 1` confirmed
+  it present and unclaimed on the real unit (2026-08-27).
+- Sensitive to reducing gases generally — hydrogen, CO, methane, ethanol, VOCs
+  (cooking, solvents, smoke). **Not** a calibrated pollutant monitor: no PM, no ppm,
+  no AQI mapping.
+- `sensors/air_quality.py` ports the Foundation kit's `tgs2600.py`: the value is
+  `100 × (max − adc) / max` — how far the divider voltage is pulled below full
+  scale, as a 0–100 percentage. Higher = more reducing gas. Only meaningful against
+  this one station's own baseline over time.
+- Heater needs to stabilise after power-on, so the driver suppresses readings for
+  `sensors.air_quality.warmup_s` (default 300 s) after start. Disabled by default
+  (`sensors.air_quality.enabled`); the collector runs fine without the board.
+- Stored as `Record.air_quality` → SQLite → Supabase (`readings.air_quality`, and
+  averaged in `readings_hourly`). Shown on the dashboard as an "Air quality" card
+  and a history line, both hidden until real data exists. Not uploaded to
+  WU/Windy — neither accepts a non-calibrated index.
 
 ## Wind vane
 
@@ -122,12 +142,12 @@ for BMP085/180 (a BME280 would read `0x60`, a BMP280 `0x58`).
 
 ## Not implemented (available but out of scope)
 
-- **TGS2600 air quality sensor** at `0x6A` (MCP342X channel 0) — physically present
-  on the kit's detachable board but this project doesn't read or upload it.
-- Chip at `0x68` — unidentified, presumed RTC, unused.
+- Chip at `0x68` — unidentified, presumed RTC. `i2cdetect` shows it as `UU` (a
+  kernel driver is bound to it), which fits the RTC guess. Unused by this project.
 
-(The DS18B20 1-Wire probe *is* now implemented — as the air-temperature source, not
-as a separate ground-temp field. See its section above.)
+(The DS18B20 1-Wire probe and the TGS2600 air-quality sensor *are* both
+implemented now — see their sections above. The DS18B20 is repurposed as the
+air-temperature source rather than a ground-temp field.)
 
 ## Provisioning gotchas hit during bring-up
 

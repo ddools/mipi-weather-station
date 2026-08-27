@@ -28,3 +28,8 @@ class MockPulse:
 class MockVane:
     def read_deg(self):
         return random.choice([0, 45, 90, 135, 180, 225, 270, 315])
+
+
+class MockAirQualitySensor:
+    def read_index(self):
+        return round(20.0 + random.uniform(-6, 6), 1)

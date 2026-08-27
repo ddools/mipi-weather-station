@@ -16,7 +16,9 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27. Remaining:
 - **Supabase retention job** — SQL written (`docs/supabase-retention.sql`), not yet
   run against the live project; repoint the 7d/30d queries at `readings_hourly` after (§5).
 - **README screenshots** of the live dashboard (§5).
-- **TGS2600 air-quality sensor** — backlog (§5).
+- **TGS2600 air quality** — collector + dashboard support built (2026-08-27, §5);
+  still needs the schema/retention SQL run on the live project, the daughterboard
+  mounted, `sensors.air_quality.enabled: true` on the Pi, and a warm-up soak.
 
 ## Done
 
@@ -261,9 +263,19 @@ domain may come later).
       Pi, so the probe on its lead is the real air thermometer. See
       [docs/sensors.md](docs/sensors.md) "DS18B20".
 - [ ] README screenshots of the live dashboard once it exists
-- [ ] Optional/backlog — chips physically present on the kit but still out of
-      scope (see docs/sensors.md "Not implemented"):
-  - [ ] TGS2600 air quality sensor (MCP342X @ `0x6A`, channel 0)
+- [~] TGS2600 air quality sensor (MCP342X @ `0x6A`, channel 0) — **code done**
+      (2026-08-27). `i2cdetect` confirms the ADC at `0x6a` is present and
+      unclaimed. `sensors/air_quality.py` ports the Foundation kit's relative
+      index (`100 × (max − adc) / max`, uncalibrated — higher = more reducing
+      gas); `sensors.air_quality.{enabled,warmup_s}` in config (off by default,
+      300 s heater warm-up gate); flows through sampler → `Record.air_quality` →
+      SQLite → Supabase. `air_quality` column added to `docs/supabase-schema.sql`
+      + `docs/supabase-retention.sql` (averaged in the hourly rollup). Dashboard:
+      a conditional "Air quality" card on the live panel + a history line chart,
+      both hidden until real data lands. **Remaining:** run the two updated SQL
+      files on the live project; fit the snap-off board; set `enabled: true` on
+      the Pi; let it warm up and sanity-check the trend. Not sent to WU/Windy —
+      neither accepts a non-calibrated index.
 
 ## Housekeeping
 

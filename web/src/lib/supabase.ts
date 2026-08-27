@@ -10,10 +10,12 @@ export interface Reading {
   wind_dir_deg: number | null;
   rain_mm: number | null;
   dewpoint_c: number | null;
+  /** TGS2600 relative contaminants index, 0–100, uncalibrated. null unless the sensor is fitted. */
+  air_quality: number | null;
 }
 
 const READING_COLUMNS =
-  "id,recorded_at,temp_c,humidity,pressure_hpa,pressure_msl_hpa,wind_speed_ms,wind_gust_ms,wind_dir_deg,rain_mm,dewpoint_c";
+  "id,recorded_at,temp_c,humidity,pressure_hpa,pressure_msl_hpa,wind_speed_ms,wind_gust_ms,wind_dir_deg,rain_mm,dewpoint_c,air_quality";
 
 function restUrl(path: string): string {
   const base = import.meta.env.PUBLIC_SUPABASE_URL;
@@ -185,6 +187,7 @@ function bucketHourly(rows: Reading[]): Reading[] {
     "wind_dir_deg",
     "rain_mm",
     "dewpoint_c",
+    "air_quality",
   ] as const;
 
   return [...buckets.entries()].map(([hourKey, bucketRows], i) => {

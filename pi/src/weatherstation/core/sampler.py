@@ -15,9 +15,20 @@ log = logging.getLogger(__name__)
 
 
 class Sampler:
-    def __init__(self, cfg: Config, air, anemometer, rain, vane, buffer: LocalBuffer, uploaders):
+    def __init__(
+        self,
+        cfg: Config,
+        air,
+        anemometer,
+        rain,
+        vane,
+        buffer: LocalBuffer,
+        uploaders,
+        air_quality=None,
+    ):
         self.cfg = cfg
         self.air, self.anemometer, self.rain, self.vane = air, anemometer, rain, vane
+        self.air_quality = air_quality
         self.buffer = buffer
         self.uploaders = uploaders
 
@@ -62,6 +73,13 @@ class Sampler:
             rec.pressure_msl_hpa = round(units.sea_level_pressure_hpa(p, st.elevation_m, t), 2)
         except Exception:
             log.exception("air sensor read failed")
+        if self.air_quality is not None:
+            try:
+                aq = self.air_quality.read_index()
+                if aq is not None:
+                    rec.air_quality = round(aq, 1)
+            except Exception:
+                log.exception("air quality sensor read failed")
         if wind_samples:
             rec.wind_speed_ms = round(statistics.mean(wind_samples), 2)
             rec.wind_gust_ms = round(max(wind_samples), 2)

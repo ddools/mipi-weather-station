@@ -116,10 +116,13 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
 - **CI live** (2026-08-27) — `.github/workflows/ci.yml`: `pi` job (ruff check +
   ruff format check + pytest on Py 3.9 & 3.13) and `web` job (`npm ci` + `astro
   build`). Runs on push-to-`main` and every PR.
-- No CWOP uploader. TGS2600 air quality sensor is present on the kit but not
-  implemented (see docs/sensors.md "Not implemented"). The DS18B20 1-Wire probe
-  **is** now used — as the air-temperature source (see Gotchas), not as a
-  separate ground-temp field.
+- No CWOP uploader. **TGS2600 air quality** now has collector + dashboard support
+  (`sensors/air_quality.py`, `sensors.air_quality.enabled` — off by default,
+  uncalibrated 0–100 relative index; see docs/sensors.md "TGS2600 air quality");
+  still needs the daughterboard fitted, `enabled: true` on the Pi, and the
+  updated schema/retention SQL run on the live Supabase project. The DS18B20
+  1-Wire probe **is** used — as the air-temperature source (see Gotchas), not as
+  a separate ground-temp field.
 
 ## Dev conventions
 
