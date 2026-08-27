@@ -5,6 +5,19 @@ and verified (see [docs/sensors.md](docs/sensors.md)); this tracks what's left.
 Numbered items match the corresponding step in plan.MD's "Details" sections where
 one exists.
 
+## Still open
+
+Everything in plan.MD's core path (sensors, store-and-forward, Supabase, the Astro
+site on Vercel, Weather Underground, Windy) is live as of 2026-08-27. Remaining:
+
+- **Soak test** — passively confirm no gaps in `readings.recorded_at` after 24h (§1).
+- **Benchmarks** — live value updates within 60s of a new reading; mobile Lighthouse ≥ 90 (§2).
+- **CWOP uploader** — not started; needs a from-scratch APRS client (§5).
+- **Supabase retention job** — SQL written (`docs/supabase-retention.sql`), not yet
+  run against the live project; repoint the 7d/30d queries at `readings_hourly` after (§5).
+- **README screenshots** of the live dashboard (§5).
+- **TGS2600 air-quality sensor** — backlog (§5).
+
 ## Done
 
 - [x] Repo scaffold, package structure (`pi/`, `web/`, `docs/`)
@@ -12,7 +25,7 @@ one exists.
       wind vane, anemometer, rain gauge all confirmed working (2026-08-27)
 - [x] SQLite-first local buffer with per-uploader cursors (`store/local_buffer.py`)
 - [x] Uploader code for Supabase, Weather Underground, Windy v2 — written, unit
-      tested, but **never run against live services** (no keys yet)
+      tested, and confirmed live against all three services (2026-08-27; see §§1, 3, 4)
 - [x] `docs/supabase-schema.sql` run against the real project (2026-08-27) —
       `readings` table, indexes, and RLS public-read policy all confirmed live
 - [x] systemd service deployed and running on the Pi as `ddools` (2026-08-27) —
@@ -242,11 +255,15 @@ domain may come later).
       self-serve tier. Backlog: Met Éireann's own open radar (HDF5 over FTP on
       request, data.gov.ie) would be the most authoritative Ireland source but
       needs a decode-and-tile pipeline.
+- [x] DS18B20 1-Wire probe — implemented, but as the **air-temperature source**
+      (`calibration.air_temp_source`, `sensors/ds18b20.py`), not as a separate
+      ground-temp field. The onboard BMP085/HTU21D self-heat ~10 °C next to the
+      Pi, so the probe on its lead is the real air thermometer. See
+      [docs/sensors.md](docs/sensors.md) "DS18B20".
 - [ ] README screenshots of the live dashboard once it exists
-- [ ] Optional/backlog — chips physically present on the kit but out of scope so
-      far (see docs/sensors.md "Not implemented"):
+- [ ] Optional/backlog — chips physically present on the kit but still out of
+      scope (see docs/sensors.md "Not implemented"):
   - [ ] TGS2600 air quality sensor (MCP342X @ `0x6A`, channel 0)
-  - [ ] DS18B20 ground-temperature probe (1-Wire)
 
 ## Housekeeping
 
