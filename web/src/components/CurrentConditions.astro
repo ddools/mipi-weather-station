@@ -34,9 +34,55 @@ function renderCompass(deg: number | null): string {
 }
 
 const compassSvg = renderCompass(reading?.wind_dir_deg ?? null);
+
+// Live-data status from the age of the newest reading. The collector archives
+// every ~60s, so anything within a few minutes is "live"; a longer gap means
+// the Pi or its uplink is down.
+const STATUS_COLOR = { live: "#10b981", delayed: "#f59e0b", offline: "#ef4444" };
+function liveStatus(iso: string | null | undefined) {
+  if (!iso) return { key: "offline" as const, label: "Offline" };
+  const age = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (age <= 180) return { key: "live" as const, label: "Live" };
+  if (age <= 900) return { key: "delayed" as const, label: "Delayed" };
+  return { key: "offline" as const, label: "Offline" };
+}
+const status = liveStatus(reading?.recorded_at);
+const lastUpdatedAbs = reading?.recorded_at
+  ? new Date(reading.recorded_at).toLocaleString("en-IE", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Europe/Dublin",
+    })
+  : null;
 ---
 
 <div id="current-conditions" data-recorded-at={reading?.recorded_at ?? ""}>
+  <div class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+    <span class="flex items-center gap-2 font-medium">
+      <span class="relative flex h-2.5 w-2.5">
+        <span
+          id="live-ping"
+          class:list={[
+            "absolute inline-flex h-full w-full rounded-full opacity-75",
+            { "animate-ping": status.key === "live" },
+          ]}
+          style={`background-color:${STATUS_COLOR[status.key]}`}
+        ></span>
+        <span
+          id="live-dot"
+          class="relative inline-flex h-2.5 w-2.5 rounded-full"
+          style={`background-color:${STATUS_COLOR[status.key]}`}
+        ></span>
+      </span>
+      <span id="live-label">{status.label}</span>
+    </span>
+    <span id="live-updated" class="text-muted-foreground">
+      {lastUpdatedAbs ? `Last updated ${lastUpdatedAbs}` : "Awaiting first reading"}
+    </span>
+  </div>
+
   <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
     <Card>
       <CardHeader className="flex items-center gap-2">
@@ -157,6 +203,46 @@ const compassSvg = renderCompass(reading?.wind_dir_deg ?? null);
     return `${Math.round(minutes / 60)}h ago`;
   }
 
+  const STATUS = [
+    { key: "live", label: "Live", color: "#10b981", maxAge: 180 },
+    { key: "delayed", label: "Delayed", color: "#f59e0b", maxAge: 900 },
+    { key: "offline", label: "Offline", color: "#ef4444", maxAge: Infinity },
+  ];
+
+  function fmtAbsolute(iso: string) {
+    return new Date(iso).toLocaleString(undefined, {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  function updateStatus(iso: string | undefined) {
+    const label = document.getElementById("live-label");
+    const dot = document.getElementById("live-dot");
+    const ping = document.getElementById("live-ping");
+    const updated = document.getElementById("live-updated");
+    if (!label || !dot || !ping || !updated) return;
+
+    if (!iso) {
+      label.textContent = "Offline";
+      dot.style.backgroundColor = "#ef4444";
+      ping.style.backgroundColor = "#ef4444";
+      ping.classList.remove("animate-ping");
+      updated.textContent = "Awaiting first reading";
+      return;
+    }
+
+    const age = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+    const s = STATUS.find((x) => age <= x.maxAge)!;
+    label.textContent = s.label;
+    dot.style.backgroundColor = s.color;
+    ping.style.backgroundColor = s.color;
+    ping.classList.toggle("animate-ping", s.key === "live");
+    updated.textContent = `Last updated ${fmtAbsolute(iso)} · ${timeAgo(iso)}`;
+  }
+
   async function refresh() {
     try {
       const res = await fetch("/api/current");
@@ -188,6 +274,7 @@ const compassSvg = renderCompass(reading?.wind_dir_deg ?? null);
       }
       const updatedEl = document.getElementById("updated-label");
       if (updatedEl) updatedEl.textContent = `updated ${timeAgo(reading.recorded_at)}`;
+      updateStatus(reading.recorded_at);
     } catch {
       // network hiccup — next interval will retry
     }
@@ -196,8 +283,9 @@ const compassSvg = renderCompass(reading?.wind_dir_deg ?? null);
   function tickAge() {
     const root = document.getElementById("current-conditions");
     const updatedEl = document.getElementById("updated-label");
-    const recordedAt = root?.dataset.recordedAt;
+    const recordedAt = root?.dataset.recordedAt || undefined;
     if (updatedEl && recordedAt) updatedEl.textContent = `updated ${timeAgo(recordedAt)}`;
+    updateStatus(recordedAt);
   }
 
   tickAge();
