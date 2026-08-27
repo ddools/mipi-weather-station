@@ -53,7 +53,8 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://weather.der
         aria-label="Toggle dark mode"
         class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-background text-sm hover:bg-muted"
       >
-        <span id="theme-icon">🌙</span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" id="theme-icon-light" class="lucide lucide-sun hidden h-4 w-4"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" id="theme-icon-dark" class="lucide lucide-moon h-4 w-4"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"></path></svg>
       </button>
     </header>
     <main class="mx-auto w-full max-w-6xl flex-1 px-4 pb-16 sm:px-6">
@@ -71,10 +72,13 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://weather.der
     <script is:inline>
       (function () {
         const button = document.getElementById("theme-toggle");
-        const icon = document.getElementById("theme-icon");
+        const lightIcon = document.getElementById("theme-icon-light");
+        const darkIcon = document.getElementById("theme-icon-dark");
         function sync() {
           const isDark = document.documentElement.classList.contains("dark");
-          if (icon) icon.textContent = isDark ? "☀️" : "🌙";
+          // Show the icon for the theme you'd switch to.
+          lightIcon?.classList.toggle("hidden", !isDark);
+          darkIcon?.classList.toggle("hidden", isDark);
         }
         sync();
         button?.addEventListener("click", () => {
