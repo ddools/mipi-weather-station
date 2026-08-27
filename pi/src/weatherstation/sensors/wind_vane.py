@@ -5,13 +5,28 @@ The 16 reed positions map to fixed resistor values baked into the kit's board,
 so (unlike a generic vane) the ADC ranges are derived once from Ohm's law
 rather than requiring per-unit measurement.
 """
+
 from __future__ import annotations
 
 from .mcp342x import MCP342X
 
 _COMPASS_ORDER = [
-    "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
-    "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW",
+    "N",
+    "NNE",
+    "NE",
+    "ENE",
+    "E",
+    "ESE",
+    "SE",
+    "SSE",
+    "S",
+    "SSW",
+    "SW",
+    "WSW",
+    "W",
+    "WNW",
+    "NW",
+    "NNW",
 ]
 
 

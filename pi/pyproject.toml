@@ -25,7 +25,9 @@ pi = [
 ]
 dev = [
     "pytest>=8.0",
-    "ruff>=0.4",
+    # Pinned exact: ruff's formatter output shifts between releases, so CI and
+    # local must agree on a version or `ruff format --check` flip-flops.
+    "ruff==0.16.4",
 ]
 
 [project.scripts]
@@ -36,3 +38,9 @@ where = ["src"]
 
 [tool.ruff]
 line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+# Pinned explicitly so a ruff upgrade can't silently change what CI enforces
+# (newer ruff ships a broader default set). Everything here passes clean today.
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4"]

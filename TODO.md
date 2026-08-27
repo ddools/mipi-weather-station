@@ -202,9 +202,27 @@ domain may come later).
       packet formatter (mph/°F/inHg-hundredths/rain-hundredths), and a socket send
       to `cwop.aprs.net:14580` every ~5 min. WeeWX has this built in; this project
       needs a from-scratch client.
-- [ ] GitHub Actions CI: `ruff` + `pytest` on push/PR (none exists yet)
-- [ ] Retention/downsampling job in Supabase — keep 1-minute data ~90 days, hourly
-      averages beyond that, to stay inside the 500MB free tier
+- [x] GitHub Actions CI: `.github/workflows/ci.yml` (2026-08-27) — two jobs on
+      push-to-`main` + every PR:
+  - **pi**: `ruff check` + `ruff format --check` + `pytest` on Python 3.9 & 3.13.
+    Ruff lint rules are now pinned explicitly in `pyproject.toml`
+    (`select = ["E","F","W","I","UP","B","SIM","C4"]`) and `ruff` itself pinned
+    to `==0.16.4` in the `dev` extra — newer ruff ships a broader default rule
+    set and a drifting formatter, which would make CI non-reproducible. One-time
+    `ruff format` reformat of 21 files came with this (mechanical: blank line
+    after module docstrings, re-wrapping lines that now fit in 100).
+  - **web**: `npm ci` + `astro build` on Node 22, with dummy `PUBLIC_SUPABASE_*`
+    env (build never hits Supabase; the live data paths are all request-time).
+  - Not yet: `astro check` (TS typecheck) — needs `@astrojs/check` + `typescript`
+    added as web devDeps first.
+- [~] Retention/downsampling job in Supabase — keep 1-minute data ~90 days, hourly
+      averages beyond that, to stay inside the 500MB free tier. **SQL written**
+      (`docs/supabase-retention.sql`, 2026-08-27): `readings_hourly` rollup table
+      + `roll_up_readings_hourly()` / `purge_old_readings()` functions +
+      `pg_cron` schedules (rollup at :05, purge daily 03:20 UTC). Wind direction
+      is vector-averaged, rain summed. **Not yet run against the live project** —
+      needs the Supabase SQL editor. Follow-up after it has data: repoint the
+      site's 7d/30d queries at `readings_hourly` (see §2 note).
 - [ ] README screenshots of the live dashboard once it exists
 - [ ] Optional/backlog — chips physically present on the kit but out of scope so
       far (see docs/sensors.md "Not implemented"):

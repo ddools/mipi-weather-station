@@ -1,4 +1,5 @@
 """Insert archive records into a Supabase (Postgres) table via PostgREST."""
+
 from __future__ import annotations
 
 import logging

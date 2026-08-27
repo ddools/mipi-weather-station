@@ -5,6 +5,7 @@ not a BME280. Compensation algorithm ported from the official Raspberry Pi
 Foundation driver (RaspberryPiFoundation/weather-station bmpBackend.py), which
 implements the Bosch BMP085 datasheet formula.
 """
+
 from __future__ import annotations
 
 import time

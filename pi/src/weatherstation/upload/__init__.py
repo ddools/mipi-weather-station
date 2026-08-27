@@ -1,4 +1,5 @@
 """Uploader registry. Each uploader replays its own backlog from the local buffer."""
+
 from __future__ import annotations
 
 from ..config import Config

@@ -1,4 +1,5 @@
 """Base uploader: store-and-forward loop shared by all destinations."""
+
 from __future__ import annotations
 
 import logging

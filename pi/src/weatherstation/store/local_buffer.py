@@ -1,4 +1,5 @@
 """SQLite-first store-and-forward buffer. This is the source of truth on the Pi."""
+
 from __future__ import annotations
 
 import json

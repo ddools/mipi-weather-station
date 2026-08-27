@@ -4,6 +4,7 @@ The kit uses this I2C ADC (addr 0x69 on the main board, 0x6A on the air-quality
 snap-off board), not an MCP3008 over SPI. Ported from the official Raspberry
 Pi Foundation driver (MCP342X.py).
 """
+
 from __future__ import annotations
 
 import time

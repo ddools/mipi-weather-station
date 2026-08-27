@@ -1,4 +1,5 @@
 """Deterministic-ish mock sensors so the collector runs anywhere."""
+
 from __future__ import annotations
 
 import random
@@ -7,7 +8,7 @@ import random
 class MockAirSensor:
     def read(self):
         return (
-            12.0 + random.uniform(-1, 1),      # Dublin-ish temp
+            12.0 + random.uniform(-1, 1),  # Dublin-ish temp
             80.0 + random.uniform(-5, 5),
             1013.0 + random.uniform(-3, 3),
         )

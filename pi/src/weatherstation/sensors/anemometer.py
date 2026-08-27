@@ -1,4 +1,5 @@
 """Anemometer: reed switch on a GPIO pin; 2 pulses per rotation on the Oracle kit."""
+
 from __future__ import annotations
 
 import math

@@ -1,4 +1,5 @@
 """Sampling loop: high-frequency wind samples aggregated into archive records."""
+
 from __future__ import annotations
 
 import logging
@@ -58,9 +59,7 @@ class Sampler:
             t, h, p = self.air.read()
             rec.temp_c, rec.humidity, rec.pressure_hpa = round(t, 2), round(h, 1), round(p, 2)
             rec.dewpoint_c = round(units.dewpoint_c(t, h), 2)
-            rec.pressure_msl_hpa = round(
-                units.sea_level_pressure_hpa(p, st.elevation_m, t), 2
-            )
+            rec.pressure_msl_hpa = round(units.sea_level_pressure_hpa(p, st.elevation_m, t), 2)
         except Exception:
             log.exception("air sensor read failed")
         if wind_samples:

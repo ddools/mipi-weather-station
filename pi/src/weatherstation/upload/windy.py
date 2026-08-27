@@ -9,6 +9,7 @@ server-side, which is slower than our 60s archive interval — handled by
 skipping (returning success without a request) between windows rather than
 hammering the endpoint into 429s.
 """
+
 from __future__ import annotations
 
 import logging

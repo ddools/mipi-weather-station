@@ -1,4 +1,5 @@
 """Tipping-bucket rain gauge: one GPIO pulse per bucket tip."""
+
 from __future__ import annotations
 
 import threading

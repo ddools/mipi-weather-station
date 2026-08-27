@@ -1,4 +1,5 @@
 """Load config.yaml + .env into a simple namespace."""
+
 from __future__ import annotations
 
 import os

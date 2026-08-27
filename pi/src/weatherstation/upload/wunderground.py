@@ -1,4 +1,5 @@
 """Weather Underground PWS upload (imperial units, GET updateweatherstation.php)."""
+
 from __future__ import annotations
 
 import logging
