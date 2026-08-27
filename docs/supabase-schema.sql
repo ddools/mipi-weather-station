@@ -10,8 +10,12 @@ create table if not exists readings (
     wind_gust_ms real,
     wind_dir_deg real,
     rain_mm real,
-    dewpoint_c real
+    dewpoint_c real,
+    air_quality real   -- TGS2600 relative contaminants index, 0-100 (uncalibrated); null when the sensor isn't fitted
 );
+
+-- Add the column to a table created before air quality existed (no-op otherwise).
+alter table readings add column if not exists air_quality real;
 create index if not exists idx_readings_recorded_at on readings (recorded_at desc);
 create unique index if not exists uq_readings_recorded_at on readings (recorded_at);
 

@@ -12,6 +12,7 @@ import pressureHighIcon from "@meteocons/svg/flat/pressure-high.svg?url";
 import rainIcon from "@meteocons/svg/flat/rain.svg?url";
 import windIcon from "@meteocons/svg/flat/wind.svg?url";
 import compassIcon from "@meteocons/svg/flat/compass.svg?url";
+import airQualityIcon from "@meteocons/svg/flat/smoke-particles.svg?url";
 
 type Range = "24h" | "7d" | "30d";
 const RANGES: { value: Range; label: string }[] = [
@@ -29,6 +30,7 @@ const C = {
   wind: "#10b981",
   gust: "#f59e0b",
   rain: "#38bdf8",
+  airQuality: "#78716c",
 };
 
 function useHistory(range: Range) {
@@ -137,6 +139,12 @@ function windOption(data: Reading[], ctx: AxisCtx): EChartsOption {
   ]);
 }
 
+function airQualityOption(data: Reading[], ctx: AxisCtx): EChartsOption {
+  return lineOption(ctx, "index", [
+    { name: "Air quality", type: "line", data: data.map((d) => d.air_quality), smooth: true, showSymbol: false, color: C.airQuality, areaStyle: { opacity: 0.08 } },
+  ]);
+}
+
 function rainOption(data: Reading[], ctx: AxisCtx): EChartsOption {
   const { color, muted, split } = baseTextStyle(ctx.isDark);
   return {
@@ -235,6 +243,7 @@ function RangeCharts({ range }: { range: Range }) {
   }
 
   const ctx: AxisCtx = { isDark, range, times: data.map((d) => d.recorded_at) };
+  const hasAirQuality = data.some((d) => d.air_quality != null);
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -243,6 +252,9 @@ function RangeCharts({ range }: { range: Range }) {
       <ChartCard icon={humidityIcon} title="Humidity" option={humidityOption(data, ctx)} height={240} />
       <ChartCard icon={windIcon} title="Wind speed & gust" option={windOption(data, ctx)} height={240} />
       <ChartCard icon={rainIcon} title="Rain" option={rainOption(data, ctx)} height={240} />
+      {hasAirQuality && (
+        <ChartCard icon={airQualityIcon} title="Air quality (relative)" option={airQualityOption(data, ctx)} height={240} />
+      )}
       <ChartCard wide icon={compassIcon} title="Wind rose" option={windRoseOption(data, isDark)} height={320} />
     </div>
   );

@@ -18,6 +18,7 @@ class Record:
     wind_dir_deg: float | None = None
     rain_mm: float | None = None  # rain during interval
     dewpoint_c: float | None = None
+    air_quality: float | None = None  # TGS2600 relative contaminants index, 0-100 (uncalibrated)
 
     def as_dict(self) -> dict:
         return asdict(self)

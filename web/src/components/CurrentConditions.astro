@@ -11,6 +11,7 @@ import pressureHighIcon from "@meteocons/svg/flat/pressure-high.svg?url";
 import pressureLowIcon from "@meteocons/svg/flat/pressure-low.svg?url";
 import windIcon from "@meteocons/svg/flat/wind.svg?url";
 import rainIcon from "@meteocons/svg/flat/rain.svg?url";
+import airQualityIcon from "@meteocons/svg/flat/smoke-particles.svg?url";
 import compassSvgRaw from "@meteocons/svg/flat/compass.svg?raw";
 
 const [reading, summary] = await Promise.all([getLatestReading(), getTodaySummary()]);
@@ -224,22 +225,46 @@ const lastUpdatedAbs = reading?.recorded_at
   </div>
 
   <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-    <Card className="h-full">
-      <CardHeader className="flex items-center gap-2">
-        <img src={rainIcon} alt="" class="h-10 w-10" />
-        <CardTitle>Rain today</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-1 flex-col justify-center">
-        <div class="text-3xl font-semibold tabular-nums" data-field="rain_today">
-          {fmt(summary.rainToday, 1, " mm")}
-        </div>
-        <p class="mt-2 text-sm text-muted-foreground tabular-nums">
-          last hour <span data-field="rain_last_hour">{fmt(summary.rainLastHour, 1, " mm")}</span>
-          <span class="mx-1">·</span>
-          24h <span data-field="rain_24h">{fmt(summary.rain24h, 1, " mm")}</span>
-        </p>
-      </CardContent>
-    </Card>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+      <Card>
+        <CardHeader className="flex items-center gap-2">
+          <img src={rainIcon} alt="" class="h-10 w-10" />
+          <CardTitle>Rain today</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div class="text-3xl font-semibold tabular-nums" data-field="rain_today">
+            {fmt(summary.rainToday, 1, " mm")}
+          </div>
+          <p class="mt-2 text-sm text-muted-foreground tabular-nums">
+            last hour <span data-field="rain_last_hour">{fmt(summary.rainLastHour, 1, " mm")}</span>
+            <span class="mx-1">·</span>
+            24h <span data-field="rain_24h">{fmt(summary.rain24h, 1, " mm")}</span>
+          </p>
+        </CardContent>
+      </Card>
+
+      {
+        reading?.air_quality != null && (
+          <Card>
+            <CardHeader className="flex items-center gap-2">
+              <img src={airQualityIcon} alt="" class="h-10 w-10" />
+              <CardTitle>Air quality</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div class="text-3xl font-semibold tabular-nums" data-field="air_quality">
+                {Math.round(reading.air_quality)}
+              </div>
+              <p class="mt-2 text-sm text-muted-foreground">
+                relative contaminants index · lower is cleaner
+              </p>
+              <p class="mt-1 text-xs text-muted-foreground/80">
+                Uncalibrated TGS2600 — trend only, not an AQI figure.
+              </p>
+            </CardContent>
+          </Card>
+        )
+      }
+    </div>
 
     <div class="lg:col-span-2">
       <RainRadar client:visible />
@@ -355,6 +380,8 @@ const lastUpdatedAbs = reading?.recorded_at
       set("dewpoint_c", fmt(num(reading.dewpoint_c), 1, "°C"));
       set("humidity", fmt(num(reading.humidity), 0, "%"));
       set("pressure_msl_hpa", fmt(num(reading.pressure_msl_hpa), 0, " hPa"));
+      const aq = num(reading.air_quality);
+      if (aq !== null) set("air_quality", String(Math.round(aq)));
       set("wind_kmh", kmh(windMs));
       set("wind_ms", fmt(windMs, 1, " m/s"));
       set("wind_beaufort", beaufort(windMs));

@@ -24,10 +24,12 @@ create table if not exists readings_hourly (
     wind_gust_ms     real,   -- max gust in the hour
     wind_dir_deg     real,   -- vector-averaged (see function below)
     rain_mm          real,   -- summed, not averaged
-    dewpoint_c       real
+    dewpoint_c       real,
+    air_quality      real    -- mean of the TGS2600 relative index (uncalibrated)
 );
 
 alter table readings_hourly enable row level security;
+alter table readings_hourly add column if not exists air_quality real;
 
 do $$
 begin
@@ -55,7 +57,7 @@ begin
     with rolled as (
         insert into readings_hourly (
             bucket, sample_count, temp_c, humidity, pressure_hpa, pressure_msl_hpa,
-            wind_speed_ms, wind_gust_ms, wind_dir_deg, rain_mm, dewpoint_c
+            wind_speed_ms, wind_gust_ms, wind_dir_deg, rain_mm, dewpoint_c, air_quality
         )
         select
             date_trunc('hour', recorded_at)                                   as bucket,
@@ -76,7 +78,8 @@ begin
                 360
             )::real                                                          as wind_dir_deg,
             sum(rain_mm)                                                      as rain_mm,
-            avg(dewpoint_c)                                                   as dewpoint_c
+            avg(dewpoint_c)                                                   as dewpoint_c,
+            avg(air_quality)                                                  as air_quality
         from readings
         where recorded_at < date_trunc('hour', now())
           and date_trunc('hour', recorded_at) not in (select bucket from readings_hourly)

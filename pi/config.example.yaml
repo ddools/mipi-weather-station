@@ -48,6 +48,17 @@ calibration:
       NW: 64900
       NNW: 21880
 
+sensors:
+  # TGS2600 air-quality sensor on the snap-off board (MCP342X ADC at 0x6A).
+  # Output is an uncalibrated 0-100 "contaminants" index on the Foundation kit's
+  # own scale: higher = more reducing gases (CO, H2, VOCs — cooking, solvents,
+  # smoke). Only meaningful against this station's own trend; it is NOT an AQI
+  # or a µg/m³ figure and it is not uploaded to WU/Windy. Off unless the board
+  # is fitted and you want it.
+  air_quality:
+    enabled: false
+    warmup_s: 300   # suppress readings this long after start (heater stabilising)
+
 storage:
   sqlite_path: "data/weather.sqlite3"
   retention_days: 0      # 0 = keep forever locally
