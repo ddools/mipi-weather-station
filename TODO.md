@@ -49,8 +49,10 @@ one exists.
 
 ## 2. Astro standalone site with shadcn/ui (plan.MD Details/C — now lives in this repo's `web/`)
 
-**Changed 2026-08-27:** standalone domain (TBD, not registered yet) instead of a
-`/weather` page on dermotdooley.com; `web/` is now the real deployable project.
+**Changed 2026-08-27:** standalone site instead of a `/weather` page on
+dermotdooley.com; `web/` is now the real deployable project. Live on Vercel
+project `mipi-weather`, served at `weather.dermotdooley.com` for now (a dedicated
+domain may come later).
 
 - [x] Scaffold Astro in `web/` (2026-08-27) — `npm create astro@latest`, minimal
       template, `@astrojs/vercel` adapter, `@astrojs/react` for islands, Tailwind v4
@@ -120,17 +122,27 @@ one exists.
       internal SVG markup staying the same shape, but degrades gracefully
       (falls back to the default unrotated-but-still-wobbling icon) if a
       future release changes it, rather than erroring.
-- [ ] Pick and register the domain — **still undecided, blocking**: the Vercel
-      custom-domain step and any hardcoded URLs
-- [ ] Create `web/` as its own Vercel project — **not done**. Note: a Vercel
-      project called `pi-weather-station` is already connected to the Supabase
-      project (via Supabase's dashboard integration, done outside this session) —
-      decide whether to reuse that project or make a new one before deploying
-- [ ] Vercel env vars: `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY` (anon/
-      publishable key only — never the secret key — in the front end)
-- [ ] Once domain is registered: add as custom domain on the Vercel project, point DNS
+- [x] Domain — **`weather.dermotdooley.com` for now** (2026-08-27), a subdomain of
+      the existing personal domain; a dedicated domain may be bought later. `site:`
+      in `astro.config.mjs` set to `https://weather.dermotdooley.com`.
+- [x] Created `web/` as its own Vercel project **`mipi-weather`** (2026-08-27,
+      `ddools-projects` team) — git-connected to `ddools/mipi-weather-station`,
+      Root Directory `web`, framework Astro, production branch `main`. Deliberately
+      **not** the auto-created `pi-weather-station` project (that one is wired as a
+      Python/`pi` build for Supabase's integration and carries the Supabase secret
+      key — kept separate so the frontend project never sees it). Vercel
+      Authentication (SSO) was on by default on the new project; disabled it so the
+      site is public.
+- [x] Vercel env vars set (Production + Preview): `PUBLIC_SUPABASE_URL`,
+      `PUBLIC_SUPABASE_ANON_KEY` — publishable key only, never the secret key.
+- [x] First production deploy live (2026-08-27):
+      `https://mipi-weather-ddools-projects.vercel.app` — `/api/current` confirmed
+      returning live Supabase rows.
+- [ ] **DNS at Porkbun (manual, user):** add a CNAME record — host `weather`,
+      answer `cname.vercel-dns.com`, TTL 600. Vercel already has the domain
+      attached and ownership-verified; it auto-issues the TLS cert once the CNAME
+      resolves. Until then Vercel shows the domain as "misconfigured" — expected.
 - [ ] Benchmark: live value updates within 60s of a new reading; mobile Lighthouse ≥ 90
-      — not measurable until it's actually deployed
 
 ## 3. Weather Underground upload (plan.MD Details/D)
 
