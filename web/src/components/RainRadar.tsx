@@ -223,9 +223,17 @@ export function RainRadar() {
 
   return (
     <Card>
-      <CardHeader className="flex items-center gap-2">
+      <CardHeader className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <img src={radarIcon} alt="" className="h-9 w-9" />
         <CardTitle>Rain radar</CardTitle>
+        <a
+          className="ml-auto shrink-0 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+          href="https://www.met.ie/latest-reports/recent-rainfall-radar/12-hour-rainfall-radar"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Met Éireann radar ↗
+        </a>
       </CardHeader>
       <CardContent>
         {error ? (
