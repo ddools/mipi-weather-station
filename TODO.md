@@ -107,6 +107,19 @@ one exists.
       Institute has official predictions but no clear public API found; a
       third-party option (TidesAtlas) exists but wasn't evaluated further once
       Open-Meteo's free/keyless option worked. Revisit if accuracy complaints.
+- [x] Wind Direction tile — a dedicated card (separate from the Wind
+      speed/gust card) showing the real needle-compass icon
+      (`compass.svg`) with its `<g id="Pointer">` rotated to the exact
+      `wind_dir_deg` via server-side string injection into the raw SVG (Vite
+      `?raw` import), not one of 8 pre-rotated static icons — full precision,
+      not snapped to 8 or even 16 points. The icon's own idle wobble
+      animation is preserved by marking it `additive="sum"` so it combines
+      with our static rotation instead of overwriting it every frame. Client
+      refresh (45s) updates the `transform` attribute directly via
+      `setAttribute` — brittle in the sense that it depends on meteocons'
+      internal SVG markup staying the same shape, but degrades gracefully
+      (falls back to the default unrotated-but-still-wobbling icon) if a
+      future release changes it, rather than erroring.
 - [ ] Pick and register the domain — **still undecided, blocking**: the Vercel
       custom-domain step and any hardcoded URLs
 - [ ] Create `web/` as its own Vercel project — **not done**. Note: a Vercel

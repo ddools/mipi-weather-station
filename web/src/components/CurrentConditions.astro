@@ -8,10 +8,32 @@ import pressureHighIcon from "@meteocons/svg/flat/pressure-high.svg?url";
 import pressureLowIcon from "@meteocons/svg/flat/pressure-low.svg?url";
 import windIcon from "@meteocons/svg/flat/wind.svg?url";
 import rainIcon from "@meteocons/svg/flat/rain.svg?url";
+import compassIcon from "@meteocons/svg/flat/compass.svg?url";
+import compassSvgRaw from "@meteocons/svg/flat/compass.svg?raw";
 
 const reading = await getLatestReading();
 const pressureIcon =
   (reading?.pressure_msl_hpa ?? 1013) >= 1013 ? pressureHighIcon : pressureLowIcon;
+
+// The compass icon's needle is a separate <g id="Pointer"> group with its own
+// idle wobble animation (SMIL animateTransform, rotate -6..6deg). We point it
+// at the real wind direction by injecting a static base rotation and marking
+// the wobble `additive="sum"` so the two combine instead of the wobble
+// overwriting our rotation every frame. Falls back to the icon's default
+// (unrotated, still wobbling) if either anchor string isn't found — e.g. a
+// future meteocons release changes the internal markup.
+function renderCompass(deg: number | null): string {
+  const sized = compassSvgRaw.replace("<svg ", '<svg width="100%" height="100%" ');
+  if (deg === null) return sized;
+  return sized
+    .replace('<g id="Pointer">', `<g id="Pointer" transform="rotate(${Math.round(deg)} 64 64)">`)
+    .replace(
+      'type="rotate" values="-6 64 64;6 64 64;-6 64 64"',
+      'type="rotate" values="-6 64 64;6 64 64;-6 64 64" additive="sum"'
+    );
+}
+
+const compassSvg = renderCompass(reading?.wind_dir_deg ?? null);
 ---
 
 <div id="current-conditions" data-recorded-at={reading?.recorded_at ?? ""}>
@@ -77,6 +99,24 @@ const pressureIcon =
 
     <Card>
       <CardHeader className="flex items-center gap-2">
+        <img src={compassIcon} alt="" class="h-10 w-10" />
+        <CardTitle>Wind Direction</CardTitle>
+      </CardHeader>
+      <CardContent className="flex items-center gap-4">
+        <div id="wind-compass" class="h-20 w-20 shrink-0" set:html={compassSvg} />
+        <div>
+          <div class="text-2xl font-semibold tabular-nums" data-field="wind_dir_label">
+            {degToCompass(reading?.wind_dir_deg ?? null)}
+          </div>
+          <p class="text-sm text-muted-foreground tabular-nums" data-field="wind_dir_deg">
+            {reading?.wind_dir_deg ?? "—"}°
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+
+    <Card>
+      <CardHeader className="flex items-center gap-2">
         <img src={rainIcon} alt="" class="h-10 w-10" />
         <CardTitle>Rain (interval)</CardTitle>
       </CardHeader>
@@ -136,6 +176,15 @@ const pressureIcon =
       if (windDirEl && reading.wind_dir_deg !== null) {
         const index = Math.round(reading.wind_dir_deg / 22.5) % 16;
         windDirEl.textContent = COMPASS[index];
+      }
+      const windDirLabelEl = root.querySelector('[data-field="wind_dir_label"]');
+      const windDirDegEl = root.querySelector('[data-field="wind_dir_deg"]');
+      if (reading.wind_dir_deg !== null) {
+        const index = Math.round(reading.wind_dir_deg / 22.5) % 16;
+        if (windDirLabelEl) windDirLabelEl.textContent = COMPASS[index];
+        if (windDirDegEl) windDirDegEl.textContent = `${reading.wind_dir_deg}°`;
+        const pointer = document.querySelector("#wind-compass #Pointer");
+        pointer?.setAttribute("transform", `rotate(${Math.round(reading.wind_dir_deg)} 64 64)`);
       }
       const updatedEl = document.getElementById("updated-label");
       if (updatedEl) updatedEl.textContent = `updated ${timeAgo(reading.recorded_at)}`;
