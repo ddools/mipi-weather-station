@@ -15,7 +15,7 @@
     "@astrojs/react": "^6.0.4",
     "@astrojs/vercel": "^11.0.8",
     "@fontsource-variable/geist": "^5.3.0",
-    "@meteocons/svg-static": "^0.1.0",
+    "@meteocons/svg": "^0.1.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",

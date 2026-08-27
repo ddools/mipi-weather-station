@@ -88,10 +88,25 @@ one exists.
       transitive `path-to-regexp` ReDoS advisory via `@astrojs/vercel` (low real
       risk, route patterns aren't user input; not force-fixed since that would
       downgrade the adapter)
-- [x] Weather icons — [Meteocons](https://meteocons.com) (`@meteocons/svg-static`,
-      MIT), flat style per preference. `thermometer`/`humidity`/`pressure-high`+
-      `pressure-low` (picked dynamically by value)/`wind`/`raindrop` in both the
-      current-conditions cards and the matching chart headers.
+- [x] Weather icons — [Meteocons](https://meteocons.com) (MIT), flat style per
+      preference, **animated** (`@meteocons/svg`, not `-static` — swapped after
+      feedback; the flat style's SMIL animations play fine via plain `<img>`,
+      no inline-SVG/JS needed). `thermometer`/`humidity`/`pressure-high`+
+      `pressure-low` (picked dynamically by value)/`wind`/`raindrop` inline with
+      each card/chart header (`flex items-center gap-2` on `CardHeader` — note
+      shadcn's `CardHeader` is `grid` by default, so `flex-row` alone does
+      nothing without `flex` first; tailwind-merge resolves the conflict once
+      `flex` is actually there).
+- [x] Tides section — Balbriggan, Co. Dublin (nearest coastal town), via
+      **Open-Meteo Marine API** (`marine-api.open-meteo.com`, free, no key,
+      non-commercial). `src/lib/tides.ts` fetches hourly `sea_level_height_msl`
+      and finds local min/max to derive next high/low + rising/falling trend.
+      Explicit caveat shown in the UI: this is an ~8km-resolution ocean model,
+      not an official harmonic tide-gauge prediction — fine for a hobby
+      dashboard, not for anything where accuracy matters. Ireland's Marine
+      Institute has official predictions but no clear public API found; a
+      third-party option (TidesAtlas) exists but wasn't evaluated further once
+      Open-Meteo's free/keyless option worked. Revisit if accuracy complaints.
 - [ ] Pick and register the domain — **still undecided, blocking**: the Vercel
       custom-domain step and any hardcoded URLs
 - [ ] Create `web/` as its own Vercel project — **not done**. Note: a Vercel

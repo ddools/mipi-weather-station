@@ -1,0 +1,59 @@
+---
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getTideStatus } from "@/lib/tides";
+import tideHighIcon from "@meteocons/svg/flat/water-tide-high.svg?url";
+import tideLowIcon from "@meteocons/svg/flat/water-tide-low.svg?url";
+
+const status = await getTideStatus();
+const icon = status?.trend === "rising" ? tideHighIcon : tideLowIcon;
+
+function formatTime(iso: string | undefined): string {
+  if (!iso) return "—";
+  return new Date(iso + "Z").toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+---
+
+<Card>
+  <CardHeader className="flex items-center gap-2">
+    <img src={icon} alt="" class="h-10 w-10" />
+    <CardTitle>Tides — Balbriggan</CardTitle>
+  </CardHeader>
+  <CardContent>
+    {
+      status ? (
+        <>
+          <div class="flex items-baseline gap-2">
+            <span class="text-3xl font-semibold tabular-nums">
+              {status.currentHeightM.toFixed(1)} m
+            </span>
+            <span class="text-sm text-muted-foreground capitalize">{status.trend}</span>
+          </div>
+          <div class="mt-3 grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p class="text-muted-foreground">Next high</p>
+              <p class="font-medium tabular-nums">
+                {formatTime(status.nextHigh?.time)}
+                {status.nextHigh && ` · ${status.nextHigh.heightM.toFixed(1)}m`}
+              </p>
+            </div>
+            <div>
+              <p class="text-muted-foreground">Next low</p>
+              <p class="font-medium tabular-nums">
+                {formatTime(status.nextLow?.time)}
+                {status.nextLow && ` · ${status.nextLow.heightM.toFixed(1)}m`}
+              </p>
+            </div>
+          </div>
+          <p class="mt-3 text-xs text-muted-foreground">
+            Approximate — modeled sea level, not an official tide-gauge prediction.
+          </p>
+        </>
+      ) : (
+        <p class="text-sm text-muted-foreground">Tide data unavailable right now.</p>
+      )
+    }
+  </CardContent>
+</Card>
