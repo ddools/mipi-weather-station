@@ -1,6 +1,8 @@
 ---
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Sparkline from "@/components/Sparkline.astro";
+import TidesSection from "@/components/TidesSection.astro";
+import { RainRadar } from "@/components/RainRadar";
 import { getLatestReading, getTodaySummary } from "@/lib/supabase";
 import { degToCompass, fmt, beaufort, msToKmh, pressureTrend } from "@/lib/format";
 import thermometerIcon from "@meteocons/svg/flat/thermometer.svg?url";
@@ -162,8 +164,10 @@ const lastUpdatedAbs = reading?.recorded_at
         />
       </CardContent>
     </Card>
+  </div>
 
-    <Card className="sm:col-span-2">
+  <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+    <Card className="h-full lg:col-span-2">
       <CardHeader className="flex items-center gap-2">
         <img src={windIcon} alt="" class="h-10 w-10" />
         <CardTitle>Wind</CardTitle>
@@ -216,12 +220,16 @@ const lastUpdatedAbs = reading?.recorded_at
       </CardContent>
     </Card>
 
-    <Card>
+    <TidesSection class="h-full" />
+  </div>
+
+  <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+    <Card className="h-full">
       <CardHeader className="flex items-center gap-2">
         <img src={rainIcon} alt="" class="h-10 w-10" />
         <CardTitle>Rain today</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-1 flex-col justify-center">
         <div class="text-3xl font-semibold tabular-nums" data-field="rain_today">
           {fmt(summary.rainToday, 1, " mm")}
         </div>
@@ -232,6 +240,10 @@ const lastUpdatedAbs = reading?.recorded_at
         </p>
       </CardContent>
     </Card>
+
+    <div class="lg:col-span-2">
+      <RainRadar client:visible />
+    </div>
   </div>
 </div>
 

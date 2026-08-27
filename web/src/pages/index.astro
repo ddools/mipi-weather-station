@@ -1,28 +1,29 @@
 ---
 import Layout from "@/layouts/Layout.astro";
 import CurrentConditions from "@/components/CurrentConditions.astro";
-import TidesSection from "@/components/TidesSection.astro";
 import { HistoryCharts } from "@/components/HistoryCharts";
 import { Skeleton } from "@/components/ui/skeleton";
 ---
 
 <Layout>
-  <section class="mb-6">
+  <section class="mb-10">
     <CurrentConditions server:defer>
-      <div slot="fallback" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Skeleton className="h-32" />
-        <Skeleton className="h-32" />
-        <Skeleton className="h-32" />
-        <Skeleton className="h-32 sm:col-span-2" />
-        <Skeleton className="h-32" />
+      <div slot="fallback" class="space-y-4">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+        </div>
+        <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <Skeleton className="h-40 lg:col-span-2" />
+          <Skeleton className="h-40" />
+        </div>
+        <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <Skeleton className="h-40" />
+          <Skeleton className="h-[420px] lg:col-span-2" />
+        </div>
       </div>
     </CurrentConditions>
-  </section>
-
-  <section class="mb-10 max-w-sm">
-    <TidesSection server:defer>
-      <Skeleton slot="fallback" className="h-40" />
-    </TidesSection>
   </section>
 
   <section>

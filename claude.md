@@ -110,7 +110,9 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   level concept in Windy's API). Windy also rate-limits to once per 5 min per
   station, handled client-side in the uploader. See TODO.md for the full story.
 - **Astro site live in `web/`** (2026-08-27) — full dashboard with server
-  islands, ECharts, shadcn/ui, Meteocons, tides. Not yet deployed to Vercel.
+  islands, ECharts, shadcn/ui, Meteocons, tides, and a **rain-radar** map
+  (`components/RainRadar.tsx`, Leaflet island + RainViewer tiles — see below).
+  Not yet deployed to Vercel.
 - **CI live** (2026-08-27) — `.github/workflows/ci.yml`: `pi` job (ruff check +
   ruff format check + pytest on Py 3.9 & 3.13) and `web` job (`npm ci` + `astro
   build`). Runs on push-to-`main` and every PR.
@@ -162,6 +164,20 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
 
 ## Gotchas
 
+- **Rain radar = RainViewer + Leaflet, no API key.** `web/src/components/RainRadar.tsx`
+  is a client island. Frame list: one call to
+  `https://api.rainviewer.com/public/weather-maps.json` (past ~2 h at 10-min
+  steps + short nowcast); tiles from the `host` in that response as
+  `{host}{path}/{size}/{z}/{x}/{y}/{color}/{smooth}_{snow}.png`. Free for
+  personal/educational use — **attribution is required** ("Radar data ©
+  RainViewer" link, rendered under the map). rainbow.ai was evaluated and
+  rejected: enterprise-only, paid, "contact sales", no self-serve tier.
+  Basemap is **Esri "Gray Canvas"** (`server.arcgisonline.com/.../Canvas/
+  World_{Light,Dark}_Gray_Base/MapServer/tile/{z}/{y}/{x}` — note y before x),
+  keyless and free for non-commercial use. **CARTO's `basemaps.cartocdn.com`
+  tiles now watermark "API KEY REQUIRED"** — don't use them keyless. Leaflet
+  `scrollWheelZoom` is off (the map sits mid-page). Radar tiles stop at native
+  zoom 7; Leaflet upscales past that.
 - **Windy's API reference is a JS-rendered SPA** — plain `curl`/WebFetch on
   `stations.windy.com/api-reference` returns an empty shell; need a headless
   browser (or similar) to actually read the endpoint docs. Key facts once

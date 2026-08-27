@@ -179,6 +179,17 @@ works: `npx shadcn add <component>` vendors the component source into `web/`).
    only the data panels for fast Lighthouse scores.
 6. Store secrets in Vercel project environment variables; the anon key + RLS
    means the browser can safely read data.
+
+**Rain-radar map (added 2026-08-27):** `web/src/components/RainRadar.tsx`, a
+Leaflet client island showing a looping precipitation radar centred on the
+station. Radar frames + tiles come from the free, keyless **RainViewer** Weather
+Maps API (`api.rainviewer.com/public/weather-maps.json` → past ~2 h at 10-min
+steps plus a short nowcast); the basemap is the keyless **Esri "Gray Canvas"**
+style. Both require attribution, shown on/under the map. **rainbow.ai** was
+investigated for this and rejected — it's an enterprise/paid product with no
+self-serve tier. Longer term, Met Éireann publishes its own open radar (HDF5
+composites over FTP on request, via data.gov.ie) which would be the most
+authoritative Ireland-specific source but needs a decode-and-tile pipeline.
 7. Once the domain is decided: register it, add it as a custom domain on the
    Vercel project, point DNS (Vercel's dashboard gives the exact records).
 
