@@ -1,0 +1,144 @@
+---
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getLatestReading } from "@/lib/supabase";
+import { degToCompass, fmt } from "@/lib/format";
+
+const reading = await getLatestReading();
+---
+
+<div id="current-conditions" data-recorded-at={reading?.recorded_at ?? ""}>
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <Card className="sm:col-span-2 lg:col-span-1 lg:row-span-2">
+      <CardHeader>
+        <CardTitle>Temperature</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div class="text-5xl font-semibold tabular-nums" data-field="temp_c">
+          {fmt(reading?.temp_c ?? null, 1, "°C")}
+        </div>
+        <p class="mt-2 text-sm text-muted-foreground">
+          Dewpoint <span data-field="dewpoint_c">{fmt(reading?.dewpoint_c ?? null, 1, "°C")}</span>
+        </p>
+        <p class="mt-1 text-xs text-muted-foreground" data-field="updated" id="updated-label">
+          updated —
+        </p>
+      </CardContent>
+    </Card>
+
+    <Card>
+      <CardHeader>
+        <CardTitle>Humidity</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div class="text-3xl font-semibold tabular-nums" data-field="humidity">
+          {fmt(reading?.humidity ?? null, 0, "%")}
+        </div>
+      </CardContent>
+    </Card>
+
+    <Card>
+      <CardHeader>
+        <CardTitle>Pressure</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div class="text-3xl font-semibold tabular-nums" data-field="pressure_msl_hpa">
+          {fmt(reading?.pressure_msl_hpa ?? null, 0, " hPa")}
+        </div>
+        <p class="mt-1 text-xs text-muted-foreground">sea-level adjusted</p>
+      </CardContent>
+    </Card>
+
+    <Card>
+      <CardHeader>
+        <CardTitle>Wind</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div class="text-3xl font-semibold tabular-nums" data-field="wind_speed_ms">
+          {fmt(reading?.wind_speed_ms ?? null, 1, " m/s")}
+        </div>
+        <p class="mt-1 text-xs text-muted-foreground">
+          gust <span data-field="wind_gust_ms">{fmt(reading?.wind_gust_ms ?? null, 1, " m/s")}</span>
+          · <span data-field="wind_dir">{degToCompass(reading?.wind_dir_deg ?? null)}</span>
+        </p>
+      </CardContent>
+    </Card>
+
+    <Card>
+      <CardHeader>
+        <CardTitle>Rain (interval)</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div class="text-3xl font-semibold tabular-nums" data-field="rain_mm">
+          {fmt(reading?.rain_mm ?? null, 1, " mm")}
+        </div>
+      </CardContent>
+    </Card>
+  </div>
+</div>
+
+<script>
+  const FIELD_UNITS: Record<string, { digits: number; unit: string }> = {
+    temp_c: { digits: 1, unit: "°C" },
+    dewpoint_c: { digits: 1, unit: "°C" },
+    humidity: { digits: 0, unit: "%" },
+    pressure_msl_hpa: { digits: 0, unit: " hPa" },
+    wind_speed_ms: { digits: 1, unit: " m/s" },
+    wind_gust_ms: { digits: 1, unit: " m/s" },
+    rain_mm: { digits: 1, unit: " mm" },
+  };
+  const COMPASS = [
+    "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+    "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW",
+  ];
+
+  function fmt(value: number | null, digits: number, unit: string) {
+    if (value === null || Number.isNaN(value)) return "—";
+    return `${value.toFixed(digits)}${unit}`;
+  }
+
+  function timeAgo(iso: string) {
+    const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+    if (seconds < 90) return "just now";
+    const minutes = Math.round(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    return `${Math.round(minutes / 60)}h ago`;
+  }
+
+  async function refresh() {
+    try {
+      const res = await fetch("/api/current");
+      if (!res.ok) return;
+      const reading = await res.json();
+      if (!reading) return;
+
+      const root = document.getElementById("current-conditions");
+      if (!root) return;
+      root.dataset.recordedAt = reading.recorded_at;
+
+      for (const [field, { digits, unit }] of Object.entries(FIELD_UNITS)) {
+        const el = root.querySelector(`[data-field="${field}"]`);
+        if (el) el.textContent = fmt(reading[field], digits, unit);
+      }
+      const windDirEl = root.querySelector('[data-field="wind_dir"]');
+      if (windDirEl && reading.wind_dir_deg !== null) {
+        const index = Math.round(reading.wind_dir_deg / 22.5) % 16;
+        windDirEl.textContent = COMPASS[index];
+      }
+      const updatedEl = document.getElementById("updated-label");
+      if (updatedEl) updatedEl.textContent = `updated ${timeAgo(reading.recorded_at)}`;
+    } catch {
+      // network hiccup — next interval will retry
+    }
+  }
+
+  function tickAge() {
+    const root = document.getElementById("current-conditions");
+    const updatedEl = document.getElementById("updated-label");
+    const recordedAt = root?.dataset.recordedAt;
+    if (updatedEl && recordedAt) updatedEl.textContent = `updated ${timeAgo(recordedAt)}`;
+  }
+
+  tickAge();
+  setInterval(tickAge, 15_000);
+  setInterval(refresh, 45_000);
+</script>

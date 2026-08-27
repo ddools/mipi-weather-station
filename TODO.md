@@ -52,29 +52,53 @@ one exists.
 **Changed 2026-08-27:** standalone domain (TBD, not registered yet) instead of a
 `/weather` page on dermotdooley.com; `web/` is now the real deployable project.
 
-- [ ] Pick and register the domain (currently undecided — blocks the Vercel custom
-      domain step and any hardcoded URLs)
-- [ ] Scaffold Astro in `web/` (`npm create astro@latest .`); `npx astro add vercel`
-      + `npx astro add react` (shadcn/ui components are React, mounted as islands)
-- [ ] `npx shadcn init` in `web/`, then add components as needed (`card`, `tabs`,
-      `button`, dark-mode `ThemeProvider`, etc.)
-- [ ] Create `web/` as its own Vercel project (separate from any existing site
-      projects), connected to this repo with a `web/` root directory
-- [ ] Live-conditions panel as a server island (`server:defer`) reading the latest
-      Supabase row, with a static fallback skeleton, styled with shadcn `Card`
-- [ ] `/api/current` route + client-side refresh timer (30–60s) for live updates
-      without a full reload
-- [ ] `/api/history` route (`export const prerender = false`) returning JSON for
-      24h/7d/30d ranges, with hourly downsampling for the longer ranges
-- [ ] ECharts line charts: temp, pressure, humidity, rain
-- [ ] ECharts wind rose (polar bar) + gauge dials for current temp/wind
-- [ ] Range switcher using shadcn `Tabs` (24h/7d/30d)
-- [ ] Responsive CSS grid dashboard (multi-column desktop → single-column mobile),
-      hero current-temp card, dark mode via shadcn's theme pattern
-- [ ] Vercel env vars: `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY` (anon key
-      only — never the service key — in the front end)
+- [x] Scaffold Astro in `web/` (2026-08-27) — `npm create astro@latest`, minimal
+      template, `@astrojs/vercel` adapter, `@astrojs/react` for islands, Tailwind v4
+      via `@tailwindcss/vite`. Note: create-astro dropped a nested `web/AGENTS.md` +
+      `web/CLAUDE.md` symlink with Astro-specific dev workflow notes — kept, it's
+      genuinely useful and doesn't conflict with the root `claude.md`.
+- [x] `npx shadcn init` (template `astro`, base `radix`, preset `nova`) — needed a
+      `@/*` path alias added to `tsconfig.json` first (shadcn's init won't proceed
+      without one). Added components: `card`, `tabs`, `badge`, `separator`,
+      `skeleton`, `button`.
+- [x] Live-conditions panel as a server island (`server:defer`) in
+      `src/components/CurrentConditions.astro` — queries Supabase directly
+      server-side, static `Skeleton` fallback, verified end-to-end (curled the
+      generated `/_server-islands/CurrentConditions` endpoint directly and got
+      real live data back)
+- [x] `/api/current` route + a 45s client-side refresh (in `CurrentConditions.astro`'s
+      inline script) that patches the DOM in place, plus a 15s "Xm ago" ticker
+- [x] `/api/history` route — 24h returns raw rows; 7d/30d bucket into hourly
+      averages **in the API route itself** (fetches all raw rows in range, then
+      averages in JS) rather than via a Postgres view/RPC. Fine at today's volume;
+      revisit with server-side aggregation once the table has real history —
+      pulling 43k raw rows for a 30d query will get slow eventually.
+- [x] ECharts: temp/humidity/pressure line chart, rain bar chart, wind rose (polar
+      bar, averaged by 16-point compass bucket) — all in `HistoryCharts.tsx`
+      (client island). **Gauge dials for current temp/wind are not built** —
+      only the three charts above exist so far.
+- [x] Range switcher via shadcn `Tabs` (24h/7d/30d) — note: all three ranges fetch
+      on mount (Radix keeps inactive `TabsContent` mounted), not just the active
+      one. Fine at today's volume, worth lazy-loading later.
+- [x] Responsive grid dashboard + dark mode — verified visually via headless
+      browser screenshot (light + dark), both render correctly; dark mode toggle
+      in the header, vanilla JS + `localStorage`, no FOUC (inline blocking script
+      in `<head>`)
+- [x] Production build verified (`npm run build`) — succeeds; one pre-existing
+      transitive `path-to-regexp` ReDoS advisory via `@astrojs/vercel` (low real
+      risk, route patterns aren't user input; not force-fixed since that would
+      downgrade the adapter)
+- [ ] Pick and register the domain — **still undecided, blocking**: the Vercel
+      custom-domain step and any hardcoded URLs
+- [ ] Create `web/` as its own Vercel project — **not done**. Note: a Vercel
+      project called `pi-weather-station` is already connected to the Supabase
+      project (via Supabase's dashboard integration, done outside this session) —
+      decide whether to reuse that project or make a new one before deploying
+- [ ] Vercel env vars: `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY` (anon/
+      publishable key only — never the secret key — in the front end)
 - [ ] Once domain is registered: add as custom domain on the Vercel project, point DNS
 - [ ] Benchmark: live value updates within 60s of a new reading; mobile Lighthouse ≥ 90
+      — not measurable until it's actually deployed
 
 ## 3. Weather Underground upload (plan.MD Details/D)
 

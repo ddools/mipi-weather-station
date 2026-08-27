@@ -1,0 +1,25 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import CurrentConditions from "@/components/CurrentConditions.astro";
+import { HistoryCharts } from "@/components/HistoryCharts";
+import { Skeleton } from "@/components/ui/skeleton";
+---
+
+<Layout>
+  <section class="mb-10">
+    <CurrentConditions server:defer>
+      <div slot="fallback" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Skeleton className="h-48 sm:col-span-2 lg:col-span-1 lg:row-span-2" />
+        <Skeleton className="h-28" />
+        <Skeleton className="h-28" />
+        <Skeleton className="h-28" />
+        <Skeleton className="h-28" />
+      </div>
+    </CurrentConditions>
+  </section>
+
+  <section>
+    <h2 class="mb-4 text-base font-semibold text-muted-foreground">History</h2>
+    <HistoryCharts client:load />
+  </section>
+</Layout>
