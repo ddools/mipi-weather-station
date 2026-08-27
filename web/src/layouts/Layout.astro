@@ -48,6 +48,15 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://weather.der
           Skerries, Co. Dublin · 53.58°N 6.11°W · readings every 60s
         </p>
       </div>
+      <div class="flex shrink-0 items-center gap-2">
+      <a
+        href="https://www.dermotdooley.com"
+        rel="noopener"
+        aria-label="dermotdooley.com"
+        class="inline-flex h-9 w-9 items-center justify-center rounded-lg hover:bg-muted"
+      >
+        <img src="/dermotdooley.svg" alt="" width="28" height="28" class="h-7 w-7 rounded-md" />
+      </a>
       <button
         id="theme-toggle"
         aria-label="Toggle dark mode"
@@ -56,6 +65,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://weather.der
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" id="theme-icon-light" class="lucide lucide-sun hidden h-4 w-4"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" id="theme-icon-dark" class="lucide lucide-moon h-4 w-4"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"></path></svg>
       </button>
+      </div>
     </header>
     <main class="mx-auto w-full max-w-6xl flex-1 px-4 pb-16 sm:px-6">
       <slot />
