@@ -7,7 +7,7 @@ import humidityIcon from "@meteocons/svg/flat/humidity.svg?url";
 import pressureHighIcon from "@meteocons/svg/flat/pressure-high.svg?url";
 import pressureLowIcon from "@meteocons/svg/flat/pressure-low.svg?url";
 import windIcon from "@meteocons/svg/flat/wind.svg?url";
-import raindropIcon from "@meteocons/svg/flat/raindrop.svg?url";
+import rainIcon from "@meteocons/svg/flat/rain.svg?url";
 
 const reading = await getLatestReading();
 const pressureIcon =
@@ -77,7 +77,7 @@ const pressureIcon =
 
     <Card>
       <CardHeader className="flex items-center gap-2">
-        <img src={raindropIcon} alt="" class="h-10 w-10" />
+        <img src={rainIcon} alt="" class="h-10 w-10" />
         <CardTitle>Rain (interval)</CardTitle>
       </CardHeader>
       <CardContent>

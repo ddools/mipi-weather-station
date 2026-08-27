@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EChart } from "@/components/EChart";
 import type { Reading } from "@/lib/supabase";
 import thermometerIcon from "@meteocons/svg/flat/thermometer.svg?url";
-import raindropIcon from "@meteocons/svg/flat/raindrop.svg?url";
+import rainIcon from "@meteocons/svg/flat/rain.svg?url";
 import windIcon from "@meteocons/svg/flat/wind.svg?url";
 
 type Range = "24h" | "7d" | "30d";
@@ -175,7 +175,7 @@ function RangeCharts({ range }: { range: Range }) {
       </Card>
       <Card>
         <CardHeader className="flex items-center gap-2">
-          <img src={raindropIcon} alt="" className="h-9 w-9" />
+          <img src={rainIcon} alt="" className="h-9 w-9" />
           <CardTitle>Rain</CardTitle>
         </CardHeader>
         <CardContent>
