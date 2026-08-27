@@ -138,10 +138,11 @@ domain may come later).
 - [x] First production deploy live (2026-08-27):
       `https://mipi-weather-ddools-projects.vercel.app` — `/api/current` confirmed
       returning live Supabase rows.
-- [ ] **DNS at Porkbun (manual, user):** add a CNAME record — host `weather`,
-      answer `cname.vercel-dns.com`, TTL 600. Vercel already has the domain
-      attached and ownership-verified; it auto-issues the TLS cert once the CNAME
-      resolves. Until then Vercel shows the domain as "misconfigured" — expected.
+- [x] DNS at Porkbun: `weather` CNAME → `cname.vercel-dns.com` added 2026-08-27.
+      Resolves via public resolvers, Vercel reports the domain configured, TLS
+      cert issued — `https://weather.dermotdooley.com/api/current` returns live
+      Supabase data. (Note: a local macOS resolver cache can lag; public DNS is
+      fine.)
 - [ ] Benchmark: live value updates within 60s of a new reading; mobile Lighthouse ≥ 90
 
 ## 3. Weather Underground upload (plan.MD Details/D)
