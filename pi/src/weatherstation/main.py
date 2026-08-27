@@ -15,7 +15,7 @@ def main() -> None:
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
     )
     cfg = config.load()
-    bme, anemometer, rain, vane = build_sensors(cfg)
+    air, anemometer, rain, vane = build_sensors(cfg)
     buffer = LocalBuffer(cfg.storage.sqlite_path)
     uploaders = build_uploaders(cfg)
     logging.info(
@@ -24,7 +24,7 @@ def main() -> None:
         config.mock_sensors(),
         [u.name for u in uploaders] or "none",
     )
-    Sampler(cfg, bme, anemometer, rain, vane, buffer, uploaders).run_forever()
+    Sampler(cfg, air, anemometer, rain, vane, buffer, uploaders).run_forever()
 
 
 if __name__ == "__main__":

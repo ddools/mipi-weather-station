@@ -13,15 +13,33 @@ sampling:
 pins:                    # BCM numbering
   anemometer: 5
   rain_gauge: 6
-  wind_vane_adc_channel: 0   # MCP3008 channel
 
 calibration:
   anemometer_radius_cm: 9.0
-  anemometer_adjustment: 1.18   # Foundation/BYOWS default factor
+  anemometer_adjustment: 2.36   # Oracle/Foundation kit factory calibration factor
   rain_bucket_mm: 0.2794        # mm per bucket tip
-  # 16-position vane: ADC value (0-1) -> degrees. Tune for YOUR unit.
-  vane_table:
-    0.0: 112.5   # placeholder — run `weatherstation --calibrate-vane` to map yours
+  # Wind vane: MCP342X ADC (addr 0x69) reading a fixed resistor-divider network
+  # built into the Oracle kit board — these are the factory values, not per-unit.
+  wind_vane:
+    vin: 3.268
+    vdivider_ohms: 75000
+    directions:
+      N: 33000
+      NNE: 6570
+      NE: 8200
+      ENE: 891
+      E: 1000
+      ESE: 688
+      SE: 2200
+      SSE: 1410
+      S: 3900
+      SSW: 3140
+      SW: 16000
+      WSW: 14120
+      W: 120000
+      WNW: 42120
+      NW: 64900
+      NNW: 21880
 
 storage:
   sqlite_path: "data/weather.sqlite3"

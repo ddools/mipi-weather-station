@@ -1,7 +1,17 @@
 # Building the Software for a Raspberry Pi Weather Station (Oracle Kit → dermotdooley.com/weather)
 
+> **Errata (2026-08-27):** the "Sensor reading specifics" section below described
+> generic BYOWS (Build-Your-Own-Weather-Station) hardware — BME280 + MCP3008 SPI
+> ADC. Bringing the sensors up on the real Pi over SSH showed this kit is actually
+> the official Raspberry Pi Foundation/Oracle HAT, which uses **different chips**:
+> BMP085/BMP180 + HTU21D (I2C) for temp/humidity/pressure, and an MCP342X I2C ADC
+> (not SPI) for the wind vane. The anemometer calibration factor was also wrong
+> (1.18, should be 2.36). Corrected below inline; full verified reference is
+> **[docs/sensors.md](docs/sensors.md)**. The rest of this plan (cloud/web/upload
+> architecture) is unaffected.
+
 ## TL;DR
-- **Build a small, custom Python service on the Pi** (BME280 over I2C, anemometer/rain gauge via GPIO pulse counting, wind vane via MCP3008 ADC) that logs to a local SQLite buffer and pushes readings to a free-tier **Supabase (Postgres) cloud database**; your Astro site on Vercel reads from Supabase via a server island / SSR API route and renders live conditions + history charts with **ECharts or Chart.js**. This is the most practical, publishable architecture for a father-son project.
+- **Build a small, custom Python service on the Pi** (BMP085 + HTU21D over I2C for temp/humidity/pressure, anemometer/rain gauge via GPIO pulse counting, wind vane via an MCP342X I2C ADC — see [docs/sensors.md](docs/sensors.md) for the verified chip set) that logs to a local SQLite buffer and pushes readings to a free-tier **Supabase (Postgres) cloud database**; your Astro site on Vercel reads from Supabase via a server island / SSR API route and renders live conditions + history charts with **ECharts or Chart.js**. This is the most practical, publishable architecture for a father-son project.
 - **For weather-service sharing, prioritise Weather Underground** (still free for PWS uploads in 2026 via `weatherstation.wunderground.com/weatherstation/updateweatherstation.php`), plus **CWOP** (feeds NOAA MADIS) and **Windy** (new Stations API v2, effective January 2026). Do **not** build around Met Office/Met Éireann WOW — it is being **decommissioned in late 2026**.
 - **Publish as open source from day one** with a clean monorepo (`/pi` Python collector, `/web` Astro app, `/docs`), an OSI licence (MIT for maximum reuse, or GPLv3 to match the existing Pi Foundation code lineage), and a strong README. Build in stages: sensors → local logging → cloud push → website → weather-service uploads → polish.
 
@@ -13,11 +23,26 @@ The official Raspberry Pi Foundation code (`github.com/RaspberryPiFoundation/wea
 ### There is a mature open-source path: WeeWX with a Build-Your-Own-Weather-Station (BYOWS) driver
 `jardiamj/BYOWS_RPi` is a WeeWX driver (GPLv3) written specifically for the Raspberry Pi BYOWS hardware — the same BME280 + GPIO + MCP3008 sensor set. WeeWX is described as "the most mature open-source weather station software for Linux," handles archiving, unit conversion, report generation and — crucially — has built-in "StdRESTful" uploaders for Weather Underground, PWSweather, CWOP, Windy and (formerly) WOW, plus an MQTT publish extension. This is a genuine fork in the road for the project (see Recommendations).
 
-### Sensor reading specifics (confirmed)
-- **BME280 (temp/humidity/pressure):** I2C, default address `0x76` (sometimes `0x77`); use `adafruit-circuitpython-bme280` (`pip3 install adafruit-circuitpython-bme280`), install in a venv. Set `sea_level_pressure` for altitude.
-- **Anemometer:** reed switch on a GPIO pin counted with `gpiozero.Button`; wind speed derived from rotations × circumference over a sample interval. The Foundation/BYOWS code uses `radius_cm = 9.0` and a calibration constant `ADJUSTMENT = 1.18` (its documented default).
-- **Rain gauge:** tipping bucket, each tip = a fixed volume. The BYOWS source defines `BUCKET_SIZE = 0.2794` ("Bucket Size in mm, the DEFAULT is 0.2794 mm"), counted as GPIO pulses.
-- **Wind vane:** analogue; needs an **MCP3008 ADC** (SPI). A voltage divider (4.7 kΩ works well) maps 16 reed-switch positions to distinct voltages; `gpiozero.MCP3008(channel=0)` reads a 0–1 value. Real vanes produce noisy/extra readings, so map nearest-neighbour to the 16 known values.
+### Sensor reading specifics (confirmed on real hardware, 2026-08-27)
+- **Temp/pressure — BMP085/BMP180**, not BME280: I2C, fixed address `0x77`, chip ID
+  `0x55`. No CircuitPython driver exists for this discontinued chip; talk to it
+  directly over `smbus2` using the Bosch compensation formula (ported from the
+  official kit driver — see `pi/src/weatherstation/sensors/bmp085.py`).
+- **Humidity — HTU21D**, a separate chip: I2C, fixed address `0x40`. Not bundled
+  with pressure as a BME280 would be. Includes a CRC-8 check on each reading.
+- **Anemometer:** reed switch on a GPIO pin (GPIO 5 on this kit) counted with
+  `gpiozero.Button`; wind speed derived from rotations × circumference over a
+  sample interval. `radius_cm = 9.0`, and the real Foundation calibration constant
+  is **`2.36`**, not 1.18 (a documentation error in an earlier draft of this plan —
+  1.18 belongs to a different kit's docs).
+- **Rain gauge:** tipping bucket on GPIO 6, each tip = a fixed volume,
+  `BUCKET_SIZE = 0.2794` mm — this value was already correct.
+- **Wind vane:** analogue, but reads via an **MCP342X I2C ADC** (`0x69`, channel 0)
+  — **not** an MCP3008 over SPI. The 16 reed-switch positions map to a *fixed*
+  resistor-divider network built into the kit board (`Vin = 3.268V`, divider
+  `75kΩ`), so — unlike a generic vane — the ADC-value-to-degrees table is a known
+  manufacturing constant, not something to measure per-unit. Full resistor table
+  in `docs/sensors.md`.
 
 ### Data pipeline: a cloud Postgres push is the best fit
 The Pi sits behind a home NAT in Dublin, so the cleanest pattern is **the Pi pushing outbound to a cloud database** (no port-forwarding, no dynamic-DNS). Free-tier options compared (2026):
@@ -50,13 +75,21 @@ The Pi sits behind a home NAT in Dublin, so the cleanest pattern is **the Pi pus
 
 **OS & prerequisites**
 1. Flash current Raspberry Pi OS (Lite is fine) — do **not** use the old bundled SD image.
-2. `sudo raspi-config` → enable **I2C** (BME280), **SPI** (MCP3008 ADC), and 1-Wire if you use a DS18B20 ground/soil probe.
-3. Create a Python virtual environment; install `adafruit-circuitpython-bme280`, `adafruit-circuitpython-mcp3008` (or use `gpiozero`'s MCP3008), `gpiozero`, `requests`, `paho-mqtt` (optional), and the `supabase` Python client.
-4. Verify sensors with `i2cdetect -y 1` (expect `76`/`77` for BME280).
+2. `sudo raspi-config nonint do_i2c 0` → enable **I2C** (BMP085, HTU21D, both MCP342X
+   ADCs including the wind vane all sit on I2C — SPI is not needed for this kit),
+   and 1-Wire if you use a DS18B20 ground/soil probe.
+3. Create a Python virtual environment; install `smbus2` (talks to the BMP085,
+   HTU21D, and MCP342X directly — no CircuitPython/Blinka needed), `gpiozero`,
+   `requests`, `paho-mqtt` (optional), and the `supabase` Python client.
+4. Verify sensors with `i2cdetect -y 1` (expect `77` for BMP085/180, `40` for
+   HTU21D, `69`/`6A` for the two MCP342X ADCs — see `docs/sensors.md`).
 
 **Recommended architecture (custom Python — the publishable path)**
 Structure the collector as a small package rather than one script:
-- `sensors/bme280.py`, `sensors/anemometer.py`, `sensors/rain.py`, `sensors/wind_vane.py` — one module per sensor, each returning clean SI values.
+- `sensors/bmp085.py`, `sensors/humidity.py`, `sensors/air.py` (combines the two
+  into one temp/humidity/pressure reading), `sensors/mcp342x.py`, `sensors/anemometer.py`,
+  `sensors/rain.py`, `sensors/wind_vane.py` — one module per sensor, each returning
+  clean SI values.
 - `core/sampler.py` — schedules sampling: high-frequency wind sampling (e.g. every few seconds for gusts), aggregated into an **archive record** every 1–5 minutes (mirroring WeeWX's loop/archive model).
 - `store/local_buffer.py` — writes every archive record to a **local SQLite database first** (this is the source of truth and the store-and-forward buffer).
 - `upload/` — one uploader per destination: `supabase.py`, `wunderground.py`, `cwop.py`, `windy.py`. Each reads unsent rows from SQLite, posts them, and marks them sent only on success. This gives **automatic catch-up after network/power outages**.
@@ -125,7 +158,9 @@ Design the uploaders as pluggable modules so adding/removing a service is a conf
 - **Publish incrementally:** it's fine to open the repo early with a clear roadmap; a short, clear README beats none.
 
 ## Recommendations
-1. **Weekend 1 — hardware validation.** Bring up each sensor in isolation (BME280 via `i2cdetect`, anemometer/rain pulse counts, wind-vane 16-value mapping). Optionally install **WeeWX + BYOWS driver** to confirm the whole chain quickly. *Benchmark to proceed:* all four sensors returning plausible values.
+1. ~~**Weekend 1 — hardware validation.**~~ Done 2026-08-27 — all four sensors
+   (BMP085, HTU21D, anemometer, rain gauge, wind vane) verified returning plausible
+   values on real hardware. See [docs/sensors.md](docs/sensors.md).
 2. **Weekend 2 — local logging + cloud push.** Write the SQLite-first collector and the Supabase uploader; get one row/minute landing in Postgres with RLS read-only. *Benchmark:* 24 h of continuous rows with no gaps after a deliberate network-unplug test (store-and-forward works).
 3. **Weekend 3 — the website.** Ship `/weather` on Vercel: server-island live panel + one history chart. *Benchmark:* live value updates within 60 s; mobile Lighthouse ≥ 90.
 4. **Weekend 4 — weather services.** Add Weather Underground first, then CWOP, then Windy. *Benchmark:* your station visible on the wunderground.com dashboard and findU (CWOP).

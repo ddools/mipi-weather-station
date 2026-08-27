@@ -14,9 +14,9 @@ log = logging.getLogger(__name__)
 
 
 class Sampler:
-    def __init__(self, cfg: Config, bme, anemometer, rain, vane, buffer: LocalBuffer, uploaders):
+    def __init__(self, cfg: Config, air, anemometer, rain, vane, buffer: LocalBuffer, uploaders):
         self.cfg = cfg
-        self.bme, self.anemometer, self.rain, self.vane = bme, anemometer, rain, vane
+        self.air, self.anemometer, self.rain, self.vane = air, anemometer, rain, vane
         self.buffer = buffer
         self.uploaders = uploaders
 
@@ -55,14 +55,14 @@ class Sampler:
         st = self.cfg.station
         rec = Record()
         try:
-            t, h, p = self.bme.read()
+            t, h, p = self.air.read()
             rec.temp_c, rec.humidity, rec.pressure_hpa = round(t, 2), round(h, 1), round(p, 2)
             rec.dewpoint_c = round(units.dewpoint_c(t, h), 2)
             rec.pressure_msl_hpa = round(
                 units.sea_level_pressure_hpa(p, st.elevation_m, t), 2
             )
         except Exception:
-            log.exception("BME280 read failed")
+            log.exception("air sensor read failed")
         if wind_samples:
             rec.wind_speed_ms = round(statistics.mean(wind_samples), 2)
             rec.wind_gust_ms = round(max(wind_samples), 2)

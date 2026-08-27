@@ -43,22 +43,39 @@ Key decisions already made — do not re-litigate without asking:
 
 ## Hardware facts (Oracle kit)
 
-- BME280 on I2C, addr 0x76 (fallback 0x77) — temp/humidity/pressure
-- Anemometer: reed switch, GPIO pulse, **2 pulses/rotation, radius 9.0 cm,
-  adjustment factor 1.18**
-- Rain gauge: tipping bucket, **0.2794 mm/tip**
-- Wind vane: 16 reed positions via **MCP3008 ADC** (SPI) + voltage divider —
-  ADC→degrees table is per-unit; `calibration.vane_table` in config.yaml is a
-  placeholder and needs real measured values.
+Full reference with wiring, chip IDs, and provisioning gotchas: **[docs/sensors.md](docs/sensors.md)**.
+Verified against real hardware on 2026-08-27 and against the official kit's
+open-source driver ([RaspberryPiFoundation/weather-station](https://github.com/RaspberryPiFoundation/weather-station)).
+
+This is the real Oracle/Foundation HAT, **not** generic BYOWS hardware — an early
+plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
+
+- **BMP085/BMP180** on I2C addr `0x77` (fixed) — temp/pressure. No humidity output;
+  see below. `sensors/bmp085.py`.
+- **HTU21D** on I2C addr `0x40` — humidity, separate chip. `sensors/humidity.py`.
+  `sensors/air.py:AirSensor` combines both into one `(temp, humidity, pressure)`
+  reading so the rest of the collector still sees a single "air" sensor.
+- Anemometer: reed switch, GPIO 5, **2 pulses/rotation, radius 9.0 cm,
+  adjustment factor 2.36** (was wrongly documented as 1.18).
+- Rain gauge: tipping bucket, GPIO 6, **0.2794 mm/tip** (this was already correct).
+- Wind vane: 16 reed positions via **MCP342X I2C ADC** (addr `0x69`, channel 0) —
+  **not** SPI/MCP3008. The 16 resistor values are a fixed factory network on the
+  board, not per-unit — `calibration.wind_vane` in config.example.yaml ships with
+  the real values and works out of the box, no per-unit calibration step needed.
 
 ## Current state (verified working)
 
 - `pip install -e ".[dev]"` clean; **5/5 pytest pass** (`pi/tests/`).
 - Full pipeline smoke-tested with `WS_MOCK_SENSORS=1 weatherstation` — mock sensors
-  produce records through sampler → SQLite. Hardware drivers written but **untested
-  on real hardware**.
+  produce records through sampler → SQLite.
+- **All four sensors verified on real hardware** (2026-08-27, over SSH to the Pi):
+  BMP085 and HTU21D return plausible live readings; wind vane tracks physical
+  rotation across the full 16-point compass; anemometer and rain gauge both
+  register GPIO pulses when triggered by hand. See [docs/sensors.md](docs/sensors.md).
 - Uploaders written but **never run against live services** (no keys yet).
-- No CI yet. No CWOP uploader. No Astro components written yet.
+- No CI yet. No CWOP uploader. No Astro components written yet. TGS2600 air
+  quality and DS18B20 ground-temp sensors are present on the kit but not
+  implemented (see docs/sensors.md "Not implemented").
 
 ## Dev conventions
 
@@ -76,9 +93,11 @@ Key decisions already made — do not re-litigate without asking:
 
 ## Roadmap / next steps (in order)
 
-1. **Sensor bring-up on the real Pi** — `i2cdetect -y 1` for BME280; verify pulse
-   counts; add `--calibrate-vane` CLI mode that prints raw ADC values while rotating
-   the vane, to fill `vane_table`.
+1. ~~**Sensor bring-up on the real Pi**~~ — done 2026-08-27, all four sensors
+   verified on real hardware. See [docs/sensors.md](docs/sensors.md) for what
+   changed (real chips are BMP085/HTU21D/MCP342X, not BME280/MCP3008 as first
+   planned) and the provisioning steps (I2C/SPI enable, `swig`/`liblgpio-dev` for
+   gpiozero's `lgpio` backend on trixie).
 2. **Supabase live** — create project, run `docs/supabase-schema.sql`, add keys to
    `.env`, verify inserts + backlog replay (unplug-network test: 24h no gaps).
 3. **Astro /weather page** — in the dermotdooley.com repo: `npx astro add vercel`;
@@ -94,6 +113,9 @@ Key decisions already made — do not re-litigate without asking:
 
 ## Gotchas
 
+- Real hardware is the official Oracle/Foundation HAT (BMP085 + HTU21D + MCP342X),
+  not generic BYOWS parts (BME280 + MCP3008/SPI) — see docs/sensors.md before
+  touching any sensor driver.
 - WU wants **imperial** (°F, inHg, mph, inches) and UTC `dateutc`; response body must
   contain "success".
 - Windy upload pressure is **Pa**, not hPa.

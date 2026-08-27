@@ -4,7 +4,7 @@ from __future__ import annotations
 import random
 
 
-class MockBME280:
+class MockAirSensor:
     def read(self):
         return (
             12.0 + random.uniform(-1, 1),      # Dublin-ish temp

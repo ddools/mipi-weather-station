@@ -8,11 +8,12 @@ Live at: **[dermotdooley.com/weather](https://dermotdooley.com/weather)**
 
 ## What it does
 
-- Reads the full Oracle kit sensor set on a Raspberry Pi:
-  - **BME280** — temperature, humidity, pressure (I2C)
+- Reads the full Oracle kit sensor set on a Raspberry Pi (see
+  [docs/sensors.md](docs/sensors.md) for the verified chip-level reference):
+  - **BMP085/BMP180 + HTU21D** — temperature, humidity, pressure (I2C)
   - **Anemometer** — wind speed & gust (GPIO pulse counting)
   - **Rain gauge** — tipping bucket (GPIO pulse counting)
-  - **Wind vane** — direction (MCP3008 ADC over SPI)
+  - **Wind vane** — direction (MCP342X ADC over I2C)
 - Logs every archive record to a **local SQLite buffer first** (source of truth), so
   nothing is lost during network or power outages — uploaders replay the backlog
   automatically (store-and-forward).
@@ -26,7 +27,7 @@ Live at: **[dermotdooley.com/weather](https://dermotdooley.com/weather)**
 ```
 ┌─────────────── Raspberry Pi ───────────────┐
 │  sensors/ ──▶ core/sampler ──▶ store/      │
-│  (BME280, wind, rain)         (SQLite)     │
+│  (BMP085/HTU21D, wind, rain)  (SQLite)     │
 │                                  │         │
 │                              upload/       │──▶ Supabase (Postgres)
 │                    (supabase, wunderground,│──▶ Weather Underground
@@ -83,7 +84,7 @@ WS_MOCK_SENSORS=1 weatherstation
 ## Roadmap
 
 - [x] Repo scaffold, package structure
-- [ ] Sensor bring-up & calibration (BME280 → wind → rain → vane)
+- [x] Sensor bring-up & calibration (air sensor → wind → rain → vane)
 - [ ] SQLite buffer + Supabase uploader (store-and-forward)
 - [ ] Astro `/weather` page: server-island live panel + history charts
 - [ ] Weather Underground upload

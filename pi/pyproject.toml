@@ -20,7 +20,7 @@ dependencies = [
 # Hardware libs — install on the Pi only
 pi = [
     "gpiozero>=2.0",
-    "adafruit-circuitpython-bme280>=2.6",
+    "smbus2>=0.4",
     "RPi.GPIO; platform_machine=='armv7l' or platform_machine=='aarch64'",
 ]
 dev = [

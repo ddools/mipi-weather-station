@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+pi/config.yaml
+pi/.env
+pi/data/
+
+node_modules/
+dist/
+.DS_Store
