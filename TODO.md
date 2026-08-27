@@ -233,6 +233,15 @@ domain may come later).
       is vector-averaged, rain summed. **Not yet run against the live project** —
       needs the Supabase SQL editor. Follow-up after it has data: repoint the
       site's 7d/30d queries at `readings_hourly` (see §2 note).
+- [x] Rain-radar map on the dashboard (2026-08-27) — `web/src/components/RainRadar.tsx`,
+      a Leaflet client island. Radar frames + tiles from the free, keyless
+      **RainViewer** Weather Maps API (past 2 h + short nowcast, play/scrub
+      controls); basemap is keyless **Esri Gray Canvas** (CARTO now requires an
+      API key). Attribution to RainViewer + Esri rendered under/on the map.
+      **rainbow.ai was evaluated and rejected** — enterprise/paid only, no
+      self-serve tier. Backlog: Met Éireann's own open radar (HDF5 over FTP on
+      request, data.gov.ie) would be the most authoritative Ireland source but
+      needs a decode-and-tile pipeline.
 - [ ] README screenshots of the live dashboard once it exists
 - [ ] Optional/backlog — chips physically present on the kit but out of scope so
       far (see docs/sensors.md "Not implemented"):

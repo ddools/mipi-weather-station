@@ -3,6 +3,7 @@ import type { EChartsOption } from "echarts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EChart } from "@/components/EChart";
+import { useIsDark } from "@/lib/use-is-dark";
 import type { Reading } from "@/lib/supabase";
 import { MS_TO_KMH } from "@/lib/format";
 import thermometerIcon from "@meteocons/svg/flat/thermometer.svg?url";
@@ -29,19 +30,6 @@ const C = {
   gust: "#f59e0b",
   rain: "#38bdf8",
 };
-
-function useIsDark() {
-  const [isDark, setIsDark] = useState(false);
-  useEffect(() => {
-    const root = document.documentElement;
-    const update = () => setIsDark(root.classList.contains("dark"));
-    update();
-    const observer = new MutationObserver(update);
-    observer.observe(root, { attributes: true, attributeFilter: ["class"] });
-    return () => observer.disconnect();
-  }, []);
-  return isDark;
-}
 
 function useHistory(range: Range) {
   const [data, setData] = useState<Reading[] | null>(null);

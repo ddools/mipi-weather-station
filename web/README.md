@@ -18,11 +18,20 @@ not integration notes for elsewhere. UI components use **shadcn/ui**.
    - `src/pages/index.astro` — static shell, hero card, grid layout.
    - Live panel as a **server island** (`<CurrentConditions server:defer />`) that
      fetches the newest row server-side; a small client timer re-fetches
-     `/api/current` every 60 s.
+     `/api/current` every 60 s. It owns the whole top block: three rows on desktop
+     — temp/pressure/humidity, then wind + tides, then rain + rain radar — so
+     `TidesSection` and the `RainRadar` island render nested inside it (that's
+     why the radar's `client:visible` island sits within a server island).
    - `src/pages/api/current.ts` and `src/pages/api/history.ts` with
      `export const prerender = false` — thin Supabase queries returning JSON.
    - Charts: **ECharts** client island — temp/pressure/humidity lines, rain bars,
      wind rose (polar bar), gauge dials. Range tabs (shadcn `Tabs`): 24h / 7d / 30d.
+   - Rain radar: `RainRadar.tsx` **Leaflet** client island (`client:visible`),
+     rendered in the third row of `CurrentConditions` next to the rain card.
+     Frames + tiles from the free, keyless [RainViewer](https://www.rainviewer.com/api/weather-maps-api.html)
+     Weather Maps API (past 2 h + short nowcast), basemap from keyless Esri Gray
+     Canvas. Attribution to RainViewer + Esri is required and shown on/under the
+     map. `leaflet` + `@types/leaflet` are the only added deps.
 6. Responsive: CSS grid, multi-column desktop → single column mobile; dark mode
    via shadcn's `ThemeProvider` + CSS variable pattern.
 7. Once the domain is decided: register it, add as a custom domain on the Vercel

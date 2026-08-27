@@ -4,6 +4,11 @@ import { getTideStatus } from "@/lib/tides";
 import tideHighIcon from "@meteocons/svg/flat/water-tide-high.svg?url";
 import tideLowIcon from "@meteocons/svg/flat/water-tide-low.svg?url";
 
+interface Props {
+  class?: string;
+}
+const { class: className } = Astro.props;
+
 const status = await getTideStatus();
 const icon = status?.trend === "rising" ? tideHighIcon : tideLowIcon;
 
@@ -19,7 +24,7 @@ function formatTime(iso: string | undefined): string {
 }
 ---
 
-<Card>
+<Card className={className}>
   <CardHeader className="flex items-center gap-2">
     <img src={icon} alt="" class="h-10 w-10" />
     <CardTitle>Tides — Skerries</CardTitle>
