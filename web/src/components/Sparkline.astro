@@ -1,6 +1,8 @@
 ---
 // Zero-JS 24h trend line for the stat cards. Rendered server-side as a plain
-// inline SVG path — no chart library, no client island.
+// inline SVG path — no chart library, no client island. The path is a smooth
+// Catmull-Rom spline and uses a non-scaling stroke, so it stays a clean, even
+// hairline no matter how wide the card stretches it.
 interface Props {
   values: (number | null)[];
   color?: string;
@@ -10,20 +12,44 @@ interface Props {
 }
 const { values, color = "currentColor", width = 120, height = 32, class: klass = "" } = Astro.props;
 
-const pts = values
+interface Pt {
+  x: number;
+  y: number;
+}
+
+const raw = values
   .map((v, i) => ({ v, i }))
   .filter((p): p is { v: number; i: number } => p.v !== null && !Number.isNaN(p.v));
 
 let d = "";
-if (pts.length >= 2) {
+if (raw.length >= 2) {
   const xs = values.length - 1;
-  const lo = Math.min(...pts.map((p) => p.v));
-  const hi = Math.max(...pts.map((p) => p.v));
+  const lo = Math.min(...raw.map((p) => p.v));
+  const hi = Math.max(...raw.map((p) => p.v));
   const span = hi - lo || 1;
-  const pad = 2;
-  const x = (i: number) => pad + (i / xs) * (width - 2 * pad);
-  const y = (v: number) => pad + (1 - (v - lo) / span) * (height - 2 * pad);
-  d = pts.map((p, k) => `${k === 0 ? "M" : "L"}${x(p.i).toFixed(1)} ${y(p.v).toFixed(1)}`).join(" ");
+  const pad = 3;
+  const clampY = (y: number) => Math.max(pad, Math.min(height - pad, y));
+  const pts: Pt[] = raw.map((p) => ({
+    x: pad + (p.i / xs) * (width - 2 * pad),
+    y: pad + (1 - (p.v - lo) / span) * (height - 2 * pad),
+  }));
+
+  // Catmull-Rom → cubic Bézier. Tension < 1 keeps the curve close to the data
+  // and avoids the overshoot that would clip against the padding.
+  const t = 0.65;
+  const f = (n: number) => n.toFixed(1);
+  d = `M${f(pts[0].x)} ${f(pts[0].y)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] ?? pts[i];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[i + 2] ?? p2;
+    const c1x = p1.x + ((p2.x - p0.x) / 6) * t;
+    const c1y = clampY(p1.y + ((p2.y - p0.y) / 6) * t);
+    const c2x = p2.x - ((p3.x - p1.x) / 6) * t;
+    const c2y = clampY(p2.y - ((p3.y - p1.y) / 6) * t);
+    d += ` C${f(c1x)} ${f(c1y)}, ${f(c2x)} ${f(c2y)}, ${f(p2.x)} ${f(p2.y)}`;
+  }
 }
 ---
 
@@ -38,7 +64,14 @@ if (pts.length >= 2) {
       aria-hidden="true"
       preserveAspectRatio="none"
     >
-      <path d={d} stroke={color} stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+      <path
+        d={d}
+        stroke={color}
+        stroke-width="1.75"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        vector-effect="non-scaling-stroke"
+      />
     </svg>
   )
 }
