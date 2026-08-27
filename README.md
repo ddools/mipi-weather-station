@@ -50,7 +50,7 @@ docs/   Wiring, setup, architecture
 ## Quick start (Pi)
 
 ```bash
-# On the Pi (Raspberry Pi OS, I2C + SPI enabled via raspi-config)
+# On the Pi (Raspberry Pi OS, I2C + SPI + 1-Wire enabled via raspi-config)
 git clone https://github.com/ddools/mipi-weather-station.git
 cd mipi-weather-station/pi
 python3 -m venv .venv && source .venv/bin/activate

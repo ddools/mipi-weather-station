@@ -18,6 +18,13 @@ calibration:
   anemometer_radius_cm: 9.0
   anemometer_adjustment: 2.36   # Oracle/Foundation kit factory calibration factor
   rain_bucket_mm: 0.2794        # mm per bucket tip
+  # Air temperature source. The BMP085/HTU21D on the air board self-heat ~10 C
+  # when the board sits near the Pi; the DS18B20 probe on its lead does not.
+  #   auto     - use the DS18B20 if the 1-Wire bus has one, else the onboard chip
+  #   ds18b20  - require the DS18B20 (collector won't start if it's absent)
+  #   onboard  - always use the BMP085 temperature
+  # DS18B20 needs 1-Wire enabled: `sudo raspi-config nonint do_onewire 0`.
+  air_temp_source: auto
   # Wind vane: MCP342X ADC (addr 0x69) reading a fixed resistor-divider network
   # built into the Oracle kit board — these are the factory values, not per-unit.
   wind_vane:

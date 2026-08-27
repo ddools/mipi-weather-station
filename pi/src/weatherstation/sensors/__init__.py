@@ -1,4 +1,5 @@
 """Sensor factory. Real drivers on the Pi; mocks when WS_MOCK_SENSORS=1."""
+
 from __future__ import annotations
 
 from ..config import Config, mock_sensors
@@ -16,7 +17,7 @@ def build_sensors(cfg: Config):
     from .wind_vane import WindVane
 
     return (
-        AirSensor(),
+        AirSensor(cfg.calibration.get("air_temp_source", "auto")),
         Anemometer(cfg.pins.anemometer),
         RainGauge(cfg.pins.rain_gauge),
         WindVane(cfg.calibration.wind_vane),

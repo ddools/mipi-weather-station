@@ -62,6 +62,12 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
 - **HTU21D** on I2C addr `0x40` — humidity, separate chip. `sensors/humidity.py`.
   `sensors/air.py:AirSensor` combines both into one `(temp, humidity, pressure)`
   reading so the rest of the collector still sees a single "air" sensor.
+- **DS18B20** 1-Wire probe — the kit's "ground" probe, but repurposed as the
+  **air-temperature source** because the BMP085/HTU21D bake ~10 °C when the board
+  is near the Pi (see Gotchas). `sensors/ds18b20.py`, read via `/sys/bus/w1`.
+  `calibration.air_temp_source: auto|ds18b20|onboard` (default `auto`). When the
+  probe is in use, `AirSensor` also corrects the HTU21D's RH to the real air temp
+  (dewpoint held constant — `units.rh_from_dewpoint`).
 - Anemometer: reed switch, GPIO 5, **2 pulses/rotation, radius 9.0 cm,
   adjustment factor 2.36** (was wrongly documented as 1.18).
 - Rain gauge: tipping bucket, GPIO 6, **0.2794 mm/tip** (this was already correct).
@@ -72,13 +78,17 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
 
 ## Current state (verified working)
 
-- `pip install -e ".[dev]"` clean; **5/5 pytest pass** (`pi/tests/`).
+- `pip install -e ".[dev]"` clean; **8/8 pytest pass** (`pi/tests/`).
 - Full pipeline smoke-tested with `WS_MOCK_SENSORS=1 weatherstation` — mock sensors
   produce records through sampler → SQLite.
 - **All four sensors verified on real hardware** (2026-08-27, over SSH to the Pi):
   BMP085 and HTU21D return plausible live readings; wind vane tracks physical
   rotation across the full 16-point compass; anemometer and rain gauge both
   register GPIO pulses when triggered by hand. See [docs/sensors.md](docs/sensors.md).
+- **BMP085/HTU21D self-heating confirmed** (2026-08-27): both onboard chips read
+  ~27.5 °C against a true ~17 °C; DS18B20 (`28-000006e2639a`) on its lead reads
+  18.9 °C. Collector now defaults to the DS18B20 for air temp. Still to do:
+  deploy the change to the Pi and mount the air board away from the Pi body.
 - **Supabase live** (2026-08-27): project created, schema applied, real sensor
   data confirmed flowing end-to-end (sensors → SQLite → Supabase). RLS verified
   via direct REST calls (publishable key can SELECT, can't INSERT). Collector
@@ -101,13 +111,21 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   station, handled client-side in the uploader. See TODO.md for the full story.
 - **Astro site live in `web/`** (2026-08-27) — full dashboard with server
   islands, ECharts, shadcn/ui, Meteocons, tides. Not yet deployed to Vercel.
-- No CI yet. No CWOP uploader. TGS2600 air quality and DS18B20 ground-temp
-  sensors are present on the kit but not implemented (see docs/sensors.md
-  "Not implemented").
+- **CI live** (2026-08-27) — `.github/workflows/ci.yml`: `pi` job (ruff check +
+  ruff format check + pytest on Py 3.9 & 3.13) and `web` job (`npm ci` + `astro
+  build`). Runs on push-to-`main` and every PR.
+- No CWOP uploader. TGS2600 air quality sensor is present on the kit but not
+  implemented (see docs/sensors.md "Not implemented"). The DS18B20 1-Wire probe
+  **is** now used — as the air-temperature source (see Gotchas), not as a
+  separate ground-temp field.
 
 ## Dev conventions
 
-- Python ≥3.9, Ruff (format + lint), line length 100.
+- Python ≥3.9, Ruff (format + lint), line length 100. Ruff is **pinned exact**
+  (`ruff==0.16.4` in the `dev` extra) and lint rules are listed explicitly in
+  `pyproject.toml` (`[tool.ruff.lint] select`) — newer ruff drifts both the
+  formatter and the default rule set, which breaks CI reproducibility. Bump
+  deliberately, run `ruff format`, commit the churn.
 - Everything must run with `WS_MOCK_SENSORS=1` (no hardware deps at import time —
   hardware libs import lazily inside driver `__init__`).
 - Secrets in `.env` only (`.env.example` documents keys); station/config in
@@ -137,8 +155,10 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
 4. ~~**Weather Underground**~~ — done 2026-08-27: station live, `success`
    responses confirmed, real data visible in WU's history table.
 5. ~~**Windy v2**~~ — done 2026-08-27, see above.
-6. **Polish** — gauge dials, retention/downsampling job in Supabase,
-   GitHub Actions CI (ruff + pytest), CWOP uploader, README screenshots.
+6. **Polish** — ~~GitHub Actions CI~~ (done 2026-08-27), gauge dials,
+   retention/downsampling job in Supabase (SQL written in
+   `docs/supabase-retention.sql`, not yet applied), CWOP uploader,
+   README screenshots.
 
 ## Gotchas
 
@@ -179,6 +199,13 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
 - Real hardware is the official Oracle/Foundation HAT (BMP085 + HTU21D + MCP342X),
   not generic BYOWS parts (BME280 + MCP3008/SPI) — see docs/sensors.md before
   touching any sensor driver.
+- **BMP085/HTU21D self-heat ~10 °C** when the air board sits near the Pi — measured
+  2026-08-27: both onboard chips ~27.5 °C against a true 17 °C, while a DS18B20 on a
+  lead in the same spot read 18.9 °C. Two independent chips agreeing rules out a
+  driver/calibration bug — it's thermal. Fix is the DS18B20 as the temp source
+  (`air_temp_source`, done) and/or physically mounting the board away from the Pi.
+  Pressure is fine (BMP085 self-compensates); raw HTU21D RH reads low and is
+  corrected in `AirSensor` when the probe is active.
 - WU wants **imperial** (°F, inHg, mph, inches) and UTC `dateutc`; response body must
   contain "success".
 - Windy upload pressure is **Pa**, not hPa.

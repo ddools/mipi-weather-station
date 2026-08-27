@@ -4,6 +4,7 @@ Ported from the official Raspberry Pi Foundation driver (HTU21D.py), including
 the CRC8 check on each reading (I2C glitches otherwise read as silently wrong
 humidity values).
 """
+
 from __future__ import annotations
 
 import time
@@ -50,11 +51,15 @@ class HTU21DSensor:
             return None
         return -46.85 + 175.72 * (raw / 65536.0)
 
-    def read_humidity_pct(self) -> float | None:
+    def read_temp_rh(self) -> tuple[float | None, float | None]:
+        """(chip temp_c, compensated humidity_pct) — one pass over the bus."""
         temp_c = self.read_temp_c()
         raw = self._read(_READ_HUM_NOHOLD)
         if raw is None or temp_c is None:
-            return None
+            return temp_c, None
         rh = -6.0 + 125.0 * (raw / 65536.0)
         rh += (25 - temp_c) * -0.15  # temperature coefficient compensation
-        return max(0.0, min(100.0, rh))
+        return temp_c, max(0.0, min(100.0, rh))
+
+    def read_humidity_pct(self) -> float | None:
+        return self.read_temp_rh()[1]

@@ -36,6 +36,12 @@ for BMP085/180 (a BME280 would read `0x60`, a BMP280 `0x58`).
   it directly over `smbus2` and implements the Bosch datasheet compensation formula,
   ported line-for-line from the official kit's `bmpBackend.py`.
 - Standard resolution mode (mode `1`): ~8ms pressure conversion, no oversampling.
+- **The temperature output is unusable for air temperature when the air board sits
+  near the Pi** — verified 2026-08-27: BMP085 27.9 °C and HTU21D 27.3 °C against a
+  true 17 °C, an 11 °C self-heating offset, with a DS18B20 on a lead in the same
+  spot reading 18.9 °C. Pressure is unaffected (the chip self-compensates with its
+  own die temperature). See "DS18B20" below and `sensors/air.py` for how the
+  collector routes around this.
 
 ## HTU21D (humidity)
 
@@ -48,6 +54,30 @@ for BMP085/180 (a BME280 would read `0x60`, a BMP280 `0x58`).
   returns `None` on a bad checksum rather than a silently wrong value.
 - The humidity formula includes a temperature-coefficient correction using the
   chip's *own* temperature reading — it does not need or use the BMP085's temperature.
+- Same self-heating problem as the BMP085 (both chips are on the one board). When
+  the collector takes air temperature from the DS18B20, it also re-expresses this
+  RH at the real air temperature — the chip measured it at its own hot temperature,
+  so the raw value reads low. Dewpoint is conserved and used as the pivot:
+  `rh_true = rh_from_dewpoint(air_temp, dewpoint(chip_temp, rh_chip))`.
+
+## DS18B20 (1-Wire temperature probe)
+
+- Nominally the kit's soil/ground probe, but it's the only thermometer on the kit
+  that hangs on a lead instead of sitting on the Pi's board, so mounted in clean
+  air it's the one trustworthy air-temperature source (see BMP085 self-heating
+  above).
+- Read through the Linux `w1` kernel driver — no I2C, no library. Enable 1-Wire
+  once with `sudo raspi-config nonint do_onewire 0` (adds `dtoverlay=w1-gpio`,
+  GPIO 4 — the kit's wiring), reboot. Devices then appear as
+  `/sys/bus/w1/devices/28-*/w1_slave`; `sensors/ds18b20.py` globs for the first,
+  parses the `t=` millidegrees line, and rejects a failed CRC (`... NO`) or the
+  `85000` power-on sentinel.
+- `calibration.air_temp_source` in `config.yaml` picks the source: `auto`
+  (DS18B20 if the bus has one, else onboard — default), `ds18b20` (require it),
+  or `onboard`. `sensors/air.py` falls back to the onboard chip for any single
+  cycle where the probe read fails.
+- Verified on real hardware 2026-08-27: probe `28-000006e2639a`, `t=18875`
+  (18.9 °C) against a true ~17 °C.
 
 ## MCP342X (I2C ADC, used for the wind vane)
 
@@ -94,9 +124,10 @@ for BMP085/180 (a BME280 would read `0x60`, a BMP280 `0x58`).
 
 - **TGS2600 air quality sensor** at `0x6A` (MCP342X channel 0) — physically present
   on the kit's detachable board but this project doesn't read or upload it.
-- **DS18B20 ground-temperature probe** (1-Wire) — part of the original kit's sensor
-  set per the official repo (`ds18b20_therm.py`) but not wired/tested here.
 - Chip at `0x68` — unidentified, presumed RTC, unused.
+
+(The DS18B20 1-Wire probe *is* now implemented — as the air-temperature source, not
+as a separate ground-temp field. See its section above.)
 
 ## Provisioning gotchas hit during bring-up
 
@@ -107,3 +138,6 @@ for BMP085/180 (a BME280 would read `0x60`, a BMP280 `0x58`).
 - I2C (`/dev/i2c-1`, header pins) and SPI are both disabled by default on a fresh
   image — `sudo raspi-config nonint do_i2c 0` / `do_spi 0` then reboot. The
   always-present `/dev/i2c-2` is the HDMI DDC bus, not the sensor bus.
+- 1-Wire (for the DS18B20) is also off by default — `sudo raspi-config nonint
+  do_onewire 0` then reboot. Check with `ls /sys/bus/w1/devices/`: a `28-*` entry
+  next to `w1_bus_master1` means the probe is found.
