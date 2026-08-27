@@ -1,7 +1,7 @@
 # Copy to config.yaml and edit. Secrets go in .env, NOT here.
 
 station:
-  name: "Dublin Weather Station"
+  name: "Skerries Weather Station"
   latitude: 53.35        # decimal degrees
   longitude: -6.26
   elevation_m: 20        # metres above sea level (for sea-level pressure)

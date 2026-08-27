@@ -2,14 +2,23 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLatestReading } from "@/lib/supabase";
 import { degToCompass, fmt } from "@/lib/format";
+import thermometerIcon from "@meteocons/svg-static/flat/thermometer.svg?url";
+import humidityIcon from "@meteocons/svg-static/flat/humidity.svg?url";
+import pressureHighIcon from "@meteocons/svg-static/flat/pressure-high.svg?url";
+import pressureLowIcon from "@meteocons/svg-static/flat/pressure-low.svg?url";
+import windIcon from "@meteocons/svg-static/flat/wind.svg?url";
+import raindropIcon from "@meteocons/svg-static/flat/raindrop.svg?url";
 
 const reading = await getLatestReading();
+const pressureIcon =
+  (reading?.pressure_msl_hpa ?? 1013) >= 1013 ? pressureHighIcon : pressureLowIcon;
 ---
 
 <div id="current-conditions" data-recorded-at={reading?.recorded_at ?? ""}>
   <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
     <Card className="sm:col-span-2 lg:col-span-1 lg:row-span-2">
-      <CardHeader>
+      <CardHeader className="flex-row items-center gap-2">
+        <img src={thermometerIcon} alt="" class="h-14 w-14" />
         <CardTitle>Temperature</CardTitle>
       </CardHeader>
       <CardContent>
@@ -26,7 +35,8 @@ const reading = await getLatestReading();
     </Card>
 
     <Card>
-      <CardHeader>
+      <CardHeader className="flex-row items-center gap-2">
+        <img src={humidityIcon} alt="" class="h-10 w-10" />
         <CardTitle>Humidity</CardTitle>
       </CardHeader>
       <CardContent>
@@ -37,7 +47,8 @@ const reading = await getLatestReading();
     </Card>
 
     <Card>
-      <CardHeader>
+      <CardHeader className="flex-row items-center gap-2">
+        <img src={pressureIcon} alt="" class="h-10 w-10" />
         <CardTitle>Pressure</CardTitle>
       </CardHeader>
       <CardContent>
@@ -49,7 +60,8 @@ const reading = await getLatestReading();
     </Card>
 
     <Card>
-      <CardHeader>
+      <CardHeader className="flex-row items-center gap-2">
+        <img src={windIcon} alt="" class="h-10 w-10" />
         <CardTitle>Wind</CardTitle>
       </CardHeader>
       <CardContent>
@@ -64,7 +76,8 @@ const reading = await getLatestReading();
     </Card>
 
     <Card>
-      <CardHeader>
+      <CardHeader className="flex-row items-center gap-2">
+        <img src={raindropIcon} alt="" class="h-10 w-10" />
         <CardTitle>Rain (interval)</CardTitle>
       </CardHeader>
       <CardContent>

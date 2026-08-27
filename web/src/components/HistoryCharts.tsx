@@ -4,6 +4,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EChart } from "@/components/EChart";
 import type { Reading } from "@/lib/supabase";
+import thermometerIcon from "@meteocons/svg-static/flat/thermometer.svg?url";
+import raindropIcon from "@meteocons/svg-static/flat/raindrop.svg?url";
+import windIcon from "@meteocons/svg-static/flat/wind.svg?url";
 
 type Range = "24h" | "7d" | "30d";
 const RANGES: { value: Range; label: string }[] = [
@@ -162,7 +165,8 @@ function RangeCharts({ range }: { range: Range }) {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <Card className="lg:col-span-2">
-        <CardHeader>
+        <CardHeader className="flex-row items-center gap-2">
+          <img src={thermometerIcon} alt="" className="h-9 w-9" />
           <CardTitle>Temperature, humidity &amp; pressure</CardTitle>
         </CardHeader>
         <CardContent>
@@ -170,7 +174,8 @@ function RangeCharts({ range }: { range: Range }) {
         </CardContent>
       </Card>
       <Card>
-        <CardHeader>
+        <CardHeader className="flex-row items-center gap-2">
+          <img src={raindropIcon} alt="" className="h-9 w-9" />
           <CardTitle>Rain</CardTitle>
         </CardHeader>
         <CardContent>
@@ -178,7 +183,8 @@ function RangeCharts({ range }: { range: Range }) {
         </CardContent>
       </Card>
       <Card>
-        <CardHeader>
+        <CardHeader className="flex-row items-center gap-2">
+          <img src={windIcon} alt="" className="h-9 w-9" />
           <CardTitle>Wind rose</CardTitle>
         </CardHeader>
         <CardContent>

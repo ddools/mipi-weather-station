@@ -88,6 +88,10 @@ one exists.
       transitive `path-to-regexp` ReDoS advisory via `@astrojs/vercel` (low real
       risk, route patterns aren't user input; not force-fixed since that would
       downgrade the adapter)
+- [x] Weather icons — [Meteocons](https://meteocons.com) (`@meteocons/svg-static`,
+      MIT), flat style per preference. `thermometer`/`humidity`/`pressure-high`+
+      `pressure-low` (picked dynamically by value)/`wind`/`raindrop` in both the
+      current-conditions cards and the matching chart headers.
 - [ ] Pick and register the domain — **still undecided, blocking**: the Vercel
       custom-domain step and any hardcoded URLs
 - [ ] Create `web/` as its own Vercel project — **not done**. Note: a Vercel
