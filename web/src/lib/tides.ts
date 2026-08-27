@@ -23,12 +23,31 @@ export interface TideEvent {
   type: "high" | "low";
 }
 
+export interface TidePoint {
+  /** ISO 8601 instant, UTC, model timing correction already applied. */
+  time: string;
+  heightM: number;
+}
+
 export interface TideStatus {
   currentHeightM: number;
   trend: "rising" | "falling";
   nextHigh: TideEvent | null;
   nextLow: TideEvent | null;
+  /** Most recent high/low before now — lets the card say "High tide" for the
+   *  ~45 min around slack water on either side of the turn, not just before it. */
+  lastExtreme: TideEvent | null;
+  /** Hourly heights from ~4 h ago to ~16 h ahead, for drawing the tide curve. */
+  curve: TidePoint[];
+  /** Min/max height across `curve` — the visible tidal range, for the y-scale
+   *  and for deciding "high/low tide now" vs "rising/falling". */
+  rangeM: { min: number; max: number };
 }
+
+// How much of the curve to expose: a little history for context, then the day
+// ahead. `now` lands ~20% from the left at these values.
+const CURVE_BEFORE_MS = 4 * 3600_000;
+const CURVE_AFTER_MS = 16 * 3600_000;
 
 interface MarineResponse {
   hourly: {
@@ -72,8 +91,25 @@ export async function getTideStatus(): Promise<TideStatus | null> {
   const events = findExtrema(ms, heights);
   const nextHigh = events.find((e) => e.type === "high" && new Date(e.time).getTime() > now) ?? null;
   const nextLow = events.find((e) => e.type === "low" && new Date(e.time).getTime() > now) ?? null;
+  const lastExtreme =
+    [...events].reverse().find((e) => new Date(e.time).getTime() <= now) ?? null;
 
-  return { currentHeightM, trend, nextHigh, nextLow };
+  // Windowed hourly curve, same timing/datum corrections as the extrema so the
+  // "now" dot and the high/low markers sit consistently on the drawn line.
+  const curve: TidePoint[] = [];
+  for (let i = 0; i < ms.length; i++) {
+    const h = heights[i];
+    if (h === null) continue;
+    const t = ms[i] + MODEL_LAG_CORRECTION_MIN * 60_000;
+    if (t < now - CURVE_BEFORE_MS || t > now + CURVE_AFTER_MS) continue;
+    curve.push({ time: new Date(t).toISOString(), heightM: h + CHART_DATUM_OFFSET_M });
+  }
+  const inWindow = curve.map((p) => p.heightM);
+  const rangeM = inWindow.length
+    ? { min: Math.min(...inWindow), max: Math.max(...inWindow) }
+    : { min: currentHeightM - 1, max: currentHeightM + 1 };
+
+  return { currentHeightM, trend, nextHigh, nextLow, lastExtreme, curve, rangeM };
 }
 
 /**

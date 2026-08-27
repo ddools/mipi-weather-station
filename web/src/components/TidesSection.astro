@@ -10,7 +10,6 @@ interface Props {
 const { class: className } = Astro.props;
 
 const status = await getTideStatus();
-const icon = status?.trend === "rising" ? tideHighIcon : tideLowIcon;
 
 function formatTime(iso: string | undefined): string {
   if (!iso) return "—";
@@ -22,6 +21,110 @@ function formatTime(iso: string | undefined): string {
     timeZone: "Europe/Dublin",
   });
 }
+
+function untilLabel(iso: string | undefined): string {
+  if (!iso) return "";
+  const mins = Math.round((new Date(iso).getTime() - Date.now()) / 60_000);
+  if (mins <= 0) return "now";
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h ? `${h}h ${m}m` : `${m}m`;
+}
+
+// --- Glance state: where are we in the cycle right now? ---------------------
+// "High/Low tide" for the ~45 min around slack water (either side of the turn);
+// "Coming in / Going out" the rest of the time.
+const SLACK_WINDOW_MIN = 45;
+const minsTo = (iso: string | undefined) =>
+  iso ? Math.abs(new Date(iso).getTime() - Date.now()) / 60_000 : Infinity;
+
+let stateLabel = "";
+let target: { time: string; heightM: number } | null = null;
+let targetWord = "";
+if (status) {
+  const nearHigh =
+    minsTo(status.nextHigh?.time) <= SLACK_WINDOW_MIN ||
+    (status.lastExtreme?.type === "high" && minsTo(status.lastExtreme.time) <= SLACK_WINDOW_MIN);
+  const nearLow =
+    minsTo(status.nextLow?.time) <= SLACK_WINDOW_MIN ||
+    (status.lastExtreme?.type === "low" && minsTo(status.lastExtreme.time) <= SLACK_WINDOW_MIN);
+
+  if (nearHigh) stateLabel = "High tide";
+  else if (nearLow) stateLabel = "Low tide";
+  else stateLabel = status.trend === "rising" ? "Coming in" : "Going out";
+
+  target = status.trend === "rising" ? status.nextHigh : status.nextLow;
+  targetWord = status.trend === "rising" ? "high" : "low";
+}
+const icon =
+  status && (stateLabel === "High tide" || status.trend === "rising")
+    ? tideHighIcon
+    : tideLowIcon;
+
+// --- Tide curve geometry (zero-JS inline SVG, stretched to card width) ------
+const VB_W = 300;
+const VB_H = 104;
+const PAD_Y = 16;
+
+interface XY {
+  x: number;
+  y: number;
+}
+
+let linePath = "";
+let areaPath = "";
+let nowDot: XY | null = null;
+let extremaMarkers: (XY & { label: string; type: "high" | "low" })[] = [];
+
+if (status && status.curve.length >= 2) {
+  const t0 = new Date(status.curve[0].time).getTime();
+  const t1 = new Date(status.curve[status.curve.length - 1].time).getTime();
+  const tSpan = t1 - t0 || 1;
+  const { min, max } = status.rangeM;
+  const hSpan = max - min || 1;
+
+  const px = (t: number) => ((t - t0) / tSpan) * VB_W;
+  const py = (h: number) => PAD_Y + (1 - (h - min) / hSpan) * (VB_H - 2 * PAD_Y);
+
+  const pts: XY[] = status.curve.map((p) => ({
+    x: px(new Date(p.time).getTime()),
+    y: py(p.heightM),
+  }));
+
+  // Catmull-Rom → cubic Bézier for a smooth wave (tension keeps it near the data).
+  const f = (n: number) => n.toFixed(1);
+  const t = 0.8;
+  linePath = `M${f(pts[0].x)} ${f(pts[0].y)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] ?? pts[i];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[i + 2] ?? p2;
+    const c1x = p1.x + ((p2.x - p0.x) / 6) * t;
+    const c1y = p1.y + ((p2.y - p0.y) / 6) * t;
+    const c2x = p2.x - ((p3.x - p1.x) / 6) * t;
+    const c2y = p2.y - ((p3.y - p1.y) / 6) * t;
+    linePath += ` C${f(c1x)} ${f(c1y)}, ${f(c2x)} ${f(c2y)}, ${f(p2.x)} ${f(p2.y)}`;
+  }
+  areaPath = `${linePath} L${f(VB_W)} ${VB_H} L0 ${VB_H} Z`;
+
+  const now = Date.now();
+  nowDot = { x: px(now), y: py(status.currentHeightM) };
+
+  for (const e of [status.nextHigh, status.nextLow]) {
+    if (!e) continue;
+    const et = new Date(e.time).getTime();
+    if (et < t0 || et > t1) continue;
+    extremaMarkers.push({
+      x: px(et),
+      y: py(e.heightM),
+      label: formatTime(e.time),
+      type: e.type,
+    });
+  }
+}
+
+const nowPct = nowDot ? (nowDot.x / VB_W) * 100 : 0;
 ---
 
 <Card className={className}>
@@ -37,9 +140,86 @@ function formatTime(iso: string | undefined): string {
             <span class="text-3xl font-semibold tabular-nums">
               {status.currentHeightM.toFixed(1)} m
             </span>
-            <span class="text-sm text-muted-foreground capitalize">{status.trend}</span>
+            <span class="text-base font-medium text-sky-600 dark:text-sky-400">{stateLabel}</span>
           </div>
-          <div class="mt-3 grid grid-cols-2 gap-4 text-sm">
+          <p class="mt-0.5 text-sm text-muted-foreground tabular-nums">
+            {target
+              ? `${targetWord === "high" ? "High" : "Low"} tide ${formatTime(target.time)} · in ${untilLabel(target.time)}`
+              : status.trend === "rising"
+                ? "Rising"
+                : "Falling"}
+          </p>
+
+          <div class="relative mt-4">
+            <svg
+              class="block h-28 w-full text-sky-500"
+              viewBox={`0 0 ${VB_W} ${VB_H}`}
+              preserveAspectRatio="none"
+              aria-hidden="true"
+            >
+              <path d={areaPath} fill="currentColor" fill-opacity="0.14" />
+              <path
+                d={linePath}
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                vector-effect="non-scaling-stroke"
+              />
+              {nowDot && (
+                <line
+                  x1={nowDot.x}
+                  y1="0"
+                  x2={nowDot.x}
+                  y2={VB_H}
+                  stroke="currentColor"
+                  stroke-opacity="0.3"
+                  stroke-width="1"
+                  stroke-dasharray="3 3"
+                  vector-effect="non-scaling-stroke"
+                />
+              )}
+            </svg>
+            {/* Dots + labels as HTML so preserveAspectRatio="none" doesn't
+                squash circles into ovals or stretch the text. */}
+            <div
+              class="pointer-events-none absolute inset-0 text-[10px] text-muted-foreground"
+              role="img"
+              aria-label={`Tide curve — currently ${stateLabel.toLowerCase()} at ${status.currentHeightM.toFixed(1)} metres`}
+            >
+              {extremaMarkers.map((m) => (
+                <>
+                  <span
+                    class="absolute h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-sky-500"
+                    style={`left:${(m.x / VB_W) * 100}%;top:${(m.y / VB_H) * 100}%`}
+                  />
+                  <span
+                    class="absolute -translate-x-1/2 tabular-nums whitespace-nowrap"
+                    style={`left:${Math.min(90, Math.max(10, (m.x / VB_W) * 100))}%;${
+                      m.type === "high" ? "top:-3px" : "bottom:-3px"
+                    }`}
+                  >
+                    {m.type === "high" ? "▲" : "▼"} {m.label}
+                  </span>
+                </>
+              ))}
+              {nowDot && (
+                <span
+                  class="absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500 ring-2 ring-card"
+                  style={`left:${nowPct}%;top:${(nowDot.y / VB_H) * 100}%`}
+                />
+              )}
+              <span
+                class="absolute bottom-0 -translate-x-1/2 font-medium text-foreground/70"
+                style={`left:${Math.min(94, Math.max(6, nowPct))}%`}
+              >
+                now
+              </span>
+            </div>
+          </div>
+
+          <div class="mt-5 grid grid-cols-2 gap-4 text-sm">
             <div>
               <p class="text-muted-foreground">Next high</p>
               <p class="font-medium tabular-nums">
@@ -55,6 +235,7 @@ function formatTime(iso: string | undefined): string {
               </p>
             </div>
           </div>
+
           <p class="mt-3 text-xs text-muted-foreground">
             Approximate — an ocean model calibrated to Skerries Harbour, usually
             within ~15 min of the official prediction. Not for navigation.
