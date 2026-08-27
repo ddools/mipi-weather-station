@@ -8,6 +8,58 @@ Scope: the visitor-facing weather page only. Collector/upload work is tracked in
 [TODO.md](TODO.md); hardware in [docs/sensors.md](docs/sensors.md). This doc does
 **not** re-litigate the architecture decisions in [CLAUDE.md](CLAUDE.md).
 
+## Progress — 2026-08-27 (branch `dashboard-ux-enhancements`)
+
+Items **2–15 shipped** in one pass. `npm run build` clean; verified in a headless
+browser (desktop + mobile, light + dark, 24h/7d/30d). What changed:
+
+- New shared helpers in [format.ts](web/src/lib/format.ts): `msToKmh`,
+  `beaufort`, `pressureTrend`, `MS_TO_KMH`, `MS_TO_KNOTS`.
+- New `getTodaySummary()` in [supabase.ts](web/src/lib/supabase.ts) (today's
+  min/max, gust max, 3-window rain totals, pressure-3h-ago, + a 48-pt downsample
+  for sparklines) and a thin [`/api/summary`](web/src/pages/api/summary.ts) route
+  so the 5-min client refresh gets ~10 numbers instead of the raw 24h rows. First
+  paint comes straight from the server island — no route hit.
+- [CurrentConditions.astro](web/src/components/CurrentConditions.astro) reworked:
+  placeholder gone; H/L-today on temp; pressure trend; wind is km/h-primary +
+  m/s + Beaufort with the compass merged in (the separate Wind Direction card is
+  gone); Rain card is "today / last hour / 24h"; SSR sparklines on
+  temp/pressure/humidity/wind ([Sparkline.astro](web/src/components/Sparkline.astro),
+  zero-JS inline SVG); tab title shows the current temp.
+- [HistoryCharts.tsx](web/src/components/HistoryCharts.tsx) rebuilt: the triple-
+  axis chart is split into Temperature+dewpoint / Pressure / Humidity; new Wind
+  speed+gust chart; wind rose is now frequency-by-speed-band, not average speed;
+  per-range x-axis formatting.
+- [Layout.astro](web/src/layouts/Layout.astro): station metadata line, footer
+  with repo link, description + OpenGraph/Twitter meta, canonical URL.
+
+### Tides — relabelled Skerries + accuracy fix (2026-08-27)
+
+The card was ~45–75 min off. Three causes, all fixed in
+[tides.ts](web/src/lib/tides.ts) / [TidesSection.astro](web/src/components/TidesSection.astro):
+
+1. **Timezone** — `formatTime` used the runtime default zone. Server islands
+   render in UTC on Vercel, so summer times read an hour early. Pinned to
+   `Europe/Dublin`.
+2. **Hourly snap** — extrema were the raw hourly model samples (±30 min). Now
+   refined by fitting a parabola through each turning point and its neighbours.
+3. **Model bias** — Open-Meteo runs ~22 min early and ~2.8 m below chart datum
+   versus the Skerries Harbour harmonic prediction. Two documented constants,
+   `MODEL_LAG_CORRECTION_MIN` and `CHART_DATUM_OFFSET_M`, correct both (heights
+   were previously negative because they were MSL-referenced).
+
+Accuracy check: [`web/scripts/verify-tides.mjs`](web/scripts/verify-tides.mjs)
+(`npm run verify:tides`) diffs the corrected model against a hardcoded
+tidetime.org reference and fails if mean error exceeds 20 min / 0.6 m. Current
+fit: **mean 5.3 min, max 12 min, 0.08 m**. Re-tune the two constants and refresh
+the reference day in the script if it drifts. Not wired into CI (external API).
+
+**Still open:** #1 (Pi-side temp source — the live temp chart shows a step down
+from ~27 °C to ~19 °C around 18:00 on 2026-08-27, so the DS18B20 switch may
+already have landed; confirm on the Pi). #16 P3 polish (feels-like, records
+strip, chart auto-refresh, chart-a11y table). Sparklines are SSR and do not
+redraw on the 5-min refresh — acceptable for a session; revisit if wanted.
+
 ## Current page (what a visitor sees today)
 
 Single page, [web/src/pages/index.astro](web/src/pages/index.astro):
@@ -33,10 +85,10 @@ wind_speed_ms, wind_gust_ms, wind_dir_deg, rain_mm, dewpoint_c, recorded_at`.
 |---|--------|----------|---------|
 | 1 | Fix the temperature source (shows ~28 °C, should be ~17 °C) | **P0** | Pi, not `web/` |
 | 2 | Remove broken-looking `updated —` placeholder on the temp card | **P0** | `web/` |
-| 3 | Temp / wind-gust / pressure high–low for **today** | **P1** | `web/` + aggregate |
+| 3 | Temp / wind-gust / pressure high–low for **today** | **P1** | `web/` |
 | 4 | Wind in **km/h** (primary) + m/s + Beaufort | **P1** | `web/` |
-| 5 | Pressure **trend** arrow (rising / steady / falling) | **P1** | `web/` + aggregate |
-| 6 | Rain: **"today" total** instead of raw interval | **P1** | `web/` + aggregate |
+| 5 | Pressure **trend** arrow (rising / steady / falling) | **P1** | `web/` |
+| 6 | Rain: **"today" total** instead of raw interval | **P1** | `web/` |
 | 7 | Add a **wind speed/gust time-series** chart | **P1** | `web/` |
 | 8 | Wind rose by **frequency**, not average speed | **P2** | `web/` |
 | 9 | **Merge** the two wind cards | **P2** | `web/` |
@@ -96,17 +148,25 @@ just the trend arrow from #5).
 
 - "Today" = since local midnight **Europe/Dublin**. Label it `(today)` so a
   visitor at 00:30 isn't confused by a tiny range.
-- **Cheap path:** compute min/max client-side from `/api/history?range=24h`,
-  which the History section already fetches — the raw 24h rows are returned
-  unbucketed ([supabase.ts:64](web/src/lib/supabase.ts#L64)). Filter to
-  today-local, `Math.min/max`.
-- **Better path:** a Postgres RPC / view returning `temp_min_today`,
-  `temp_max_today`, `gust_max_today`, `rain_today`, `pressure_min_24h`,
-  `pressure_max_24h`, `pressure_3h_ago`. Add it to
-  [docs/supabase-retention.sql](docs/supabase-retention.sql) alongside the
-  rollup work, expose via a new `/api/summary` route, fetch once on load and on
-  the 45s refresh. Preferred once the table has real history — see the
-  "pulling every raw row" caveat in [TODO.md](TODO.md) §2.
+- **No new API route.** The 24h window is permanently small (~1,440 rows at 60s,
+  regardless of how much history accumulates) and the History section already
+  downloads exactly these rows on load. `getHistory("24h")` returns them
+  unbucketed ([supabase.ts:64](web/src/lib/supabase.ts#L64)).
+- **First paint:** `CurrentConditions.astro` is a server island that already
+  calls `getLatestReading()` server-side. Add a `getTodaySummary()` helper to
+  [web/src/lib/supabase.ts](web/src/lib/supabase.ts) that reuses
+  `getHistory("24h")` and returns `{ tempMin, tempMax, gustMax, rainToday,
+  rainLastHour, rain24h, pressure3hAgo }`; `await` it in the island next to the
+  latest reading. Zero client JS, real numbers on first render.
+- **45s refresh:** either have the inline script also fetch the existing
+  `/api/history?range=24h` and recompute, or accept extremes that lag by one
+  refresh interval (they barely move minute to minute). Don't add a route.
+- A server-side aggregate only earns its place for the **records** feature
+  (P3, #16) — month/all-time extremes need 30–90 days of rows, which should come
+  from the hourly rollup table in
+  [docs/supabase-retention.sql](docs/supabase-retention.sql), not a bespoke RPC,
+  and only once that table exists. See the "pulling every raw row" caveat in
+  [TODO.md](TODO.md) §2.
 
 ### 4. Wind in km/h (primary), plus m/s and Beaufort
 
@@ -141,8 +201,8 @@ exactly this (`status.trend`,
 [TidesSection.astro:31](web/src/components/TidesSection.astro#L31)).
 
 Add to the pressure card: `↑ rising 1.2 hPa / 3h`, `→ steady`, `↓ falling`.
-Compute from `pressure_msl_hpa` now vs ~3h ago (from the 24h history rows, or the
-`/api/summary` RPC in #3). Threshold ~±0.5 hPa/3h for "steady".
+Compute from `pressure_msl_hpa` now vs ~3h ago — `pressure3hAgo` comes from the
+same `getTodaySummary()` helper as #3. Threshold ~±0.5 hPa/3h for "steady".
 
 ### 6. Rain: "today" total, not raw interval
 
@@ -160,8 +220,8 @@ Last hour 0.0 mm  ·  Last 24h 3.1 mm
 
 All three are sums of `rain_mm` over the window (`rain_mm` accumulates per
 archive record; `bucketHourly` already sums rather than averages it —
-[supabase.ts:95-97](web/src/lib/supabase.ts#L95-L97)). Same data-source choice as
-#3 (client-side from 24h rows, or `/api/summary`).
+[supabase.ts:95-97](web/src/lib/supabase.ts#L95-L97)). Same source as #3 —
+`getTodaySummary()` over the 24h rows, no new route.
 
 ### 7. Wind speed/gust time-series chart
 
@@ -266,7 +326,10 @@ glanceability.
 
 - **Feels-like / apparent temperature** (wind chill + humidity) on the temp card.
 - **Records strip**: "Warmest this month 24 °C · Max gust 47 km/h · Wettest day
-  12 mm" — trivial once the `/api/summary` RPC exists.
+  12 mm" — this is the one feature that needs a server-side aggregate: query the
+  hourly rollup table from
+  [docs/supabase-retention.sql](docs/supabase-retention.sql) (build that first),
+  not raw rows and not a bespoke RPC.
 - **Charts auto-refresh** — only the current-conditions cards poll today; the
   history charts freeze after load. A 5-min `setInterval` re-fetch on the active
   range would do it.
@@ -281,10 +344,10 @@ glanceability.
 1. **#1** — fix the temperature source on the Pi. Nothing else matters while the
    headline number is 10° off. (Blocks nothing else technically, but do it first.)
 2. **#2** — delete the `updated —` placeholder. Five minutes.
-3. **#3 + #5 + #6** — one pass over `CurrentConditions.astro`: today's high/low,
-   pressure trend, rain-today. Decide client-side-from-24h vs `/api/summary` RPC
-   up front (RPC preferred; put the SQL in
-   [docs/supabase-retention.sql](docs/supabase-retention.sql)).
+3. **#3 + #5 + #6** — one pass: add `getTodaySummary()` to
+   [web/src/lib/supabase.ts](web/src/lib/supabase.ts), consume it in the
+   `CurrentConditions.astro` server island for today's high/low, pressure trend,
+   and rain-today. No new API route.
 4. **#4 + #9** — wind: km/h + Beaufort, and merge the two wind cards in the same
    edit.
 5. **#7 + #8** — wind time-series chart, and fix the wind rose to frequency.
@@ -297,8 +360,12 @@ glanceability.
 
 - Everything must still build in CI with dummy `PUBLIC_SUPABASE_*` env
   ([TODO.md](TODO.md) §5) — keep live-data paths at request time, not build time.
-- New `/api/*` routes need `export const prerender = false` (see
-  [web/src/pages/api/history.ts](web/src/pages/api/history.ts)).
+- The P1 card work needs **no new `/api/*` route** — a `getTodaySummary()` helper
+  in [web/src/lib/supabase.ts](web/src/lib/supabase.ts), consumed by the
+  `CurrentConditions.astro` server island, covers it. The 24h window is always
+  ~1,440 rows. (If a new route ever is added, it needs
+  `export const prerender = false` — see
+  [web/src/pages/api/history.ts](web/src/pages/api/history.ts).)
 - shadcn `CardHeader` is `grid` by default — need `flex` before `flex-row` for
   icon+title rows ([TODO.md](TODO.md) §2, Meteocons note).
 - Don't pull 30d of raw rows for new aggregates — reuse / extend the hourly

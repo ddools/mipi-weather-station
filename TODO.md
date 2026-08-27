@@ -143,6 +143,16 @@ domain may come later).
       cert issued — `https://weather.dermotdooley.com/api/current` returns live
       Supabase data. (Note: a local macOS resolver cache can lag; public DNS is
       fine.)
+- [x] Dashboard UX enhancement pass (2026-08-27, branch
+      `dashboard-ux-enhancements`) — see [product-enhancement.md](product-enhancement.md).
+      Today's H/L on the temp card; wind in km/h + Beaufort with the compass
+      merged into the Wind card (dropped the separate Wind Direction tile);
+      pressure trend arrow; Rain card is "today / last hour / 24h"; SSR
+      sparklines on the stat cards; `/api/summary` route + `getTodaySummary()`.
+      History charts: split the triple-axis chart into three, added a wind
+      speed/gust chart, wind rose is now frequency-by-speed-band, per-range
+      x-axis formatting. Layout: station metadata line, footer, OG/description
+      meta, tab-title shows current temp.
 - [ ] Benchmark: live value updates within 60s of a new reading; mobile Lighthouse ≥ 90
 
 ## 3. Weather Underground upload (plan.MD Details/D)

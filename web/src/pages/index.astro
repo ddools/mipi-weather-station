@@ -9,13 +9,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 <Layout>
   <section class="mb-6">
     <CurrentConditions server:defer>
-      <div slot="fallback" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Skeleton className="h-28" />
-        <Skeleton className="h-28" />
-        <Skeleton className="h-28" />
-        <Skeleton className="h-28" />
-        <Skeleton className="h-28" />
-        <Skeleton className="h-28" />
+      <div slot="fallback" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Skeleton className="h-32" />
+        <Skeleton className="h-32" />
+        <Skeleton className="h-32" />
+        <Skeleton className="h-32 sm:col-span-2" />
+        <Skeleton className="h-32" />
       </div>
     </CurrentConditions>
   </section>

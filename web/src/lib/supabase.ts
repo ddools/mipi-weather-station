@@ -65,6 +65,107 @@ export async function getHistory(range: HistoryRange): Promise<Reading[]> {
   return bucketHourly(rows);
 }
 
+export interface TodaySummary {
+  /** min/max of instantaneous temperature since local midnight (Europe/Dublin). */
+  tempMin: number | null;
+  tempMax: number | null;
+  /** highest gust and highest sustained wind since local midnight. */
+  gustMax: number | null;
+  windMax: number | null;
+  /** rain accumulation, in mm, over three windows. */
+  rainToday: number;
+  rainLastHour: number;
+  rain24h: number;
+  /** sea-level pressure now and ~3h ago, for the trend indicator. */
+  pressureNow: number | null;
+  pressure3hAgo: number | null;
+  /** ~48-point downsample of the last 24h, oldest→newest, for card sparklines. */
+  spark: {
+    temp: (number | null)[];
+    pressure: (number | null)[];
+    humidity: (number | null)[];
+    wind: (number | null)[];
+  };
+}
+
+const dublinDate = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Europe/Dublin",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function max(values: (number | null)[]): number | null {
+  const nums = values.filter((v): v is number => v !== null && !Number.isNaN(v));
+  return nums.length ? Math.max(...nums) : null;
+}
+function min(values: (number | null)[]): number | null {
+  const nums = values.filter((v): v is number => v !== null && !Number.isNaN(v));
+  return nums.length ? Math.min(...nums) : null;
+}
+function sumRain(rows: Reading[]): number {
+  return rows.reduce((acc, r) => acc + (r.rain_mm ?? 0), 0);
+}
+
+/**
+ * Derived "today so far" figures for the current-conditions cards. Computed from
+ * the raw 24h rows (always ~1,440 at a 60s archive interval, regardless of how
+ * much history exists) — no server-side aggregate needed at this scale.
+ */
+export async function getTodaySummary(): Promise<TodaySummary> {
+  const rows = await getHistory("24h");
+  const now = Date.now();
+  const todayStr = dublinDate.format(new Date(now));
+  const todayRows = rows.filter((r) => dublinDate.format(new Date(r.recorded_at)) === todayStr);
+
+  const hourAgo = now - 3600_000;
+  const lastHourRows = rows.filter((r) => new Date(r.recorded_at).getTime() >= hourAgo);
+
+  // Row nearest to 3h ago, for the pressure trend.
+  const target = now - 3 * 3600_000;
+  let pressure3hAgo: number | null = null;
+  let bestGap = Infinity;
+  for (const r of rows) {
+    if (r.pressure_msl_hpa === null) continue;
+    const gap = Math.abs(new Date(r.recorded_at).getTime() - target);
+    if (gap < bestGap) {
+      bestGap = gap;
+      pressure3hAgo = r.pressure_msl_hpa;
+    }
+  }
+  // Only trust it if we actually have a reading within ±45 min of the 3h mark.
+  if (bestGap > 45 * 60_000) pressure3hAgo = null;
+
+  const latest = rows[rows.length - 1] ?? null;
+
+  return {
+    tempMin: min(todayRows.map((r) => r.temp_c)),
+    tempMax: max(todayRows.map((r) => r.temp_c)),
+    gustMax: max(todayRows.map((r) => r.wind_gust_ms)),
+    windMax: max(todayRows.map((r) => r.wind_speed_ms)),
+    rainToday: sumRain(todayRows),
+    rainLastHour: sumRain(lastHourRows),
+    rain24h: sumRain(rows),
+    pressureNow: latest?.pressure_msl_hpa ?? null,
+    pressure3hAgo,
+    spark: {
+      temp: downsample(rows.map((r) => r.temp_c), 48),
+      pressure: downsample(rows.map((r) => r.pressure_msl_hpa), 48),
+      humidity: downsample(rows.map((r) => r.humidity), 48),
+      wind: downsample(rows.map((r) => r.wind_speed_ms), 48),
+    },
+  };
+}
+
+/** Take every Nth-ish point so a long series renders as a compact sparkline. */
+function downsample(values: (number | null)[], target: number): (number | null)[] {
+  if (values.length <= target) return values;
+  const step = values.length / target;
+  const out: (number | null)[] = [];
+  for (let i = 0; i < target; i++) out.push(values[Math.floor(i * step)]);
+  return out;
+}
+
 function bucketHourly(rows: Reading[]): Reading[] {
   const buckets = new Map<string, Reading[]>();
   for (const row of rows) {

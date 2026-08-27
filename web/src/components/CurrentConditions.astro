@@ -1,19 +1,26 @@
 ---
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getLatestReading } from "@/lib/supabase";
-import { degToCompass, fmt } from "@/lib/format";
+import Sparkline from "@/components/Sparkline.astro";
+import { getLatestReading, getTodaySummary } from "@/lib/supabase";
+import { degToCompass, fmt, beaufort, msToKmh, pressureTrend } from "@/lib/format";
 import thermometerIcon from "@meteocons/svg/flat/thermometer.svg?url";
 import humidityIcon from "@meteocons/svg/flat/humidity.svg?url";
 import pressureHighIcon from "@meteocons/svg/flat/pressure-high.svg?url";
 import pressureLowIcon from "@meteocons/svg/flat/pressure-low.svg?url";
 import windIcon from "@meteocons/svg/flat/wind.svg?url";
 import rainIcon from "@meteocons/svg/flat/rain.svg?url";
-import compassIcon from "@meteocons/svg/flat/compass.svg?url";
 import compassSvgRaw from "@meteocons/svg/flat/compass.svg?raw";
 
-const reading = await getLatestReading();
+const [reading, summary] = await Promise.all([getLatestReading(), getTodaySummary()]);
+
 const pressureIcon =
   (reading?.pressure_msl_hpa ?? 1013) >= 1013 ? pressureHighIcon : pressureLowIcon;
+
+const trend = pressureTrend(summary.pressureNow, summary.pressure3hAgo);
+const bft = beaufort(reading?.wind_speed_ms ?? null);
+const windKmh = msToKmh(reading?.wind_speed_ms ?? null);
+const gustKmh = msToKmh(reading?.wind_gust_ms ?? null);
+const gustMaxKmh = msToKmh(summary.gustMax);
 
 // The compass icon's needle is a separate <g id="Pointer"> group with its own
 // idle wobble animation (SMIL animateTransform, rotate -6..6deg). We point it
@@ -58,7 +65,11 @@ const lastUpdatedAbs = reading?.recorded_at
   : null;
 ---
 
-<div id="current-conditions" data-recorded-at={reading?.recorded_at ?? ""}>
+<div
+  id="current-conditions"
+  data-recorded-at={reading?.recorded_at ?? ""}
+  data-wind-dir-deg={reading?.wind_dir_deg ?? ""}
+>
   <div class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
     <span class="flex items-center gap-2 font-medium">
       <span class="relative flex h-2.5 w-2.5">
@@ -83,7 +94,7 @@ const lastUpdatedAbs = reading?.recorded_at
     </span>
   </div>
 
-  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
     <Card>
       <CardHeader className="flex items-center gap-2">
         <img src={thermometerIcon} alt="" class="h-10 w-10" />
@@ -93,24 +104,21 @@ const lastUpdatedAbs = reading?.recorded_at
         <div class="text-3xl font-semibold tabular-nums" data-field="temp_c">
           {fmt(reading?.temp_c ?? null, 1, "°C")}
         </div>
-        <p class="mt-2 text-sm text-muted-foreground">
+        <p class="mt-2 text-sm text-muted-foreground tabular-nums">
+          <span class="text-foreground/70">H</span> <span data-field="temp_max"
+            >{fmt(summary.tempMax, 1, "°")}</span
+          ><span class="mx-1.5">·</span><span class="text-foreground/70">L</span> <span
+            data-field="temp_min">{fmt(summary.tempMin, 1, "°")}</span
+          ><span class="ml-1.5 text-xs">today</span>
+        </p>
+        <p class="mt-1 text-sm text-muted-foreground">
           Dewpoint <span data-field="dewpoint_c">{fmt(reading?.dewpoint_c ?? null, 1, "°C")}</span>
         </p>
-        <p class="mt-1 text-xs text-muted-foreground" data-field="updated" id="updated-label">
-          updated —
-        </p>
-      </CardContent>
-    </Card>
-
-    <Card>
-      <CardHeader className="flex items-center gap-2">
-        <img src={humidityIcon} alt="" class="h-10 w-10" />
-        <CardTitle>Humidity</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div class="text-3xl font-semibold tabular-nums" data-field="humidity">
-          {fmt(reading?.humidity ?? null, 0, "%")}
-        </div>
+        <Sparkline
+          values={summary.spark.temp}
+          color="#ef4444"
+          class="mt-3 w-full text-muted-foreground/60"
+        />
       </CardContent>
     </Card>
 
@@ -123,76 +131,140 @@ const lastUpdatedAbs = reading?.recorded_at
         <div class="text-3xl font-semibold tabular-nums" data-field="pressure_msl_hpa">
           {fmt(reading?.pressure_msl_hpa ?? null, 0, " hPa")}
         </div>
-        <p class="mt-1 text-xs text-muted-foreground">sea-level adjusted</p>
+        <p class="mt-2 text-sm text-muted-foreground tabular-nums" id="pressure-trend">
+          {
+            trend
+              ? `${trend.arrow} ${trend.label} ${Math.abs(trend.deltaHpa).toFixed(1)} hPa / 3h`
+              : "sea-level adjusted"
+          }
+        </p>
+        <Sparkline
+          values={summary.spark.pressure}
+          color="#8b5cf6"
+          class="mt-3 w-full text-muted-foreground/60"
+        />
       </CardContent>
     </Card>
 
     <Card>
+      <CardHeader className="flex items-center gap-2">
+        <img src={humidityIcon} alt="" class="h-10 w-10" />
+        <CardTitle>Humidity</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div class="text-3xl font-semibold tabular-nums" data-field="humidity">
+          {fmt(reading?.humidity ?? null, 0, "%")}
+        </div>
+        <Sparkline
+          values={summary.spark.humidity}
+          color="#3b82f6"
+          class="mt-3 w-full text-muted-foreground/60"
+        />
+      </CardContent>
+    </Card>
+
+    <Card className="sm:col-span-2">
       <CardHeader className="flex items-center gap-2">
         <img src={windIcon} alt="" class="h-10 w-10" />
         <CardTitle>Wind</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div class="text-3xl font-semibold tabular-nums" data-field="wind_speed_ms">
-          {fmt(reading?.wind_speed_ms ?? null, 1, " m/s")}
-        </div>
-        <p class="mt-1 text-xs text-muted-foreground">
-          gust <span data-field="wind_gust_ms">{fmt(reading?.wind_gust_ms ?? null, 1, " m/s")}</span>
-          · <span data-field="wind_dir">{degToCompass(reading?.wind_dir_deg ?? null)}</span>
-        </p>
-      </CardContent>
-    </Card>
-
-    <Card>
-      <CardHeader className="flex items-center gap-2">
-        <img src={compassIcon} alt="" class="h-10 w-10" />
-        <CardTitle>Wind Direction</CardTitle>
-      </CardHeader>
-      <CardContent className="flex items-center gap-4">
-        <div id="wind-compass" class="h-20 w-20 shrink-0" set:html={compassSvg} />
-        <div>
-          <div class="text-2xl font-semibold tabular-nums" data-field="wind_dir_label">
-            {degToCompass(reading?.wind_dir_deg ?? null)}
+      <CardContent className="flex flex-wrap items-center gap-x-8 gap-y-4">
+        <div class="flex items-center gap-4">
+          <div id="wind-compass" class="h-20 w-20 shrink-0" set:html={compassSvg} />
+          <div>
+            <div class="flex items-baseline gap-2">
+              <span class="text-3xl font-semibold tabular-nums" data-field="wind_kmh">
+                {windKmh === null ? "—" : `${Math.round(windKmh)} km/h`}
+              </span>
+              <span class="text-sm text-muted-foreground tabular-nums" data-field="wind_ms">
+                {fmt(reading?.wind_speed_ms ?? null, 1, " m/s")}
+              </span>
+            </div>
+            <p class="mt-1 text-sm text-muted-foreground" data-field="wind_beaufort">
+              {bft ? `Force ${bft.force} · ${bft.label}` : "—"}
+            </p>
           </div>
-          <p class="text-sm text-muted-foreground tabular-nums" data-field="wind_dir_deg">
-            {reading?.wind_dir_deg ?? "—"}°
-          </p>
         </div>
+        <dl class="text-sm text-muted-foreground tabular-nums">
+          <div class="flex gap-2">
+            <dt class="w-32 shrink-0">Gust now</dt>
+            <dd data-field="wind_gust_kmh">
+              {gustKmh === null ? "—" : `${Math.round(gustKmh)} km/h`}
+            </dd>
+          </div>
+          <div class="mt-1 flex gap-2">
+            <dt class="w-32 shrink-0">Max gust today</dt>
+            <dd data-field="wind_gust_max_kmh">
+              {gustMaxKmh === null ? "—" : `${Math.round(gustMaxKmh)} km/h`}
+            </dd>
+          </div>
+          <div class="mt-1 flex gap-2">
+            <dt class="w-32 shrink-0">Direction</dt>
+            <dd>
+              from <span data-field="wind_dir"
+                >{degToCompass(reading?.wind_dir_deg ?? null)}</span
+              > <span data-field="wind_dir_deg">({reading?.wind_dir_deg ?? "—"}°)</span>
+            </dd>
+          </div>
+        </dl>
+        <Sparkline
+          values={summary.spark.wind}
+          color="#10b981"
+          height={28}
+          class="mt-1 w-full basis-full text-muted-foreground/60"
+        />
       </CardContent>
     </Card>
 
     <Card>
       <CardHeader className="flex items-center gap-2">
         <img src={rainIcon} alt="" class="h-10 w-10" />
-        <CardTitle>Rain (interval)</CardTitle>
+        <CardTitle>Rain today</CardTitle>
       </CardHeader>
       <CardContent>
-        <div class="text-3xl font-semibold tabular-nums" data-field="rain_mm">
-          {fmt(reading?.rain_mm ?? null, 1, " mm")}
+        <div class="text-3xl font-semibold tabular-nums" data-field="rain_today">
+          {fmt(summary.rainToday, 1, " mm")}
         </div>
+        <p class="mt-2 text-sm text-muted-foreground tabular-nums">
+          last hour <span data-field="rain_last_hour">{fmt(summary.rainLastHour, 1, " mm")}</span>
+          <span class="mx-1">·</span>
+          24h <span data-field="rain_24h">{fmt(summary.rain24h, 1, " mm")}</span>
+        </p>
       </CardContent>
     </Card>
   </div>
 </div>
 
 <script>
-  const FIELD_UNITS: Record<string, { digits: number; unit: string }> = {
-    temp_c: { digits: 1, unit: "°C" },
-    dewpoint_c: { digits: 1, unit: "°C" },
-    humidity: { digits: 0, unit: "%" },
-    pressure_msl_hpa: { digits: 0, unit: " hPa" },
-    wind_speed_ms: { digits: 1, unit: " m/s" },
-    wind_gust_ms: { digits: 1, unit: " m/s" },
-    rain_mm: { digits: 1, unit: " mm" },
-  };
   const COMPASS = [
     "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
     "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW",
   ];
 
+  const BEAUFORT = [
+    [0.5, 0, "Calm"], [1.5, 1, "Light air"], [3.3, 2, "Light breeze"],
+    [5.5, 3, "Gentle breeze"], [7.9, 4, "Moderate breeze"], [10.7, 5, "Fresh breeze"],
+    [13.8, 6, "Strong breeze"], [17.1, 7, "Near gale"], [20.7, 8, "Gale"],
+    [24.4, 9, "Strong gale"], [28.4, 10, "Storm"], [32.6, 11, "Violent storm"],
+    [Infinity, 12, "Hurricane force"],
+  ] as const;
+
+  function num(value: unknown): number | null {
+    return typeof value === "number" && !Number.isNaN(value) ? value : null;
+  }
   function fmt(value: number | null, digits: number, unit: string) {
-    if (value === null || Number.isNaN(value)) return "—";
-    return `${value.toFixed(digits)}${unit}`;
+    return value === null ? "—" : `${value.toFixed(digits)}${unit}`;
+  }
+  function kmh(ms: number | null) {
+    return ms === null ? "—" : `${Math.round(ms * 3.6)} km/h`;
+  }
+  function beaufort(ms: number | null) {
+    if (ms === null) return "—";
+    const b = BEAUFORT.find(([maxMs]) => ms < maxMs) ?? BEAUFORT[BEAUFORT.length - 1];
+    return `Force ${b[1]} · ${b[2]}`;
+  }
+  function compass(deg: number | null) {
+    return deg === null ? "—" : COMPASS[Math.round(deg / 22.5) % 16];
   }
 
   function timeAgo(iso: string) {
@@ -210,13 +282,20 @@ const lastUpdatedAbs = reading?.recorded_at
   ];
 
   function fmtAbsolute(iso: string) {
-    return new Date(iso).toLocaleString(undefined, {
+    return new Date(iso).toLocaleString("en-IE", {
       day: "2-digit",
       month: "short",
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: "Europe/Dublin",
     });
   }
+
+  const root = () => document.getElementById("current-conditions");
+  const set = (field: string, text: string) => {
+    const el = root()?.querySelector(`[data-field="${field}"]`);
+    if (el) el.textContent = text;
+  };
 
   function updateStatus(iso: string | undefined) {
     const label = document.getElementById("live-label");
@@ -243,52 +322,82 @@ const lastUpdatedAbs = reading?.recorded_at
     updated.textContent = `Last updated ${fmtAbsolute(iso)} · ${timeAgo(iso)}`;
   }
 
-  async function refresh() {
+  async function refreshCurrent() {
     try {
       const res = await fetch("/api/current");
       if (!res.ok) return;
       const reading = await res.json();
       if (!reading) return;
 
-      const root = document.getElementById("current-conditions");
-      if (!root) return;
-      root.dataset.recordedAt = reading.recorded_at;
+      const el = root();
+      if (!el) return;
+      el.dataset.recordedAt = reading.recorded_at;
+      el.dataset.windDirDeg = reading.wind_dir_deg ?? "";
 
-      for (const [field, { digits, unit }] of Object.entries(FIELD_UNITS)) {
-        const el = root.querySelector(`[data-field="${field}"]`);
-        if (el) el.textContent = fmt(reading[field], digits, unit);
-      }
-      const windDirEl = root.querySelector('[data-field="wind_dir"]');
-      if (windDirEl && reading.wind_dir_deg !== null) {
-        const index = Math.round(reading.wind_dir_deg / 22.5) % 16;
-        windDirEl.textContent = COMPASS[index];
-      }
-      const windDirLabelEl = root.querySelector('[data-field="wind_dir_label"]');
-      const windDirDegEl = root.querySelector('[data-field="wind_dir_deg"]');
-      if (reading.wind_dir_deg !== null) {
-        const index = Math.round(reading.wind_dir_deg / 22.5) % 16;
-        if (windDirLabelEl) windDirLabelEl.textContent = COMPASS[index];
-        if (windDirDegEl) windDirDegEl.textContent = `${reading.wind_dir_deg}°`;
+      const temp = num(reading.temp_c);
+      const windMs = num(reading.wind_speed_ms);
+      const gustMs = num(reading.wind_gust_ms);
+      const dir = num(reading.wind_dir_deg);
+
+      set("temp_c", fmt(temp, 1, "°C"));
+      set("dewpoint_c", fmt(num(reading.dewpoint_c), 1, "°C"));
+      set("humidity", fmt(num(reading.humidity), 0, "%"));
+      set("pressure_msl_hpa", fmt(num(reading.pressure_msl_hpa), 0, " hPa"));
+      set("wind_kmh", kmh(windMs));
+      set("wind_ms", fmt(windMs, 1, " m/s"));
+      set("wind_beaufort", beaufort(windMs));
+      set("wind_gust_kmh", kmh(gustMs));
+      set("wind_dir", compass(dir));
+      set("wind_dir_deg", dir === null ? "(—°)" : `(${Math.round(dir)}°)`);
+
+      if (dir !== null) {
         const pointer = document.querySelector("#wind-compass #Pointer");
-        pointer?.setAttribute("transform", `rotate(${Math.round(reading.wind_dir_deg)} 64 64)`);
+        pointer?.setAttribute("transform", `rotate(${Math.round(dir)} 64 64)`);
       }
-      const updatedEl = document.getElementById("updated-label");
-      if (updatedEl) updatedEl.textContent = `updated ${timeAgo(reading.recorded_at)}`;
+      if (temp !== null) {
+        document.title = `${Math.round(temp)}° · Skerries Weather Station`;
+      }
       updateStatus(reading.recorded_at);
     } catch {
       // network hiccup — next interval will retry
     }
   }
 
+  async function refreshSummary() {
+    try {
+      const res = await fetch("/api/summary");
+      if (!res.ok) return;
+      const s = await res.json();
+
+      set("temp_max", fmt(num(s.tempMax), 1, "°"));
+      set("temp_min", fmt(num(s.tempMin), 1, "°"));
+      set("wind_gust_max_kmh", kmh(num(s.gustMax)));
+      set("rain_today", fmt(s.rainToday ?? 0, 1, " mm"));
+      set("rain_last_hour", fmt(s.rainLastHour ?? 0, 1, " mm"));
+      set("rain_24h", fmt(s.rain24h ?? 0, 1, " mm"));
+
+      const now = num(s.pressureNow);
+      const past = num(s.pressure3hAgo);
+      const trendEl = document.getElementById("pressure-trend");
+      if (trendEl && now !== null && past !== null) {
+        const delta = now - past;
+        const arrow = delta > 0.5 ? "↑" : delta < -0.5 ? "↓" : "→";
+        const label = delta > 0.5 ? "rising" : delta < -0.5 ? "falling" : "steady";
+        trendEl.textContent = `${arrow} ${label} ${Math.abs(delta).toFixed(1)} hPa / 3h`;
+      }
+    } catch {
+      // ignore — next interval retries
+    }
+  }
+
   function tickAge() {
-    const root = document.getElementById("current-conditions");
-    const updatedEl = document.getElementById("updated-label");
-    const recordedAt = root?.dataset.recordedAt || undefined;
-    if (updatedEl && recordedAt) updatedEl.textContent = `updated ${timeAgo(recordedAt)}`;
+    const recordedAt = root()?.dataset.recordedAt || undefined;
     updateStatus(recordedAt);
   }
 
   tickAge();
+  refreshCurrent(); // sets the tab title and reconciles any drift since SSR
   setInterval(tickAge, 15_000);
-  setInterval(refresh, 45_000);
+  setInterval(refreshCurrent, 45_000);
+  setInterval(refreshSummary, 5 * 60_000);
 </script>
