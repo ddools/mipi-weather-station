@@ -89,10 +89,62 @@ function categoryXAxis({ isDark, range, times }: AxisCtx) {
   };
 }
 
-function lineOption(
+// Every time-series card is the same chart: a smoothed area under a 2px line,
+// the fill a vertical fade from the series colour to near-transparent, same
+// grid, axis and legend treatment throughout. `stack` groups turn overlapping
+// series into stacked areas (see the wind rose and any future part-of-whole
+// series); independent measurements like temp/dewpoint stay unstacked and just
+// overlap — the fade keeps that readable rather than muddy.
+const HEX = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i;
+function rgba(hex: string, alpha: number): string {
+  const m = HEX.exec(hex);
+  if (!m) return hex;
+  const [r, g, b] = [m[1], m[2], m[3]].map((h) => parseInt(h, 16));
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function fillGradient(color: string) {
+  return {
+    type: "linear" as const,
+    x: 0,
+    y: 0,
+    x2: 0,
+    y2: 1,
+    colorStops: [
+      { offset: 0, color: rgba(color, 0.3) },
+      { offset: 1, color: rgba(color, 0.02) },
+    ],
+  };
+}
+
+interface AreaSeries {
+  name: string;
+  data: (number | null)[];
+  color: string;
+  stack?: string;
+  smooth?: boolean;
+}
+
+function areaSeries({ name, data, color, stack, smooth = true }: AreaSeries) {
+  return {
+    name,
+    type: "line" as const,
+    data,
+    stack,
+    smooth,
+    showSymbol: false,
+    lineStyle: { width: 2 },
+    areaStyle: { color: fillGradient(color) },
+    emphasis: { focus: "series" as const },
+    color,
+  };
+}
+
+function areaChartOption(
   ctx: AxisCtx,
   yName: string,
-  series: NonNullable<EChartsOption["series"]>
+  series: AreaSeries[],
+  yAxis: { min?: number; scale?: boolean } = {}
 ): EChartsOption {
   const { color, muted, split } = baseTextStyle(ctx.isDark);
   return {
@@ -104,57 +156,63 @@ function lineOption(
     yAxis: {
       type: "value",
       name: yName,
-      scale: true,
+      min: yAxis.min,
+      scale: yAxis.scale ?? true,
       axisLabel: { color: muted },
       splitLine: { lineStyle: { color: split } },
     },
-    series,
+    series: series.map(areaSeries),
   };
 }
 
 function tempOption(data: Reading[], ctx: AxisCtx): EChartsOption {
-  return lineOption(ctx, "°C", [
-    { name: "Temp", type: "line", data: data.map((d) => d.temp_c), smooth: true, showSymbol: false, color: C.temp },
-    { name: "Dewpoint", type: "line", data: data.map((d) => d.dewpoint_c), smooth: true, showSymbol: false, color: C.dewpoint },
+  return areaChartOption(ctx, "°C", [
+    { name: "Temp", data: data.map((d) => d.temp_c), color: C.temp },
+    { name: "Dewpoint", data: data.map((d) => d.dewpoint_c), color: C.dewpoint },
   ]);
 }
 
 function pressureOption(data: Reading[], ctx: AxisCtx): EChartsOption {
-  return lineOption(ctx, "hPa", [
-    { name: "Pressure", type: "line", data: data.map((d) => d.pressure_msl_hpa), smooth: true, showSymbol: false, color: C.pressure, areaStyle: { opacity: 0.08 } },
+  return areaChartOption(ctx, "hPa", [
+    { name: "Pressure", data: data.map((d) => d.pressure_msl_hpa), color: C.pressure },
   ]);
 }
 
 function humidityOption(data: Reading[], ctx: AxisCtx): EChartsOption {
-  return lineOption(ctx, "%", [
-    { name: "Humidity", type: "line", data: data.map((d) => d.humidity), smooth: true, showSymbol: false, color: C.humidity, areaStyle: { opacity: 0.08 } },
+  return areaChartOption(ctx, "%", [
+    { name: "Humidity", data: data.map((d) => d.humidity), color: C.humidity },
   ]);
 }
 
 function windOption(data: Reading[], ctx: AxisCtx): EChartsOption {
   const toKmh = (v: number | null) => (v === null ? null : +(v * MS_TO_KMH).toFixed(1));
-  return lineOption(ctx, "km/h", [
-    { name: "Wind", type: "line", data: data.map((d) => toKmh(d.wind_speed_ms)), smooth: true, showSymbol: false, color: C.wind },
-    { name: "Gust", type: "line", data: data.map((d) => toKmh(d.wind_gust_ms)), smooth: true, showSymbol: false, color: C.gust },
-  ]);
+  return areaChartOption(
+    ctx,
+    "km/h",
+    [
+      // Gust first so the (always larger) gust band sits behind the sustained-wind fill.
+      { name: "Gust", data: data.map((d) => toKmh(d.wind_gust_ms)), color: C.gust },
+      { name: "Wind", data: data.map((d) => toKmh(d.wind_speed_ms)), color: C.wind },
+    ],
+    { min: 0, scale: false }
+  );
 }
 
 function airQualityOption(data: Reading[], ctx: AxisCtx): EChartsOption {
-  return lineOption(ctx, "index", [
-    { name: "Air quality", type: "line", data: data.map((d) => d.air_quality), smooth: true, showSymbol: false, color: C.airQuality, areaStyle: { opacity: 0.08 } },
+  return areaChartOption(ctx, "index", [
+    { name: "Air quality", data: data.map((d) => d.air_quality), color: C.airQuality },
   ]);
 }
 
 function rainOption(data: Reading[], ctx: AxisCtx): EChartsOption {
-  const { color, muted, split } = baseTextStyle(ctx.isDark);
-  return {
-    textStyle: { color },
-    grid: { left: 44, right: 16, top: 24, bottom: 28 },
-    tooltip: { trigger: "axis" },
-    xAxis: categoryXAxis(ctx),
-    yAxis: { type: "value", name: "mm", axisLabel: { color: muted }, splitLine: { lineStyle: { color: split } } },
-    series: [{ name: "Rain", type: "bar", data: data.map((d) => d.rain_mm), color: C.rain }],
-  };
+  // Rain is a discrete per-bucket total — no smoothing (interpolating rainfall
+  // between samples would invent weather), but the same filled-area treatment.
+  return areaChartOption(
+    ctx,
+    "mm",
+    [{ name: "Rain", data: data.map((d) => d.rain_mm), color: C.rain, smooth: false }],
+    { min: 0, scale: false }
+  );
 }
 
 const COMPASS = [
