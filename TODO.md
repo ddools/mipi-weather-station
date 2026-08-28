@@ -10,15 +10,21 @@ one exists.
 Everything in plan.MD's core path (sensors, store-and-forward, Supabase, the Astro
 site on Vercel, Weather Underground, Windy) is live as of 2026-08-27. Remaining:
 
-- **Soak test** — passively confirm no gaps in `readings.recorded_at` after 24h (§1).
+- **Soak test** — data-integrity check **passed** 2026-08-28 (§1): local SQLite and
+  Supabase both hold 1032 contiguous readings with full parity, all uploader cursors
+  current, no gaps since the last stable restart. Still outstanding: a deliberate
+  network-partition (unplug) test, and a genuine 24h *uninterrupted* run — yesterday's
+  clean-run clock restarted at 2026-08-27 21:46 BST after a deploy-session restart storm.
 - **Benchmarks** — live value updates within 60s of a new reading; mobile Lighthouse ≥ 90 (§2).
 - **CWOP uploader** — not started; needs a from-scratch APRS client (§5).
 - **Supabase retention job** — SQL written (`docs/supabase-retention.sql`), not yet
   run against the live project; repoint the 7d/30d queries at `readings_hourly` after (§5).
 - **README screenshots** of the live dashboard (§5).
 - **TGS2600 air quality** — collector + dashboard support built (2026-08-27, §5);
-  still needs the schema/retention SQL run on the live project, the daughterboard
-  mounted, `sensors.air_quality.enabled: true` on the Pi, and a warm-up soak.
+  **enabled and flowing** as of 2026-08-28 (`sensors.air_quality.enabled: true` on
+  the Pi, `air_quality` values landing in Supabase — schema column is live). Still
+  needs the **retention SQL** run, the daughterboard physically mounted, and a
+  warm-up/calibration sanity check on the trend.
 
 ## Done
 
@@ -56,11 +62,19 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27. Remaining:
       data (200), publishable-key `INSERT` is rejected (401)
 - [x] systemd service installed, enabled, and running as `ddools` — confirmed
       `active (running)`, `enabled` (starts on boot)
-- [ ] Store-and-forward soak test: **in progress, passive** — service has been
-      running continuously since 2026-08-27 11:01 BST; check back around
-      2026-08-28 11:01 BST and confirm no gaps in `readings.recorded_at` (a
-      deliberate network-unplug test was considered but skipped in favor of
-      just letting it run)
+- [x] Store-and-forward data-integrity check — **passed 2026-08-28 09:30 BST**.
+      Local SQLite: 1032 readings, IDs 1–1032 contiguous, zero missing. Supabase:
+      exactly 1032 rows, latest row identical to local latest — full parity. All
+      three uploader cursors (`supabase`/`wunderground`/`windy`) at 1032, no
+      backlog. Notably the pipeline lost **no** data across yesterday evening's
+      30+ restarts (a `config.yaml`-missing crash loop, one `readonly database`
+      crash, the air-quality deploy) — every id is present locally and upstream.
+- [ ] Store-and-forward soak test — the *remaining* pieces: a deliberate
+      network-unplug test (never done), and a genuine 24h uninterrupted run.
+      The service has only been continuously up since 2026-08-27 21:46 BST (the
+      earlier "since 11:01 BST" note was wrong — it was restarted repeatedly
+      during the evening deploy session). No gaps >150s since that restart;
+      nominal archive interval measures ~66s.
 
 ## 2. Astro standalone site with shadcn/ui (plan.MD Details/C — now lives in this repo's `web/`)
 
@@ -186,10 +200,11 @@ domain may come later).
 - [x] Verified real data arriving: the **history table**
       (`/dashboard/pws/IHOLMP2/table/<date>/<date>/daily`) shows the actual Pi's
       archived readings, matching our Supabase rows unit-converted (83.1°F/38%
-      ≈ our 28.4°C/38%). The **live "current conditions" tile still shows
-      "Offline"** — this looks like normal dashboard-activation lag for a new
-      station (ingest clearly works; the front-end tile hasn't caught up yet).
-      Worth a follow-up check in a day to confirm the badge flips to online.
+      ≈ our 28.4°C/38%).
+- [x] **Station online confirmed** (2026-08-28) — the new-station "Offline" tile
+      lag from yesterday has cleared. `api.weather.com/v2/pws/observations/current`
+      for `IHOLMP2` returns our latest observation in real time (obsTimeUtc
+      matches the newest Supabase row; temp/humidity/wind/pressure all line up).
 
 ## 4. Windy Stations API v2 upload (plan.MD Details/D)
 

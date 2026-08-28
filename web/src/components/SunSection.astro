@@ -1,0 +1,97 @@
+---
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getSunTimes, humanDuration } from "@/lib/sun";
+import sunriseIcon from "@meteocons/svg/flat/sunrise.svg?url";
+import sunsetIcon from "@meteocons/svg/flat/sunset.svg?url";
+
+interface Props {
+  class?: string;
+}
+const { class: className } = Astro.props;
+
+const now = new Date();
+const sun = getSunTimes(now);
+
+function formatTime(d: Date): string {
+  // Server islands render in the deploy region's zone (UTC on Vercel) — pin the
+  // zone or summer times read an hour off.
+  return d.toLocaleTimeString("en-IE", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Dublin",
+  });
+}
+
+const beforeSunrise = now < sun.sunrise;
+const afterSunset = now > sun.sunset;
+const isDay = !beforeSunrise && !afterSunset;
+
+// Next event to count down to.
+const next = beforeSunrise
+  ? { word: "Sunrise", time: sun.sunrise, icon: sunriseIcon, tomorrow: false }
+  : isDay
+    ? { word: "Sunset", time: sun.sunset, icon: sunsetIcon, tomorrow: false }
+    : { word: "Sunrise", time: getSunTimes(new Date(now.getTime() + 86_400_000)).sunrise, icon: sunriseIcon, tomorrow: true };
+
+const untilNext = humanDuration((next.time.getTime() - now.getTime()) / 1000);
+
+// Position of the sun along the daylight span (0 = sunrise, 1 = sunset).
+const dayFraction = Math.max(
+  0,
+  Math.min(1, (now.getTime() - sun.sunrise.getTime()) / (sun.sunset.getTime() - sun.sunrise.getTime())),
+);
+const markerPct = isDay ? dayFraction * 100 : beforeSunrise ? 0 : 100;
+
+const delta = sun.deltaVsYesterdaySeconds;
+const deltaText =
+  Math.abs(delta) < 30
+    ? "same as yesterday"
+    : `${humanDuration(Math.abs(delta))} ${delta > 0 ? "longer" : "shorter"} than yesterday`;
+---
+
+<Card className={className}>
+  <CardHeader className="flex items-center gap-2">
+    <img src={next.icon} alt="" class="h-10 w-10" />
+    <CardTitle>Sun — Skerries</CardTitle>
+  </CardHeader>
+  <CardContent>
+    <div class="flex items-baseline gap-2">
+      <span class="text-3xl font-semibold tabular-nums">{formatTime(next.time)}</span>
+      <span class="text-base font-medium text-amber-600 dark:text-amber-400">
+        {next.word}{next.tomorrow ? " tomorrow" : ""}
+      </span>
+    </div>
+    <p class="mt-0.5 text-sm text-muted-foreground tabular-nums">in {untilNext}</p>
+
+    <div class="relative mt-4 h-2 rounded-full bg-gradient-to-r from-indigo-400/40 via-amber-300 to-orange-500/70">
+      {
+        !isDay && (
+          <div class="absolute inset-0 rounded-full bg-background/55" />
+        )
+      }
+      <span
+        class="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-400 ring-2 ring-card"
+        style={`left:${markerPct}%`}
+        role="img"
+        aria-label={isDay ? "Sun is up" : "Sun is down"}
+      />
+    </div>
+
+    <div class="mt-4 grid grid-cols-2 gap-4 text-sm">
+      <div>
+        <p class="text-muted-foreground">Sunrise</p>
+        <p class="font-medium tabular-nums">{formatTime(sun.sunrise)}</p>
+      </div>
+      <div>
+        <p class="text-muted-foreground">Sunset</p>
+        <p class="font-medium tabular-nums">{formatTime(sun.sunset)}</p>
+      </div>
+    </div>
+
+    <p class="mt-3 text-sm text-muted-foreground tabular-nums">
+      {humanDuration(sun.daylightSeconds)} of daylight
+      <span class="mx-1">·</span>
+      {deltaText}
+    </p>
+  </CardContent>
+</Card>

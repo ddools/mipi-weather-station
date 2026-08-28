@@ -2,6 +2,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Sparkline from "@/components/Sparkline.astro";
 import TidesSection from "@/components/TidesSection.astro";
+import SunSection from "@/components/SunSection.astro";
 import { RainRadar } from "@/components/RainRadar";
 import { getLatestReading, getTodaySummary } from "@/lib/supabase";
 import { degToCompass, fmt, beaufort, msToKmh, pressureTrend } from "@/lib/format";
@@ -226,6 +227,8 @@ const lastUpdatedAbs = reading?.recorded_at
 
   <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+      <SunSection />
+
       <Card>
         <CardHeader className="flex items-center gap-2">
           <img src={rainIcon} alt="" class="h-10 w-10" />
