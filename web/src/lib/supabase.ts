@@ -74,10 +74,10 @@ export interface TodaySummary {
   /** highest gust and highest sustained wind since local midnight. */
   gustMax: number | null;
   windMax: number | null;
-  /** rain accumulation, in mm, over three windows. */
-  rainToday: number;
-  rainLastHour: number;
-  rain24h: number;
+  /** rain accumulation, in mm, over three windows. null when no readings cover the window. */
+  rainToday: number | null;
+  rainLastHour: number | null;
+  rain24h: number | null;
   /** sea-level pressure now and ~3h ago, for the trend indicator. */
   pressureNow: number | null;
   pressure3hAgo: number | null;
@@ -105,8 +105,11 @@ function min(values: (number | null)[]): number | null {
   const nums = values.filter((v): v is number => v !== null && !Number.isNaN(v));
   return nums.length ? Math.min(...nums) : null;
 }
-function sumRain(rows: Reading[]): number {
-  return rows.reduce((acc, r) => acc + (r.rain_mm ?? 0), 0);
+/** Total rain over the rows, or null if none of them actually carry a rain reading. */
+function sumRain(rows: Reading[]): number | null {
+  const measured = rows.filter((r) => r.rain_mm !== null && !Number.isNaN(r.rain_mm));
+  if (measured.length === 0) return null;
+  return measured.reduce((acc, r) => acc + (r.rain_mm as number), 0);
 }
 
 /**
@@ -197,8 +200,9 @@ function bucketHourly(rows: Reading[]): Reading[] {
         .map((r) => r[field])
         .filter((v): v is number => v !== null);
       if (field === "rain_mm") {
-        // rain accumulates — sum the bucket, don't average it
-        avg[field] = values.reduce((a, b) => a + b, 0);
+        // rain accumulates — sum the bucket, don't average it; null if the hour
+        // has no rain readings at all (a data gap, not a dry hour)
+        avg[field] = values.length ? values.reduce((a, b) => a + b, 0) : null;
       } else {
         avg[field] = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
       }

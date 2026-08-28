@@ -246,7 +246,7 @@ function RangeCharts({ range }: { range: Range }) {
   const hasAirQuality = data.some((d) => d.air_quality != null);
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
       <ChartCard wide icon={thermometerIcon} title="Temperature & dewpoint" option={tempOption(data, ctx)} />
       <ChartCard icon={pressureHighIcon} title="Pressure" option={pressureOption(data, ctx)} height={240} />
       <ChartCard icon={humidityIcon} title="Humidity" option={humidityOption(data, ctx)} height={240} />

@@ -10,6 +10,7 @@ import thermometerIcon from "@meteocons/svg/flat/thermometer.svg?url";
 import humidityIcon from "@meteocons/svg/flat/humidity.svg?url";
 import pressureHighIcon from "@meteocons/svg/flat/pressure-high.svg?url";
 import pressureLowIcon from "@meteocons/svg/flat/pressure-low.svg?url";
+import pressureNoneIcon from "@meteocons/svg/flat/barometer.svg?url";
 import windIcon from "@meteocons/svg/flat/wind.svg?url";
 import rainIcon from "@meteocons/svg/flat/rain.svg?url";
 import airQualityIcon from "@meteocons/svg/flat/smoke-particles.svg?url";
@@ -17,8 +18,13 @@ import compassSvgRaw from "@meteocons/svg/flat/compass.svg?raw";
 
 const [reading, summary] = await Promise.all([getLatestReading(), getTodaySummary()]);
 
+const pressureHpa = reading?.pressure_msl_hpa ?? null;
 const pressureIcon =
-  (reading?.pressure_msl_hpa ?? 1013) >= 1013 ? pressureHighIcon : pressureLowIcon;
+  pressureHpa === null
+    ? pressureNoneIcon
+    : pressureHpa >= 1013
+      ? pressureHighIcon
+      : pressureLowIcon;
 
 const trend = pressureTrend(summary.pressureNow, summary.pressure3hAgo);
 const bft = beaufort(reading?.wind_speed_ms ?? null);
@@ -98,7 +104,7 @@ const lastUpdatedAbs = reading?.recorded_at
     </span>
   </div>
 
-  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
     <Card>
       <CardHeader className="flex items-center gap-2">
         <img src={thermometerIcon} alt="" class="h-10 w-10" />
@@ -166,10 +172,12 @@ const lastUpdatedAbs = reading?.recorded_at
         />
       </CardContent>
     </Card>
+
+    <SunSection />
   </div>
 
-  <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
-    <Card className="h-full lg:col-span-2">
+  <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-4 lg:items-start">
+    <Card className="lg:col-span-2">
       <CardHeader className="flex items-center gap-2">
         <img src={windIcon} alt="" class="h-10 w-10" />
         <CardTitle>Wind</CardTitle>
@@ -180,14 +188,14 @@ const lastUpdatedAbs = reading?.recorded_at
           <div>
             <div class="flex items-baseline gap-2">
               <span class="text-3xl font-semibold tabular-nums" data-field="wind_kmh">
-                {windKmh === null ? "—" : `${Math.round(windKmh)} km/h`}
+                {windKmh === null ? "N/A" : `${Math.round(windKmh)} km/h`}
               </span>
               <span class="text-sm text-muted-foreground tabular-nums" data-field="wind_ms">
                 {fmt(reading?.wind_speed_ms ?? null, 1, " m/s")}
               </span>
             </div>
             <p class="mt-1 text-sm text-muted-foreground" data-field="wind_beaufort">
-              {bft ? `Force ${bft.force} · ${bft.label}` : "—"}
+              {bft ? `Force ${bft.force} · ${bft.label}` : "N/A"}
             </p>
           </div>
         </div>
@@ -195,13 +203,13 @@ const lastUpdatedAbs = reading?.recorded_at
           <div class="flex gap-2">
             <dt class="w-32 shrink-0">Gust now</dt>
             <dd data-field="wind_gust_kmh">
-              {gustKmh === null ? "—" : `${Math.round(gustKmh)} km/h`}
+              {gustKmh === null ? "N/A" : `${Math.round(gustKmh)} km/h`}
             </dd>
           </div>
           <div class="mt-1 flex gap-2">
             <dt class="w-32 shrink-0">Max gust today</dt>
             <dd data-field="wind_gust_max_kmh">
-              {gustMaxKmh === null ? "—" : `${Math.round(gustMaxKmh)} km/h`}
+              {gustMaxKmh === null ? "N/A" : `${Math.round(gustMaxKmh)} km/h`}
             </dd>
           </div>
           <div class="mt-1 flex gap-2">
@@ -209,7 +217,9 @@ const lastUpdatedAbs = reading?.recorded_at
             <dd>
               from <span data-field="wind_dir"
                 >{degToCompass(reading?.wind_dir_deg ?? null)}</span
-              > <span data-field="wind_dir_deg">({reading?.wind_dir_deg ?? "—"}°)</span>
+              > <span data-field="wind_dir_deg"
+                >{reading?.wind_dir_deg == null ? "(N/A)" : `(${reading.wind_dir_deg}°)`}</span
+              >
             </dd>
           </div>
         </dl>
@@ -222,13 +232,11 @@ const lastUpdatedAbs = reading?.recorded_at
       </CardContent>
     </Card>
 
-    <TidesSection class="h-full" />
+    <TidesSection class="lg:col-span-2" />
   </div>
 
-  <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+  <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-4 lg:items-start">
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-      <SunSection />
-
       <Card>
         <CardHeader className="flex items-center gap-2">
           <img src={rainIcon} alt="" class="h-10 w-10" />
@@ -269,7 +277,7 @@ const lastUpdatedAbs = reading?.recorded_at
       }
     </div>
 
-    <div class="lg:col-span-2">
+    <div class="lg:col-span-3">
       <RainRadar client:visible />
     </div>
   </div>
@@ -292,19 +300,20 @@ const lastUpdatedAbs = reading?.recorded_at
   function num(value: unknown): number | null {
     return typeof value === "number" && !Number.isNaN(value) ? value : null;
   }
+  const NO_VALUE = "N/A";
   function fmt(value: number | null, digits: number, unit: string) {
-    return value === null ? "—" : `${value.toFixed(digits)}${unit}`;
+    return value === null ? NO_VALUE : `${value.toFixed(digits)}${unit}`;
   }
   function kmh(ms: number | null) {
-    return ms === null ? "—" : `${Math.round(ms * 3.6)} km/h`;
+    return ms === null ? NO_VALUE : `${Math.round(ms * 3.6)} km/h`;
   }
   function beaufort(ms: number | null) {
-    if (ms === null) return "—";
+    if (ms === null) return NO_VALUE;
     const b = BEAUFORT.find(([maxMs]) => ms < maxMs) ?? BEAUFORT[BEAUFORT.length - 1];
     return `Force ${b[1]} · ${b[2]}`;
   }
   function compass(deg: number | null) {
-    return deg === null ? "—" : COMPASS[Math.round(deg / 22.5) % 16];
+    return deg === null ? NO_VALUE : COMPASS[Math.round(deg / 22.5) % 16];
   }
 
   function timeAgo(iso: string) {
@@ -384,13 +393,13 @@ const lastUpdatedAbs = reading?.recorded_at
       set("humidity", fmt(num(reading.humidity), 0, "%"));
       set("pressure_msl_hpa", fmt(num(reading.pressure_msl_hpa), 0, " hPa"));
       const aq = num(reading.air_quality);
-      if (aq !== null) set("air_quality", String(Math.round(aq)));
+      set("air_quality", aq === null ? NO_VALUE : String(Math.round(aq)));
       set("wind_kmh", kmh(windMs));
       set("wind_ms", fmt(windMs, 1, " m/s"));
       set("wind_beaufort", beaufort(windMs));
       set("wind_gust_kmh", kmh(gustMs));
       set("wind_dir", compass(dir));
-      set("wind_dir_deg", dir === null ? "(—°)" : `(${Math.round(dir)}°)`);
+      set("wind_dir_deg", dir === null ? "(N/A)" : `(${Math.round(dir)}°)`);
 
       if (dir !== null) {
         const pointer = document.querySelector("#wind-compass #Pointer");
@@ -414,9 +423,9 @@ const lastUpdatedAbs = reading?.recorded_at
       set("temp_max", fmt(num(s.tempMax), 1, "°"));
       set("temp_min", fmt(num(s.tempMin), 1, "°"));
       set("wind_gust_max_kmh", kmh(num(s.gustMax)));
-      set("rain_today", fmt(s.rainToday ?? 0, 1, " mm"));
-      set("rain_last_hour", fmt(s.rainLastHour ?? 0, 1, " mm"));
-      set("rain_24h", fmt(s.rain24h ?? 0, 1, " mm"));
+      set("rain_today", fmt(num(s.rainToday), 1, " mm"));
+      set("rain_last_hour", fmt(num(s.rainLastHour), 1, " mm"));
+      set("rain_24h", fmt(num(s.rain24h), 1, " mm"));
 
       const now = num(s.pressureNow);
       const past = num(s.pressure3hAgo);

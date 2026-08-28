@@ -182,6 +182,11 @@ domain may come later).
       speed/gust chart, wind rose is now frequency-by-speed-band, per-range
       x-axis formatting. Layout: station metadata line, footer, OG/description
       meta, tab-title shows current temp.
+- [x] Sun tile (2026-08-28) — `src/components/SunSection.astro` + `src/lib/sun.ts`.
+      Sunrise/sunset for Skerries computed locally (SunCalc-core algorithm, no API),
+      daylight-progress bar with a sun marker, day length + delta vs yesterday.
+      Sits in the left column of the live panel above Rain/Air quality; verified
+      light + dark via headless screenshot.
 - [ ] Benchmark: live value updates within 60s of a new reading; mobile Lighthouse ≥ 90
 
 ## 3. Weather Underground upload (plan.MD Details/D)

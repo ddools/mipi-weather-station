@@ -3,14 +3,17 @@ const COMPASS = [
   "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW",
 ];
 
+/** Shown wherever a sensor value is missing — a genuine gap, never a stand-in number. */
+export const NO_VALUE = "N/A";
+
 export function degToCompass(deg: number | null): string {
-  if (deg === null) return "—";
+  if (deg === null) return NO_VALUE;
   const index = Math.round(deg / 22.5) % 16;
   return COMPASS[index];
 }
 
 export function fmt(value: number | null, digits = 1, unit = ""): string {
-  if (value === null || Number.isNaN(value)) return "—";
+  if (value === null || Number.isNaN(value)) return NO_VALUE;
   return `${value.toFixed(digits)}${unit}`;
 }
 
