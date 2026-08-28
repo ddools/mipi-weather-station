@@ -313,7 +313,7 @@ function RangeCharts({ range }: { range: Range }) {
       {hasAirQuality && (
         <ChartCard icon={airQualityIcon} title="Air quality (relative)" option={airQualityOption(data, ctx)} height={240} />
       )}
-      <ChartCard wide icon={compassIcon} title="Wind rose" option={windRoseOption(data, isDark)} height={320} />
+      <ChartCard icon={compassIcon} title="Wind rose" option={windRoseOption(data, isDark)} height={320} />
     </div>
   );
 }
