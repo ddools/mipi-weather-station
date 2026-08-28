@@ -16,7 +16,26 @@ import rainIcon from "@meteocons/svg/flat/rain.svg?url";
 import airQualityIcon from "@meteocons/svg/flat/smoke-particles.svg?url";
 import compassSvgRaw from "@meteocons/svg/flat/compass.svg?raw";
 
-const [reading, summary] = await Promise.all([getLatestReading(), getTodaySummary()]);
+const [latestReading, summary] = await Promise.all([getLatestReading(), getTodaySummary()]);
+
+// Live-data status from the age of the newest reading. The collector archives
+// every ~60s, so anything within a few minutes is "live"; a longer gap means
+// the Pi or its uplink is down.
+const STATUS_COLOR = { live: "#10b981", delayed: "#f59e0b", offline: "#ef4444" };
+function liveStatus(iso: string | null | undefined) {
+  if (!iso) return { key: "offline" as const, label: "Offline" };
+  const age = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (age <= 180) return { key: "live" as const, label: "Live" };
+  if (age <= 900) return { key: "delayed" as const, label: "Delayed" };
+  return { key: "offline" as const, label: "Offline" };
+}
+const status = liveStatus(latestReading?.recorded_at);
+
+// Once the station is offline the newest row is stale — its instantaneous
+// readings (temp, wind, pressure now, …) no longer describe current conditions,
+// so we show N/A rather than a frozen number. The "today so far" figures from
+// `summary` (H/L, rain, max gust) stay — they're valid history for the day.
+const reading = status.key === "offline" ? null : latestReading;
 
 const pressureHpa = reading?.pressure_msl_hpa ?? null;
 const pressureIcon =
@@ -26,7 +45,7 @@ const pressureIcon =
       ? pressureHighIcon
       : pressureLowIcon;
 
-const trend = pressureTrend(summary.pressureNow, summary.pressure3hAgo);
+const trend = reading ? pressureTrend(summary.pressureNow, summary.pressure3hAgo) : null;
 const bft = beaufort(reading?.wind_speed_ms ?? null);
 const windKmh = msToKmh(reading?.wind_speed_ms ?? null);
 const gustKmh = msToKmh(reading?.wind_gust_ms ?? null);
@@ -52,20 +71,8 @@ function renderCompass(deg: number | null): string {
 
 const compassSvg = renderCompass(reading?.wind_dir_deg ?? null);
 
-// Live-data status from the age of the newest reading. The collector archives
-// every ~60s, so anything within a few minutes is "live"; a longer gap means
-// the Pi or its uplink is down.
-const STATUS_COLOR = { live: "#10b981", delayed: "#f59e0b", offline: "#ef4444" };
-function liveStatus(iso: string | null | undefined) {
-  if (!iso) return { key: "offline" as const, label: "Offline" };
-  const age = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (age <= 180) return { key: "live" as const, label: "Live" };
-  if (age <= 900) return { key: "delayed" as const, label: "Delayed" };
-  return { key: "offline" as const, label: "Offline" };
-}
-const status = liveStatus(reading?.recorded_at);
-const lastUpdatedAbs = reading?.recorded_at
-  ? new Date(reading.recorded_at).toLocaleString("en-IE", {
+const lastUpdatedAbs = latestReading?.recorded_at
+  ? new Date(latestReading.recorded_at).toLocaleString("en-IE", {
       day: "2-digit",
       month: "short",
       hour: "2-digit",
@@ -77,7 +84,7 @@ const lastUpdatedAbs = reading?.recorded_at
 
 <div
   id="current-conditions"
-  data-recorded-at={reading?.recorded_at ?? ""}
+  data-recorded-at={latestReading?.recorded_at ?? ""}
   data-wind-dir-deg={reading?.wind_dir_deg ?? ""}
 >
   <div class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
@@ -341,6 +348,13 @@ const lastUpdatedAbs = reading?.recorded_at
   }
 
   const root = () => document.getElementById("current-conditions");
+  // The newest row is "stale" once it's over 15 min old — the station is offline
+  // and its instantaneous readings no longer describe current conditions.
+  function isStale(): boolean {
+    const iso = root()?.dataset.recordedAt;
+    if (!iso) return true;
+    return (Date.now() - new Date(iso).getTime()) / 1000 > 900;
+  }
   const set = (field: string, text: string) => {
     const el = root()?.querySelector(`[data-field="${field}"]`);
     if (el) el.textContent = text;
@@ -381,18 +395,23 @@ const lastUpdatedAbs = reading?.recorded_at
       const el = root();
       if (!el) return;
       el.dataset.recordedAt = reading.recorded_at;
-      el.dataset.windDirDeg = reading.wind_dir_deg ?? "";
 
-      const temp = num(reading.temp_c);
-      const windMs = num(reading.wind_speed_ms);
-      const gustMs = num(reading.wind_gust_ms);
-      const dir = num(reading.wind_dir_deg);
+      // Offline (>15 min old) means the newest row is stale — its instantaneous
+      // readings no longer describe now, so blank them rather than freeze a number.
+      const stale = isStale();
+
+      el.dataset.windDirDeg = stale ? "" : reading.wind_dir_deg ?? "";
+
+      const temp = stale ? null : num(reading.temp_c);
+      const windMs = stale ? null : num(reading.wind_speed_ms);
+      const gustMs = stale ? null : num(reading.wind_gust_ms);
+      const dir = stale ? null : num(reading.wind_dir_deg);
 
       set("temp_c", fmt(temp, 1, "°C"));
-      set("dewpoint_c", fmt(num(reading.dewpoint_c), 1, "°C"));
-      set("humidity", fmt(num(reading.humidity), 0, "%"));
-      set("pressure_msl_hpa", fmt(num(reading.pressure_msl_hpa), 0, " hPa"));
-      const aq = num(reading.air_quality);
+      set("dewpoint_c", fmt(stale ? null : num(reading.dewpoint_c), 1, "°C"));
+      set("humidity", fmt(stale ? null : num(reading.humidity), 0, "%"));
+      set("pressure_msl_hpa", fmt(stale ? null : num(reading.pressure_msl_hpa), 0, " hPa"));
+      const aq = stale ? null : num(reading.air_quality);
       set("air_quality", aq === null ? NO_VALUE : String(Math.round(aq)));
       set("wind_kmh", kmh(windMs));
       set("wind_ms", fmt(windMs, 1, " m/s"));
@@ -401,13 +420,16 @@ const lastUpdatedAbs = reading?.recorded_at
       set("wind_dir", compass(dir));
       set("wind_dir_deg", dir === null ? "(N/A)" : `(${Math.round(dir)}°)`);
 
+      const pointer = document.querySelector("#wind-compass #Pointer");
       if (dir !== null) {
-        const pointer = document.querySelector("#wind-compass #Pointer");
         pointer?.setAttribute("transform", `rotate(${Math.round(dir)} 64 64)`);
+      } else {
+        pointer?.removeAttribute("transform");
       }
-      if (temp !== null) {
-        document.title = `${Math.round(temp)}° · Skerries Weather Station`;
-      }
+      document.title =
+        temp !== null
+          ? `${Math.round(temp)}° · Skerries Weather Station`
+          : "Skerries Weather Station";
       updateStatus(reading.recorded_at);
     } catch {
       // network hiccup — next interval will retry
@@ -427,14 +449,19 @@ const lastUpdatedAbs = reading?.recorded_at
       set("rain_last_hour", fmt(num(s.rainLastHour), 1, " mm"));
       set("rain_24h", fmt(num(s.rain24h), 1, " mm"));
 
-      const now = num(s.pressureNow);
+      // Trend leans on "pressure now" — meaningless once the station is offline.
+      const now = isStale() ? null : num(s.pressureNow);
       const past = num(s.pressure3hAgo);
       const trendEl = document.getElementById("pressure-trend");
-      if (trendEl && now !== null && past !== null) {
-        const delta = now - past;
-        const arrow = delta > 0.5 ? "↑" : delta < -0.5 ? "↓" : "→";
-        const label = delta > 0.5 ? "rising" : delta < -0.5 ? "falling" : "steady";
-        trendEl.textContent = `${arrow} ${label} ${Math.abs(delta).toFixed(1)} hPa / 3h`;
+      if (trendEl) {
+        if (now !== null && past !== null) {
+          const delta = now - past;
+          const arrow = delta > 0.5 ? "↑" : delta < -0.5 ? "↓" : "→";
+          const label = delta > 0.5 ? "rising" : delta < -0.5 ? "falling" : "steady";
+          trendEl.textContent = `${arrow} ${label} ${Math.abs(delta).toFixed(1)} hPa / 3h`;
+        } else {
+          trendEl.textContent = "sea-level adjusted";
+        }
       }
     } catch {
       // ignore — next interval retries
