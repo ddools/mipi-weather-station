@@ -1,0 +1,86 @@
+name: Dashboard health
+
+# Scheduled check that the public dashboard's data is still fresh: query the
+# live Supabase REST endpoint (same anon key + path the site uses) for the most
+# recent reading and fail if it's missing or stale. Catches a wedged collector,
+# a paused Supabase project, or a broken upload path before anyone notices the
+# site has gone quiet.
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+    inputs:
+      max_age_minutes:
+        description: "Fail if the latest reading is older than this many minutes"
+        required: false
+        default: "30"
+
+concurrency:
+  group: dashboard-health
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  freshness:
+    name: latest reading is fresh
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.PUBLIC_SUPABASE_URL }}
+      SUPABASE_KEY: ${{ secrets.PUBLIC_SUPABASE_ANON_KEY }}
+      MAX_AGE_MINUTES: ${{ github.event.inputs.max_age_minutes || '30' }}
+    steps:
+      - name: Query latest reading
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_KEY:-}" ]; then
+            echo "::error::PUBLIC_SUPABASE_URL / PUBLIC_SUPABASE_ANON_KEY repo secrets are not set"
+            exit 1
+          fi
+
+          url="${SUPABASE_URL%/}/rest/v1/readings?select=recorded_at,temp_c&order=recorded_at.desc&limit=1"
+          code=$(curl -sS -m 30 -o resp.json -w '%{http_code}' \
+            -H "apikey: ${SUPABASE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_KEY}" \
+            "$url")
+
+          if [ "$code" != "200" ]; then
+            echo "::error::Supabase REST returned HTTP $code"
+            cat resp.json || true
+            exit 1
+          fi
+
+          count=$(jq 'length' resp.json)
+          if [ "$count" -eq 0 ]; then
+            echo "::error::readings table returned no rows"
+            exit 1
+          fi
+
+          recorded_at=$(jq -r '.[0].recorded_at' resp.json)
+          temp=$(jq -r '.[0].temp_c // "null"' resp.json)
+          now=$(date -u +%s)
+          then=$(date -u -d "$recorded_at" +%s)
+          age_s=$(( now - then ))
+          age_min=$(( age_s / 60 ))
+          limit_min=${MAX_AGE_MINUTES}
+
+          {
+            echo "## Dashboard health"
+            echo ""
+            echo "| field | value |"
+            echo "| --- | --- |"
+            echo "| latest recorded_at | \`$recorded_at\` |"
+            echo "| age | ${age_min} min |"
+            echo "| threshold | ${limit_min} min |"
+            echo "| temp_c | ${temp} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$age_min" -gt "$limit_min" ]; then
+            echo "::error::Latest reading is ${age_min} min old (> ${limit_min} min) — collector or upload path may be down"
+            exit 1
+          fi
+
+          echo "OK: latest reading is ${age_min} min old (<= ${limit_min} min)"
