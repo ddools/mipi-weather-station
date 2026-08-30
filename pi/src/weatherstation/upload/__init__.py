@@ -20,4 +20,9 @@ def build_uploaders(cfg: Config) -> list:
         from .windy import WindyUploader
 
         ups.append(WindyUploader(cfg))
+    cwop = u.get("cwop")  # optional block: absent in configs predating CWOP support
+    if cwop and cwop.get("enabled") and cwop.get("station_id"):
+        from .cwop import CWOPUploader
+
+        ups.append(CWOPUploader(cfg))
     return ups

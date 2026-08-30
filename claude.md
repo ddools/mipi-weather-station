@@ -43,7 +43,9 @@ Key decisions already made — do not re-litigate without asking:
   works fine as islands in an otherwise-static Astro site.
 - **Weather services**: WU first (free, imperial units, GET updateweatherstation.php),
   then Windy **v2 API only** (legacy dies end of 2026; pressure in **Pascals**), then
-  CWOP (APRS to cwop.aprs.net:14580 — not yet implemented).
+  CWOP (APRS weather packets over a raw socket to cwop.aprs.net:14580 — code done
+  2026-08-30, `upload/cwop.py`; blocked on a CW/DW/EW id from wxqa.com. See
+  [docs/cwop.md](docs/cwop.md)).
   **Do NOT target Met Office/Met Éireann WOW** — decommissioning late 2026.
   (WOW-BE reboot at wow.meteo.be is the fallback if WOW-style sharing is wanted.)
 - **Units**: SI internally everywhere; convert at the uploader edge (`core/units.py`).
@@ -116,7 +118,12 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
 - **CI live** (2026-08-27) — `.github/workflows/ci.yml`: `pi` job (ruff check +
   ruff format check + pytest on Py 3.9 & 3.13) and `web` job (`npm ci` + `astro
   build`). Runs on push-to-`main` and every PR.
-- No CWOP uploader. **TGS2600 air quality** now has collector + dashboard support
+- **CWOP uploader written** (2026-08-30, `upload/cwop.py` + `tests/test_cwop.py`,
+  10 tests) — APRS-IS socket client, not wired live yet: needs a `CW`/`DW`/`EW` id
+  from wxqa.com, then `uploaders.cwop.{enabled,station_id}` + `station.timezone`
+  on the Pi. Passcode `-1` (in `.env` as `CWOP_PASSCODE`). Full notes in
+  [docs/cwop.md](docs/cwop.md).
+- **TGS2600 air quality** now has collector + dashboard support
   (`sensors/air_quality.py`, `sensors.air_quality.enabled` — off by default,
   uncalibrated 0–100 relative index; see docs/sensors.md "TGS2600 air quality");
   still needs the daughterboard fitted, `enabled: true` on the Pi, and the
@@ -160,10 +167,10 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
 4. ~~**Weather Underground**~~ — done 2026-08-27: station live, `success`
    responses confirmed, real data visible in WU's history table.
 5. ~~**Windy v2**~~ — done 2026-08-27, see above.
-6. **Polish** — ~~GitHub Actions CI~~ (done 2026-08-27), gauge dials,
+6. **Polish** — ~~GitHub Actions CI~~ (done 2026-08-27), ~~CWOP uploader~~ (code
+   done 2026-08-30, awaiting a station id — see docs/cwop.md), gauge dials,
    retention/downsampling job in Supabase (SQL written in
-   `docs/supabase-retention.sql`, not yet applied), CWOP uploader,
-   README screenshots.
+   `docs/supabase-retention.sql`, not yet applied), README screenshots.
 
 ## Gotchas
 
@@ -228,6 +235,12 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
 - WU wants **imperial** (°F, inHg, mph, inches) and UTC `dateutc`; response body must
   contain "success".
 - Windy upload pressure is **Pa**, not hPa.
+- CWOP has **no HTTP API** — it's APRS packets over a raw TCP socket, and APRS-IS
+  never acks the observation, so `send()` returning `True` only means the socket
+  round-trip worked. Verify real landing on aprs.fi/findu, not from logs. CWOP is
+  realtime-only: `upload/cwop.py` drops records older than 10 min instead of
+  backfilling, and self-throttles to one packet per 5 min. Pressure is
+  **tenths of hPa** (`b10132` = 1013.2), temp °F, rain hundredths-of-inch.
 - Supabase free projects pause after 7 days idle — a live station never idles, but a
   long holiday pause can suspend the project (restorable, ~30 s wake).
 - Supabase uploader treats HTTP 409 (duplicate on retry) as success — there's a
