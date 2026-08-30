@@ -24,6 +24,11 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27. Remaining:
   verify at `http://map.findu.com/<ID>` + <https://aprs.fi>, then email
   cwop-support@noaa.gov to confirm the plotted location and get data flowing to
   NOAA/MADIS. Passcode stays `-1` in `.env`. See [docs/cwop.md](docs/cwop.md) (§5).
+- **WOW-BE uploader** — code done 2026-08-30 (`upload/wowbe.py`, 9 tests). JSON
+  REST `POST wow.meteo.be/api/v2/send/wow`, WU-protocol fields, endpoint probed
+  live (422 validation works). **Needs**: register a site at <https://wow.meteo.be>,
+  put the PIN in `.env` as `WOWBE_AUTH_KEY`, set `uploaders.wowbe.{enabled,station_id}`
+  + `station.timezone` on the Pi. See [docs/wowbe.md](docs/wowbe.md) (§5).
 - **Supabase retention job** — SQL written (`docs/supabase-retention.sql`), not yet
   run against the live project; repoint the 7d/30d queries at `readings_hourly` after (§5).
 - **README screenshots** of the live dashboard (§5).
@@ -267,6 +272,18 @@ domain may come later).
       `enabled: true` + `station_id` + `station.timezone` on the Pi, restart,
       verify on findu/aprs.fi, then email cwop-support@noaa.gov to confirm the
       location. 90-day deadline to finish. Full notes: [docs/cwop.md](docs/cwop.md).
+- [~] WOW-BE uploader — **code done 2026-08-30** (`upload/wowbe.py`, 9 tests).
+      RMI Belgium's WOW reboot (`wow.meteo.be`) — the migration path now that the
+      UK/IE WOW instances are being decommissioned. v2 is a JSON REST API
+      (`POST /api/v2/send/wow`, not the old query-string GET), auth = Site ID +
+      Authentication Key (PIN) in the body, WU-protocol field set (°F/inHg/mph/in),
+      `dateutc` as `YYYY-MM-DD HH:MM:SS` UTC, rate limit 20/min (no client
+      throttle needed). `rainin` (last hour) + `dailyrainin` (since local
+      midnight) summed from the SQLite buffer via the shared `upload/_rain.py`
+      helper (also refactored CWOP onto it). Endpoint probed live — 422 validation
+      responses confirm shape. **Needs**: register a site at <https://wow.meteo.be>,
+      `WOWBE_AUTH_KEY` in `.env`, `uploaders.wowbe.{enabled,station_id}` +
+      `station.timezone` on the Pi. Full notes: [docs/wowbe.md](docs/wowbe.md).
 - [x] GitHub Actions CI: `.github/workflows/ci.yml` (2026-08-27) — two jobs on
       push-to-`main` + every PR:
   - **pi**: `ruff check` + `ruff format --check` + `pytest` on Python 3.9 & 3.13.

@@ -25,4 +25,9 @@ def build_uploaders(cfg: Config) -> list:
         from .cwop import CWOPUploader
 
         ups.append(CWOPUploader(cfg))
+    wowbe = u.get("wowbe")  # optional block: absent in configs predating WOW-BE support
+    if wowbe and wowbe.get("enabled") and wowbe.get("station_id") and cfg.env.wowbe_auth_key:
+        from .wowbe import WowBeUploader
+
+        ups.append(WowBeUploader(cfg))
     return ups

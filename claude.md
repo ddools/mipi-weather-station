@@ -24,7 +24,9 @@ Repo: https://github.com/ddools/mipi-weather-station (public, MIT).
 sensors → core/sampler → store (SQLite, source of truth) → upload/* (per-dest cursors)
                                                              ├→ Supabase (Postgres) → Astro site
                                                              ├→ Weather Underground
-                                                             └→ Windy (Stations API v2)
+                                                             ├→ Windy (Stations API v2)
+                                                             ├→ CWOP / NOAA MADIS (APRS-IS socket)
+                                                             └→ WOW-BE (wow.meteo.be JSON API)
 ```
 
 Key decisions already made — do not re-litigate without asking:
@@ -47,7 +49,9 @@ Key decisions already made — do not re-litigate without asking:
   2026-08-30, `upload/cwop.py`; blocked on a CW/DW/EW id from wxqa.com. See
   [docs/cwop.md](docs/cwop.md)).
   **Do NOT target Met Office/Met Éireann WOW** — decommissioning late 2026.
-  (WOW-BE reboot at wow.meteo.be is the fallback if WOW-style sharing is wanted.)
+  **WOW-BE** (wow.meteo.be, RMI Belgium's WOW reboot) — uploader done 2026-08-30
+  (`upload/wowbe.py`), JSON REST `POST /api/v2/send/wow`, WU-protocol field set.
+  See [docs/wowbe.md](docs/wowbe.md).
 - **Units**: SI internally everywhere; convert at the uploader edge (`core/units.py`).
 
 ## Hardware facts (Oracle kit)
@@ -123,6 +127,12 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   from wxqa.com, then `uploaders.cwop.{enabled,station_id}` + `station.timezone`
   on the Pi. Passcode `-1` (in `.env` as `CWOP_PASSCODE`). Full notes in
   [docs/cwop.md](docs/cwop.md).
+- **WOW-BE uploader written** (2026-08-30, `upload/wowbe.py` + `tests/test_wowbe.py`,
+  9 tests) — JSON REST `POST wow.meteo.be/api/v2/send/wow`, WU-protocol field set,
+  Site ID + `WOWBE_AUTH_KEY` (PIN). Shares rain-accumulation code with CWOP in
+  `upload/_rain.py`. Not wired live: register at wow.meteo.be, then
+  `uploaders.wowbe.{enabled,station_id}` + `station.timezone`. See
+  [docs/wowbe.md](docs/wowbe.md).
 - **TGS2600 air quality** now has collector + dashboard support
   (`sensors/air_quality.py`, `sensors.air_quality.enabled` — off by default,
   uncalibrated 0–100 relative index; see docs/sensors.md "TGS2600 air quality");
