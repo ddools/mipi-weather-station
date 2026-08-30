@@ -17,11 +17,13 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27. Remaining:
   clean-run clock restarted at 2026-08-27 21:46 BST after a deploy-session restart storm.
 - **Benchmarks** — live value updates within 60s of a new reading; mobile Lighthouse ≥ 90 (§2).
 - **CWOP uploader** — code done 2026-08-30 (`upload/cwop.py`, APRS-IS socket
-  client, 10 tests). **Blocked on registration**: need a CW/DW/EW id from
-  <http://www.wxqa.com/SIGN-UP.html> (email arrives in a day or two), then set
-  `uploaders.cwop.{enabled,station_id}` on the Pi. Passcode stays `-1` in `.env`
-  unless a ham callsign is used. See [docs/cwop.md](docs/cwop.md). Verify landing
-  on <https://aprs.fi> / findu after first send (§5).
+  client, 10 tests). **Registration submitted 2026-08-30**; CWOP processes new
+  accounts weekly on Wednesday, so the Site Id email is due ~2026-09-02 (90-day
+  deadline to finish or the site is dropped). When it lands: set
+  `uploaders.cwop.{enabled,station_id}` + `station.timezone` on the Pi, restart,
+  verify at `http://map.findu.com/<ID>` + <https://aprs.fi>, then email
+  cwop-support@noaa.gov to confirm the plotted location and get data flowing to
+  NOAA/MADIS. Passcode stays `-1` in `.env`. See [docs/cwop.md](docs/cwop.md) (§5).
 - **Supabase retention job** — SQL written (`docs/supabase-retention.sql`), not yet
   run against the live project; repoint the 7d/30d queries at `readings_hourly` after (§5).
 - **README screenshots** of the live dashboard (§5).
@@ -260,9 +262,11 @@ domain may come later).
       dropped rather than backfilled (CWOP is realtime-only). Config block
       `uploaders.cwop` + `station.timezone` in `config.example.yaml`, passcode in
       `.env` (`CWOP_PASSCODE`, default `-1`). 10 unit tests in `tests/test_cwop.py`.
-      **Blocked on registration**: get a `CW`/`DW`/`EW` id from
-      <http://www.wxqa.com/SIGN-UP.html>, then `enabled: true` + `station_id` on
-      the Pi. Full notes: [docs/cwop.md](docs/cwop.md).
+      **Registration submitted 2026-08-30** (wxqa.com signup); CWOP registers new
+      accounts weekly on Wednesday, Site Id email due ~2026-09-02. When it lands:
+      `enabled: true` + `station_id` + `station.timezone` on the Pi, restart,
+      verify on findu/aprs.fi, then email cwop-support@noaa.gov to confirm the
+      location. 90-day deadline to finish. Full notes: [docs/cwop.md](docs/cwop.md).
 - [x] GitHub Actions CI: `.github/workflows/ci.yml` (2026-08-27) — two jobs on
       push-to-`main` + every PR:
   - **pi**: `ruff check` + `ruff format --check` + `pytest` on Python 3.9 & 3.13.

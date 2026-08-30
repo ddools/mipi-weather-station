@@ -59,9 +59,13 @@ catches up and only ever sends fresh observations.
 
 ## Setup
 
-1. **Register** for a station id at <http://www.wxqa.com/SIGN-UP.html>. You get a
-   `CW####` / `DW####` / `EW####` id by email, usually within a day or two. If you
-   hold an amateur radio licence you can use your callsign instead.
+1. **Register** for a station id at <http://www.wxqa.com/SIGN-UP.html>. CWOP
+   processes new accounts **weekly on Wednesday** and emails the `CW####` /
+   `DW####` / `EW####` id then. There is a **90-day deadline** to finish (send
+   data + verify the map location) or the site is removed. If you hold an amateur
+   radio licence, skip the form — email cwop-support@noaa.gov with your callsign,
+   town, zip and elevation-in-metres and use the callsign as the id instead.
+   (Ours: registration submitted 2026-08-30, id pending.)
 2. **`pi/.env`** — leave `CWOP_PASSCODE=-1` for a CW/DW/EW id. Only set a real
    [APRS-IS passcode](http://www.aprs-is.net/SendOnlyPorts.aspx) if `station_id`
    is a ham callsign.
