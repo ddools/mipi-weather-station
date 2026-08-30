@@ -82,3 +82,7 @@ uploaders:
     send_interval_s: 300  # CWOP asks for one report per ~5 min, no more often
     # Passcode goes in .env as CWOP_PASSCODE: "-1" for a CW/DW/EW id (the default),
     # a real APRS-IS passcode only if station_id is a licensed ham callsign.
+  wowbe:                  # wow.meteo.be — RMI Belgium's WOW reboot (WU-protocol-compatible)
+    enabled: false
+    station_id: ""        # WOW-BE Site ID from your site page on wow.meteo.be
+    # Authentication key (PIN) goes in .env as WOWBE_AUTH_KEY.

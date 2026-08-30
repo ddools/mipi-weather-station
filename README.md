@@ -18,8 +18,8 @@ Live at: **a standalone domain (TBD — not yet registered)**
   nothing is lost during network or power outages — uploaders replay the backlog
   automatically (store-and-forward).
 - Pushes readings to a **Supabase (Postgres)** cloud database that powers the website.
-- Optionally publishes to **Weather Underground**, **Windy** (Stations API v2), and more
-  via pluggable uploader modules.
+- Optionally publishes to **Weather Underground**, **Windy** (Stations API v2),
+  **CWOP** (NOAA MADIS), and **WOW-BE** (wow.meteo.be) via pluggable uploader modules.
 - An **Astro** front end (on Vercel) renders live conditions and history charts.
 
 ## Architecture
@@ -30,9 +30,10 @@ Live at: **a standalone domain (TBD — not yet registered)**
 │  (BMP085/HTU21D, wind, rain)  (SQLite)     │
 │                                  │         │
 │                              upload/       │──▶ Supabase (Postgres)
-│                    (supabase, wunderground,│──▶ Weather Underground
-│                     windy, cwop, ...)      │──▶ Windy
+│               (supabase, wunderground,     │──▶ Weather Underground
+│                windy, cwop, wowbe, ...)    │──▶ Windy
 │                                            │──▶ CWOP / NOAA MADIS (APRS-IS)
+│                                            │──▶ WOW-BE (wow.meteo.be)
 └────────────────────────────────────────────┘
                                                    │
                               Astro site on Vercel ┘
@@ -79,8 +80,8 @@ WS_MOCK_SENSORS=1 weatherstation
 
 - `config.yaml` — station metadata (lat/lon/elevation), GPIO pins, calibration
   constants, sample/archive intervals, which uploaders are enabled.
-- `.env` — secrets only (Supabase service key, WU station key, Windy API key).
-  Never committed; see `.env.example`.
+- `.env` — secrets only (Supabase service key, WU station key, Windy password,
+  CWOP passcode, WOW-BE auth key). Never committed; see `.env.example`.
 
 ## Roadmap
 
@@ -92,6 +93,7 @@ WS_MOCK_SENSORS=1 weatherstation
 - [x] Windy Stations API v2 upload
 - [x] Wind rose, gauges, dark mode
 - [x] CWOP (APRS) upload — code complete; awaiting a station id ([docs/cwop.md](docs/cwop.md))
+- [x] WOW-BE (wow.meteo.be) upload — code complete; needs a registered site ([docs/wowbe.md](docs/wowbe.md))
 
 ## Licence
 

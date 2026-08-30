@@ -26,13 +26,12 @@ from __future__ import annotations
 import contextlib
 import logging
 import socket
-import sqlite3
 import time
 from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
 
 from .. import __version__
 from ..core import units
+from ._rain import local_midnight_utc, sum_rain_since
 from .base import Uploader
 
 log = logging.getLogger(__name__)
@@ -176,33 +175,13 @@ class CWOPUploader(Uploader):
 
     def _rain_windows(self, now_utc: datetime) -> tuple[float, float, float]:
         """(last hour, last 24 h, since local midnight) rain totals in mm."""
-        windows = (
+        r1, r24, rmid = sum_rain_since(
+            self._sqlite_path,
             (now_utc - timedelta(hours=1)).isoformat(),
             (now_utc - timedelta(hours=24)).isoformat(),
-            self._local_midnight_utc(now_utc).isoformat(),
+            local_midnight_utc(self._tz, now_utc).isoformat(),
         )
-        q = (
-            "SELECT COALESCE(SUM(json_extract(payload, '$.rain_mm')), 0) "
-            "FROM readings WHERE recorded_at >= ?"
-        )
-        try:
-            db = sqlite3.connect(f"file:{self._sqlite_path}?mode=ro", uri=True, timeout=5)
-            try:
-                return tuple(float(db.execute(q, (since,)).fetchone()[0]) for since in windows)
-            finally:
-                db.close()
-        except sqlite3.Error as e:
-            log.warning("cwop: rain lookup failed (%s); reporting zeros", e)
-            return 0.0, 0.0, 0.0
-
-    def _local_midnight_utc(self, now_utc: datetime) -> datetime:
-        try:
-            local = now_utc.astimezone(ZoneInfo(self._tz))
-        except Exception:
-            log.warning("cwop: unknown timezone %r; using UTC midnight for rain total", self._tz)
-            return now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
-        midnight = local.replace(hour=0, minute=0, second=0, microsecond=0)
-        return midnight.astimezone(timezone.utc)
+        return r1, r24, rmid
 
     def _transmit(self, packet: str) -> bool:
         login = f"user {self._callsign} pass {self._passcode} vers {_SOFTWARE} {__version__}\r\n"
