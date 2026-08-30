@@ -16,7 +16,12 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27. Remaining:
   network-partition (unplug) test, and a genuine 24h *uninterrupted* run — yesterday's
   clean-run clock restarted at 2026-08-27 21:46 BST after a deploy-session restart storm.
 - **Benchmarks** — live value updates within 60s of a new reading; mobile Lighthouse ≥ 90 (§2).
-- **CWOP uploader** — not started; needs a from-scratch APRS client (§5).
+- **CWOP uploader** — code done 2026-08-30 (`upload/cwop.py`, APRS-IS socket
+  client, 10 tests). **Blocked on registration**: need a CW/DW/EW id from
+  <http://www.wxqa.com/SIGN-UP.html> (email arrives in a day or two), then set
+  `uploaders.cwop.{enabled,station_id}` on the Pi. Passcode stays `-1` in `.env`
+  unless a ham callsign is used. See [docs/cwop.md](docs/cwop.md). Verify landing
+  on <https://aprs.fi> / findu after first send (§5).
 - **Supabase retention job** — SQL written (`docs/supabase-retention.sql`), not yet
   run against the live project; repoint the 7d/30d queries at `readings_hourly` after (§5).
 - **README screenshots** of the live dashboard (§5).
@@ -242,11 +247,22 @@ domain may come later).
 
 ## 5. Polish (plan.MD Recommendations #5, Details/E)
 
-- [ ] CWOP (APRS) uploader — **not started**, no `upload/cwop.py` exists yet.
-      Needs: CWOP registration (NOAA CWOP signup for a `CW`/`DW` ID), an APRS
-      packet formatter (mph/°F/inHg-hundredths/rain-hundredths), and a socket send
-      to `cwop.aprs.net:14580` every ~5 min. WeeWX has this built in; this project
-      needs a from-scratch client.
+- [~] CWOP (APRS) uploader — **code done 2026-08-30** (`upload/cwop.py`).
+      From-scratch APRS-IS client: opens a plain TCP socket to
+      `cwop.aprs.net:14580`, logs in (`user <ID> pass <passcode> vers ...`), sends
+      one APRS complete-weather-report packet, closes. Formatter converts to the
+      APRS field set (position as `DDMM.mmN/DDDMM.mmW`, wind mph, temp °F incl.
+      sub-zero `t-dd`, pressure in tenths-of-hPa `bnnnnn`, humidity `hnn` with
+      `h00`=100%, rain in hundredths-of-inch for 1 h / 24 h / since-local-midnight).
+      Rain windows are summed straight from the local SQLite buffer (read-only
+      connection, `json_extract`), so they survive an uploader restart. Throttled
+      to `send_interval_s` (300 s) like Windy; records older than 10 min are
+      dropped rather than backfilled (CWOP is realtime-only). Config block
+      `uploaders.cwop` + `station.timezone` in `config.example.yaml`, passcode in
+      `.env` (`CWOP_PASSCODE`, default `-1`). 10 unit tests in `tests/test_cwop.py`.
+      **Blocked on registration**: get a `CW`/`DW`/`EW` id from
+      <http://www.wxqa.com/SIGN-UP.html>, then `enabled: true` + `station_id` on
+      the Pi. Full notes: [docs/cwop.md](docs/cwop.md).
 - [x] GitHub Actions CI: `.github/workflows/ci.yml` (2026-08-27) — two jobs on
       push-to-`main` + every PR:
   - **pi**: `ruff check` + `ruff format --check` + `pytest` on Python 3.9 & 3.13.

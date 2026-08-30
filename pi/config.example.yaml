@@ -5,6 +5,7 @@ station:
   latitude: 53.35        # decimal degrees
   longitude: -6.26
   elevation_m: 20        # metres above sea level (for sea-level pressure)
+  timezone: "Europe/Dublin"  # IANA name; used for CWOP "rain since local midnight"
 
 sampling:
   wind_sample_s: 5       # how often to sample wind for gust detection
@@ -73,3 +74,11 @@ uploaders:
   windy:
     enabled: false
     station_id: ""       # e.g. C9fexco — password goes in .env, not here
+  cwop:
+    enabled: false
+    station_id: ""        # CW/DW/EW id from wxqa.com/SIGN-UP.html (ham callsign if licensed)
+    server: "cwop.aprs.net"
+    port: 14580
+    send_interval_s: 300  # CWOP asks for one report per ~5 min, no more often
+    # Passcode goes in .env as CWOP_PASSCODE: "-1" for a CW/DW/EW id (the default),
+    # a real APRS-IS passcode only if station_id is a licensed ham callsign.

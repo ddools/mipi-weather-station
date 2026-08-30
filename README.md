@@ -31,7 +31,8 @@ Live at: **a standalone domain (TBD — not yet registered)**
 │                                  │         │
 │                              upload/       │──▶ Supabase (Postgres)
 │                    (supabase, wunderground,│──▶ Weather Underground
-│                     windy, ...)            │──▶ Windy
+│                     windy, cwop, ...)      │──▶ Windy
+│                                            │──▶ CWOP / NOAA MADIS (APRS-IS)
 └────────────────────────────────────────────┘
                                                    │
                               Astro site on Vercel ┘
@@ -85,12 +86,12 @@ WS_MOCK_SENSORS=1 weatherstation
 
 - [x] Repo scaffold, package structure
 - [x] Sensor bring-up & calibration (air sensor → wind → rain → vane)
-- [ ] SQLite buffer + Supabase uploader (store-and-forward)
-- [ ] Astro site (own domain, shadcn/ui): server-island live panel + history charts
-- [ ] Weather Underground upload
-- [ ] Windy Stations API v2 upload
-- [ ] Wind rose, gauges, dark mode
-- [ ] CWOP (APRS) upload
+- [x] SQLite buffer + Supabase uploader (store-and-forward)
+- [x] Astro site (own domain TBD, shadcn/ui): server-island live panel + history charts
+- [x] Weather Underground upload
+- [x] Windy Stations API v2 upload
+- [x] Wind rose, gauges, dark mode
+- [x] CWOP (APRS) upload — code complete; awaiting a station id ([docs/cwop.md](docs/cwop.md))
 
 ## Licence
 

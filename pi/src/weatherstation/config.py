@@ -35,6 +35,7 @@ def load(path: str | Path = "config.yaml") -> Config:
         supabase_key=os.getenv("SUPABASE_SERVICE_KEY", ""),
         wu_key=os.getenv("WU_STATION_KEY", ""),
         windy_station_password=os.getenv("WINDY_STATION_PASSWORD", ""),
+        cwop_passcode=os.getenv("CWOP_PASSCODE", "-1"),
     )
     return cfg
 
