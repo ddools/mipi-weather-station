@@ -10,7 +10,6 @@ import { getLatestReading, getTodaySummary } from "@/lib/supabase";
 import { degToCompass, fmt, beaufort, msToKmh, pressureTrend, trend as changeTrend } from "@/lib/format";
 import { feelsLike, dewPointComfort } from "@/lib/derived";
 import thermometerIcon from "@meteocons/svg/flat/thermometer.svg?url";
-import thermometerWarmerIcon from "@meteocons/svg/flat/thermometer-moon.svg?url";
 import humidityIcon from "@meteocons/svg/flat/humidity.svg?url";
 import pressureHighIcon from "@meteocons/svg/flat/pressure-high.svg?url";
 import pressureLowIcon from "@meteocons/svg/flat/pressure-low.svg?url";
@@ -61,6 +60,13 @@ const feels = reading
   ? feelsLike(reading.temp_c, reading.wind_speed_ms, reading.dewpoint_c)
   : null;
 const comfort = dewPointComfort(reading?.dewpoint_c ?? null);
+
+function humidityNote(rh: number | null | undefined): string {
+  if (rh == null) return "relative humidity";
+  if (rh >= 90) return "very damp air";
+  if (rh <= 45) return "dry air";
+  return "relative humidity";
+}
 
 const bft = beaufort(reading?.wind_speed_ms ?? null);
 const windKmh = msToKmh(reading?.wind_speed_ms ?? null);
@@ -127,7 +133,7 @@ const lastUpdatedAbs = latestReading?.recorded_at
     </span>
   </div>
 
-  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
     <Card>
       <CardHeader className="flex items-center gap-2">
         <img src={thermometerIcon} alt="" class="h-10 w-10" />
@@ -150,12 +156,34 @@ const lastUpdatedAbs = latestReading?.recorded_at
           ><span class="mx-1.5">·</span><span class="text-foreground/70">L</span> <span
             data-field="temp_min">{fmt(summary.tempMin, 1, "°")}</span
           ><span class="ml-1.5 text-xs">today</span>
+          <span class="mx-1.5">·</span><span data-field="temp_vs_24h">
+            {tempVs24h && tempVs24h.key !== "flat"
+              ? `${tempVs24h.delta > 0 ? "+" : "−"}${Math.abs(tempVs24h.delta).toFixed(1)}° vs 24h`
+              : "≈ 24h ago"}
+          </span>
         </p>
-        <p class="mt-1 text-sm text-muted-foreground tabular-nums" data-field="temp_vs_24h">
-          {tempVs24h && tempVs24h.key !== "flat"
-            ? `${tempVs24h.delta > 0 ? "+" : "−"}${Math.abs(tempVs24h.delta).toFixed(1)}° vs 24h ago`
-            : "about the same as 24h ago"}
-        </p>
+
+        <dl class="mt-3 border-t border-border/60 pt-3 text-sm">
+          <div class="flex items-baseline justify-between gap-2">
+            <dt class="text-muted-foreground">Feels like</dt>
+            <dd class="tabular-nums" data-field="feels_like">
+              {feels ? `${feels.value.toFixed(1)}°C` : "N/A"}
+            </dd>
+          </div>
+          <p class="mt-0.5 text-xs text-muted-foreground" data-field="feels_caption">
+            {feels ? feels.caption : "apparent temperature"}
+          </p>
+          <div class="mt-2 flex items-baseline justify-between gap-2">
+            <dt class="text-muted-foreground">Dew point</dt>
+            <dd class="tabular-nums" data-field="dewpoint_c">
+              {fmt(reading?.dewpoint_c ?? null, 1, "°C")}
+            </dd>
+          </div>
+          <p class="mt-0.5 text-xs text-muted-foreground" data-field="dewpoint_comfort">
+            {comfort ? `air feels ${comfort}` : "humidity comfort"}
+          </p>
+        </dl>
+
         <Sparkline
           values={summary.spark.temp}
           color="#ef4444"
@@ -204,36 +232,14 @@ const lastUpdatedAbs = latestReading?.recorded_at
               : ""}
           </span>
         </div>
-        <p class="mt-2 text-sm text-muted-foreground">
-          <span data-field="dewpoint_comfort">
-            {comfort ? `Air feels ${comfort}` : "dew-point comfort"}
-          </span>
+        <p class="mt-2 text-sm text-muted-foreground" data-field="humidity_note">
+          {humidityNote(reading?.humidity)}
         </p>
         <Sparkline
           values={summary.spark.humidity}
           color="#3b82f6"
           class="mt-3 w-full text-muted-foreground/60"
         />
-      </CardContent>
-    </Card>
-
-    <Card>
-      <CardHeader className="flex items-center gap-2">
-        <img src={thermometerWarmerIcon} alt="" class="h-10 w-10" />
-        <CardTitle>Feels like</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div class="text-3xl font-semibold tabular-nums" data-field="feels_like">
-          {feels ? `${feels.value.toFixed(1)}°C` : "N/A"}
-        </div>
-        <p class="mt-2 text-sm text-muted-foreground" data-field="feels_caption">
-          {feels ? feels.caption : "apparent temperature"}
-        </p>
-        <p class="mt-1 text-sm text-muted-foreground">
-          Dew point <span class="tabular-nums" data-field="dewpoint_c"
-            >{fmt(reading?.dewpoint_c ?? null, 1, "°C")}</span
-          >
-        </p>
       </CardContent>
     </Card>
   </div>
@@ -513,7 +519,17 @@ const lastUpdatedAbs = latestReading?.recorded_at
       set("feels_like", feels ? `${feels.value.toFixed(1)}°C` : NO_VALUE);
       set("feels_caption", feels ? feels.caption : "apparent temperature");
       const comfort = dewComfort(dewpoint);
-      set("dewpoint_comfort", comfort ? `Air feels ${comfort}` : "dew-point comfort");
+      set("dewpoint_comfort", comfort ? `air feels ${comfort}` : "humidity comfort");
+      set(
+        "humidity_note",
+        humidity === null
+          ? "relative humidity"
+          : humidity >= 90
+            ? "very damp air"
+            : humidity <= 45
+              ? "dry air"
+              : "relative humidity"
+      );
       const aq = stale ? null : num(reading.air_quality);
       set("air_quality", aq === null ? NO_VALUE : String(Math.round(aq)));
       set("wind_kmh", kmh(windMs));
@@ -560,8 +576,8 @@ const lastUpdatedAbs = latestReading?.recorded_at
       set(
         "temp_vs_24h",
         tv && tv.key !== "flat"
-          ? `${tv.delta > 0 ? "+" : "−"}${Math.abs(tv.delta).toFixed(1)}° vs 24h ago`
-          : "about the same as 24h ago"
+          ? `${tv.delta > 0 ? "+" : "−"}${Math.abs(tv.delta).toFixed(1)}° vs 24h`
+          : "≈ 24h ago"
       );
       const ht = changeArrow(stale ? null : num(s.humidityNow), num(s.humidity1hAgo), 2);
       set("humidity_trend", ht && ht.key !== "flat" ? `${ht.arrow} ${Math.abs(ht.delta).toFixed(0)}%/h` : "");

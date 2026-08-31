@@ -11,11 +11,10 @@ import { Skeleton } from "@/components/ui/skeleton";
   <section class="mb-10">
     <CurrentConditions server:defer>
       <div slot="fallback" class="space-y-4">
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Skeleton className="h-60" />
+          <Skeleton className="h-60" />
+          <Skeleton className="h-60" />
         </div>
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Skeleton className="h-44" />
