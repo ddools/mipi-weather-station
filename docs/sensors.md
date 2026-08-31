@@ -149,6 +149,40 @@ for BMP085/180 (a BME280 would read `0x60`, a BMP280 `0x58`).
 implemented now — see their sections above. The DS18B20 is repurposed as the
 air-temperature source rather than a ground-temp field.)
 
+## Troubleshooting: the station reads several degrees too warm
+
+The kit has three thermometers and only the DS18B20 is trustworthy for air
+temperature (see BMP085 above). If the dashboard disagrees with the forecast or
+with a neighbouring station, the first question is which chip the number came
+from. Run this on the Pi, in the collector's virtualenv:
+
+```
+.venv/bin/weatherstation-doctor
+```
+
+It reads all three thermometers at once, prints the differences between them,
+marks which one the collector is publishing, and says what the numbers mean.
+
+The two causes, in the order they're worth checking:
+
+1. **The probe isn't on the bus, so the collector is publishing the self-heated
+   onboard chip.** With `air_temp_source: auto` this is the fallback, and it is
+   worth 5-11 °C. `weatherstation-doctor` shows it as a missing 1-Wire device;
+   `journalctl -u weatherstation` shows the collector's startup warning. Fix by
+   enabling 1-Wire (`sudo raspi-config nonint do_onewire 0`, reboot) or
+   reseating the probe on GPIO 4 — the collector re-checks the bus every 60 s
+   and switches over on its own, so no restart is needed once it appears.
+2. **The probe is on the bus and reporting, but it's badly sited.** The doctor
+   shows both onboard chips close to the probe (self-heating isn't happening),
+   so the reading is real — the probe is just measuring sun-warmed air. It needs
+   permanent shade, a ventilated radiation shield, ~1.5 m up, away from walls,
+   roofs and tarmac. An unshielded probe in direct sun reads 5-10 °C high and
+   stays high for a while after the sun moves off it.
+
+Note that the fallback in (1) also applies for a single cycle whenever a probe
+read fails its CRC. That's normal and self-correcting; the collector logs it at
+most once every 15 minutes so it doesn't drown the journal.
+
 ## Provisioning gotchas hit during bring-up
 
 - Raspberry Pi OS trixie (Debian 13) ships `python3-lgpio` as a system package, but

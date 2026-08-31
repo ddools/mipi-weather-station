@@ -41,6 +41,10 @@ class DS18B20Sensor:
                 "disabled or the probe isn't connected"
             )
 
+    @property
+    def device_path(self) -> str:
+        return self._path
+
     def read_c(self) -> float | None:
         """Temperature in C, or None on a bad read (caller retries next cycle)."""
         try:

@@ -32,6 +32,9 @@ dev = [
 
 [project.scripts]
 weatherstation = "weatherstation.main:main"
+# Prints every thermometer on the kit side by side — the first thing to run
+# when the published temperature disagrees with the forecast.
+weatherstation-doctor = "weatherstation.diagnose:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
