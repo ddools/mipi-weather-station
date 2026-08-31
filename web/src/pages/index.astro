@@ -11,12 +11,14 @@ import { Skeleton } from "@/components/ui/skeleton";
   <section class="mb-10">
     <CurrentConditions server:defer>
       <div slot="fallback" class="space-y-4">
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Skeleton className="h-60" />
           <Skeleton className="h-60" />
           <Skeleton className="h-60" />
           <Skeleton className="h-60" />
         </div>
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Skeleton className="h-44" />
           <Skeleton className="h-44" />
           <Skeleton className="h-44" />
           <Skeleton className="h-44" />
@@ -25,10 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
           <Skeleton className="h-40 lg:col-span-2" />
           <Skeleton className="h-40 lg:col-span-2" />
         </div>
-        <div class="grid grid-cols-1 gap-4 lg:grid-cols-4">
-          <Skeleton className="h-40" />
-          <Skeleton className="h-[420px] lg:col-span-3" />
-        </div>
+        <Skeleton className="h-[420px]" />
       </div>
     </CurrentConditions>
   </section>

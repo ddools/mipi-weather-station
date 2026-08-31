@@ -133,7 +133,7 @@ const lastUpdatedAbs = latestReading?.recorded_at
     </span>
   </div>
 
-  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
     <Card>
       <CardHeader className="flex items-center gap-2">
         <img src={thermometerIcon} alt="" class="h-10 w-10" />
@@ -242,12 +242,52 @@ const lastUpdatedAbs = latestReading?.recorded_at
         />
       </CardContent>
     </Card>
+
+    <SunSection />
   </div>
 
-  <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-    <SunSection />
+  <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
     <MoonSection />
     <PollenSection />
+
+    <Card>
+      <CardHeader className="flex items-center gap-2">
+        <img src={rainIcon} alt="" class="h-10 w-10" />
+        <CardTitle>Rain today</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div class="text-3xl font-semibold tabular-nums" data-field="rain_today">
+          {fmt(summary.rainToday, 1, " mm")}
+        </div>
+        <p class="mt-2 text-sm text-muted-foreground tabular-nums">
+          last hour <span data-field="rain_last_hour">{fmt(summary.rainLastHour, 1, " mm")}</span>
+          <span class="mx-1">·</span>
+          24h <span data-field="rain_24h">{fmt(summary.rain24h, 1, " mm")}</span>
+        </p>
+      </CardContent>
+    </Card>
+
+    {
+      reading?.air_quality != null && (
+        <Card>
+          <CardHeader className="flex items-center gap-2">
+            <img src={airQualityIcon} alt="" class="h-10 w-10" />
+            <CardTitle>Air quality</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div class="text-3xl font-semibold tabular-nums" data-field="air_quality">
+              {Math.round(reading.air_quality)}
+            </div>
+            <p class="mt-2 text-sm text-muted-foreground">
+              relative contaminants index · lower is cleaner
+            </p>
+            <p class="mt-1 text-xs text-muted-foreground/80">
+              Uncalibrated TGS2600 — trend only, not an AQI figure.
+            </p>
+          </CardContent>
+        </Card>
+      )
+    }
   </div>
 
   <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-4 lg:items-start">
@@ -309,51 +349,8 @@ const lastUpdatedAbs = latestReading?.recorded_at
     <TidesSection class="lg:col-span-2" />
   </div>
 
-  <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-4 lg:items-start">
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-      <Card>
-        <CardHeader className="flex items-center gap-2">
-          <img src={rainIcon} alt="" class="h-10 w-10" />
-          <CardTitle>Rain today</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div class="text-3xl font-semibold tabular-nums" data-field="rain_today">
-            {fmt(summary.rainToday, 1, " mm")}
-          </div>
-          <p class="mt-2 text-sm text-muted-foreground tabular-nums">
-            last hour <span data-field="rain_last_hour">{fmt(summary.rainLastHour, 1, " mm")}</span>
-            <span class="mx-1">·</span>
-            24h <span data-field="rain_24h">{fmt(summary.rain24h, 1, " mm")}</span>
-          </p>
-        </CardContent>
-      </Card>
-
-      {
-        reading?.air_quality != null && (
-          <Card>
-            <CardHeader className="flex items-center gap-2">
-              <img src={airQualityIcon} alt="" class="h-10 w-10" />
-              <CardTitle>Air quality</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div class="text-3xl font-semibold tabular-nums" data-field="air_quality">
-                {Math.round(reading.air_quality)}
-              </div>
-              <p class="mt-2 text-sm text-muted-foreground">
-                relative contaminants index · lower is cleaner
-              </p>
-              <p class="mt-1 text-xs text-muted-foreground/80">
-                Uncalibrated TGS2600 — trend only, not an AQI figure.
-              </p>
-            </CardContent>
-          </Card>
-        )
-      }
-    </div>
-
-    <div class="lg:col-span-3">
-      <RainRadar client:visible />
-    </div>
+  <div class="mt-4">
+    <RainRadar client:visible />
   </div>
 </div>
 
