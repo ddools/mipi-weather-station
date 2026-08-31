@@ -1,0 +1,72 @@
+---
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getPollen, type PollenLevel } from "@/lib/pollen";
+import pollenIcon from "@meteocons/svg/flat/pollen.svg?url";
+
+interface Props {
+  class?: string;
+}
+const { class: className } = Astro.props;
+
+const report = await getPollen();
+
+const LEVEL_STYLE: Record<PollenLevel, { label: string; dot: string; text: string }> = {
+  none: { label: "None", dot: "bg-muted-foreground/40", text: "text-muted-foreground" },
+  low: { label: "Low", dot: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400" },
+  moderate: { label: "Moderate", dot: "bg-amber-500", text: "text-amber-600 dark:text-amber-400" },
+  high: { label: "High", dot: "bg-orange-500", text: "text-orange-600 dark:text-orange-400" },
+  "very-high": { label: "Very high", dot: "bg-red-500", text: "text-red-600 dark:text-red-400" },
+};
+
+const overall = report ? LEVEL_STYLE[report.overall] : null;
+---
+
+<Card className={className}>
+  <CardHeader className="flex items-center gap-2">
+    <img src={pollenIcon} alt="" class="h-10 w-10" />
+    <CardTitle>Pollen</CardTitle>
+  </CardHeader>
+  <CardContent>
+    {
+      !report ? (
+        <p class="text-sm text-muted-foreground">Pollen data unavailable.</p>
+      ) : (
+        <>
+          <div class="flex items-center gap-2">
+            <span class={`inline-block h-2.5 w-2.5 rounded-full ${overall!.dot}`} />
+            <span class={`text-lg font-semibold ${overall!.text}`}>{overall!.label}</span>
+          </div>
+          <p class="mt-1 text-sm text-muted-foreground">{report.headline}</p>
+
+          {report.active.length > 0 && (
+            <dl class="mt-3 space-y-1 text-sm tabular-nums">
+              {report.active.map((s) => (
+                <div class="flex items-center justify-between gap-3">
+                  <dt class="flex items-center gap-2 text-muted-foreground">
+                    <span
+                      class={`inline-block h-2 w-2 rounded-full ${LEVEL_STYLE[s.level].dot}`}
+                    />
+                    {s.label}
+                  </dt>
+                  <dd>
+                    {s.now.toFixed(s.now < 10 ? 1 : 0)}
+                    <span class="text-xs text-muted-foreground"> grains/m³</span>
+                    {s.peakToday > s.now * 1.5 && (
+                      <span class="ml-1 text-xs text-muted-foreground">
+                        (peak {s.peakToday.toFixed(s.peakToday < 10 ? 1 : 0)})
+                      </span>
+                    )}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
+
+          <p class="mt-3 text-xs text-muted-foreground">
+            CAMS European model via Open-Meteo · updates hourly
+          </p>
+        </>
+      )
+    }
+  </CardContent>
+</Card>

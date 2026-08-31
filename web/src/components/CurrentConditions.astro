@@ -3,10 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Sparkline from "@/components/Sparkline.astro";
 import TidesSection from "@/components/TidesSection.astro";
 import SunSection from "@/components/SunSection.astro";
+import MoonSection from "@/components/MoonSection.astro";
+import PollenSection from "@/components/PollenSection.astro";
 import { RainRadar } from "@/components/RainRadar";
 import { getLatestReading, getTodaySummary } from "@/lib/supabase";
-import { degToCompass, fmt, beaufort, msToKmh, pressureTrend } from "@/lib/format";
+import { degToCompass, fmt, beaufort, msToKmh, pressureTrend, trend as changeTrend } from "@/lib/format";
+import { feelsLike, dewPointComfort } from "@/lib/derived";
 import thermometerIcon from "@meteocons/svg/flat/thermometer.svg?url";
+import thermometerWarmerIcon from "@meteocons/svg/flat/thermometer-moon.svg?url";
 import humidityIcon from "@meteocons/svg/flat/humidity.svg?url";
 import pressureHighIcon from "@meteocons/svg/flat/pressure-high.svg?url";
 import pressureLowIcon from "@meteocons/svg/flat/pressure-low.svg?url";
@@ -46,6 +50,18 @@ const pressureIcon =
       : pressureLowIcon;
 
 const trend = reading ? pressureTrend(summary.pressureNow, summary.pressure3hAgo) : null;
+
+// Temperature: hourly-rate trend arrow + change since the same time yesterday.
+const tempTrend = reading ? changeTrend(summary.tempNow, summary.temp1hAgo, 0.3) : null;
+const tempVs24h = reading ? changeTrend(summary.tempNow, summary.temp24hAgo, 0.5) : null;
+const humidityTrend = reading ? changeTrend(summary.humidityNow, summary.humidity1hAgo, 2) : null;
+
+// "Feels like" apparent temperature and dew-point comfort.
+const feels = reading
+  ? feelsLike(reading.temp_c, reading.wind_speed_ms, reading.dewpoint_c)
+  : null;
+const comfort = dewPointComfort(reading?.dewpoint_c ?? null);
+
 const bft = beaufort(reading?.wind_speed_ms ?? null);
 const windKmh = msToKmh(reading?.wind_speed_ms ?? null);
 const gustKmh = msToKmh(reading?.wind_gust_ms ?? null);
@@ -118,8 +134,15 @@ const lastUpdatedAbs = latestReading?.recorded_at
         <CardTitle>Temperature</CardTitle>
       </CardHeader>
       <CardContent>
-        <div class="text-3xl font-semibold tabular-nums" data-field="temp_c">
-          {fmt(reading?.temp_c ?? null, 1, "°C")}
+        <div class="flex items-baseline gap-2">
+          <span class="text-3xl font-semibold tabular-nums" data-field="temp_c">
+            {fmt(reading?.temp_c ?? null, 1, "°C")}
+          </span>
+          <span class="text-sm text-muted-foreground tabular-nums" data-field="temp_trend">
+            {tempTrend && tempTrend.key !== "flat"
+              ? `${tempTrend.arrow} ${Math.abs(tempTrend.delta).toFixed(1)}°/h`
+              : ""}
+          </span>
         </div>
         <p class="mt-2 text-sm text-muted-foreground tabular-nums">
           <span class="text-foreground/70">H</span> <span data-field="temp_max"
@@ -128,8 +151,10 @@ const lastUpdatedAbs = latestReading?.recorded_at
             data-field="temp_min">{fmt(summary.tempMin, 1, "°")}</span
           ><span class="ml-1.5 text-xs">today</span>
         </p>
-        <p class="mt-1 text-sm text-muted-foreground">
-          Dewpoint <span data-field="dewpoint_c">{fmt(reading?.dewpoint_c ?? null, 1, "°C")}</span>
+        <p class="mt-1 text-sm text-muted-foreground tabular-nums" data-field="temp_vs_24h">
+          {tempVs24h && tempVs24h.key !== "flat"
+            ? `${tempVs24h.delta > 0 ? "+" : "−"}${Math.abs(tempVs24h.delta).toFixed(1)}° vs 24h ago`
+            : "about the same as 24h ago"}
         </p>
         <Sparkline
           values={summary.spark.temp}
@@ -169,9 +194,21 @@ const lastUpdatedAbs = latestReading?.recorded_at
         <CardTitle>Humidity</CardTitle>
       </CardHeader>
       <CardContent>
-        <div class="text-3xl font-semibold tabular-nums" data-field="humidity">
-          {fmt(reading?.humidity ?? null, 0, "%")}
+        <div class="flex items-baseline gap-2">
+          <span class="text-3xl font-semibold tabular-nums" data-field="humidity">
+            {fmt(reading?.humidity ?? null, 0, "%")}
+          </span>
+          <span class="text-sm text-muted-foreground tabular-nums" data-field="humidity_trend">
+            {humidityTrend && humidityTrend.key !== "flat"
+              ? `${humidityTrend.arrow} ${Math.abs(humidityTrend.delta).toFixed(0)}%/h`
+              : ""}
+          </span>
         </div>
+        <p class="mt-2 text-sm text-muted-foreground">
+          <span data-field="dewpoint_comfort">
+            {comfort ? `Air feels ${comfort}` : "dew-point comfort"}
+          </span>
+        </p>
         <Sparkline
           values={summary.spark.humidity}
           color="#3b82f6"
@@ -180,7 +217,31 @@ const lastUpdatedAbs = latestReading?.recorded_at
       </CardContent>
     </Card>
 
+    <Card>
+      <CardHeader className="flex items-center gap-2">
+        <img src={thermometerWarmerIcon} alt="" class="h-10 w-10" />
+        <CardTitle>Feels like</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div class="text-3xl font-semibold tabular-nums" data-field="feels_like">
+          {feels ? `${feels.value.toFixed(1)}°C` : "N/A"}
+        </div>
+        <p class="mt-2 text-sm text-muted-foreground" data-field="feels_caption">
+          {feels ? feels.caption : "apparent temperature"}
+        </p>
+        <p class="mt-1 text-sm text-muted-foreground">
+          Dew point <span class="tabular-nums" data-field="dewpoint_c"
+            >{fmt(reading?.dewpoint_c ?? null, 1, "°C")}</span
+          >
+        </p>
+      </CardContent>
+    </Card>
+  </div>
+
+  <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
     <SunSection />
+    <MoonSection />
+    <PollenSection />
   </div>
 
   <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-4 lg:items-start">
@@ -323,6 +384,39 @@ const lastUpdatedAbs = latestReading?.recorded_at
     return deg === null ? NO_VALUE : COMPASS[Math.round(deg / 22.5) % 16];
   }
 
+  // Mirrors lib/derived.ts — the client script inlines its helpers (no bundler).
+  function feelsLike(tC: number | null, ws: number | null, dp: number | null) {
+    if (tC === null) return null;
+    const windKmh = ws === null ? 0 : Math.max(0, ws) * 3.6;
+    if (tC <= 10 && windKmh > 4.8) {
+      const v = Math.pow(windKmh, 0.16);
+      const wc = 13.12 + 0.6215 * tC - 11.37 * v + 0.3965 * tC * v;
+      if (wc < tC - 0.4) return { value: wc, caption: "wind chill" };
+    }
+    if (tC >= 20 && dp !== null) {
+      const e = 6.11 * Math.exp(5417.753 * (1 / 273.16 - 1 / (273.15 + dp)));
+      const hx = tC + 0.5555 * (e - 10);
+      if (hx > tC + 0.4) return { value: hx, caption: "humidity making it feel warmer" };
+    }
+    return { value: tC, caption: "same as the air temperature" };
+  }
+  const DEWPOINT_BANDS: [number, string][] = [
+    [10, "dry"], [13, "comfortable"], [16, "becoming sticky"],
+    [18, "humid"], [21, "very humid"], [Infinity, "oppressive"],
+  ];
+  function dewComfort(dp: number | null) {
+    if (dp === null) return null;
+    return (DEWPOINT_BANDS.find(([max]) => dp < max) ?? DEWPOINT_BANDS[DEWPOINT_BANDS.length - 1])[1];
+  }
+  function changeArrow(now: number | null, past: number | null, band: number) {
+    if (now === null || past === null) return null;
+    const delta = now - past;
+    const mag = Math.abs(delta);
+    if (mag <= band) return { key: "flat", arrow: "→", delta };
+    const steep = mag > band * 3;
+    return { key: delta > 0 ? "up" : "down", arrow: delta > 0 ? (steep ? "↑" : "↗") : (steep ? "↓" : "↘"), delta };
+  }
+
   function timeAgo(iso: string) {
     const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
     if (seconds < 90) return "just now";
@@ -407,10 +501,19 @@ const lastUpdatedAbs = latestReading?.recorded_at
       const gustMs = stale ? null : num(reading.wind_gust_ms);
       const dir = stale ? null : num(reading.wind_dir_deg);
 
+      const dewpoint = stale ? null : num(reading.dewpoint_c);
+      const humidity = stale ? null : num(reading.humidity);
+
       set("temp_c", fmt(temp, 1, "°C"));
-      set("dewpoint_c", fmt(stale ? null : num(reading.dewpoint_c), 1, "°C"));
-      set("humidity", fmt(stale ? null : num(reading.humidity), 0, "%"));
+      set("dewpoint_c", fmt(dewpoint, 1, "°C"));
+      set("humidity", fmt(humidity, 0, "%"));
       set("pressure_msl_hpa", fmt(stale ? null : num(reading.pressure_msl_hpa), 0, " hPa"));
+
+      const feels = stale ? null : feelsLike(temp, windMs, dewpoint);
+      set("feels_like", feels ? `${feels.value.toFixed(1)}°C` : NO_VALUE);
+      set("feels_caption", feels ? feels.caption : "apparent temperature");
+      const comfort = dewComfort(dewpoint);
+      set("dewpoint_comfort", comfort ? `Air feels ${comfort}` : "dew-point comfort");
       const aq = stale ? null : num(reading.air_quality);
       set("air_quality", aq === null ? NO_VALUE : String(Math.round(aq)));
       set("wind_kmh", kmh(windMs));
@@ -448,6 +551,20 @@ const lastUpdatedAbs = latestReading?.recorded_at
       set("rain_today", fmt(num(s.rainToday), 1, " mm"));
       set("rain_last_hour", fmt(num(s.rainLastHour), 1, " mm"));
       set("rain_24h", fmt(num(s.rain24h), 1, " mm"));
+
+      const stale = isStale();
+      const tempNow = stale ? null : num(s.tempNow);
+      const tt = changeArrow(tempNow, num(s.temp1hAgo), 0.3);
+      set("temp_trend", tt && tt.key !== "flat" ? `${tt.arrow} ${Math.abs(tt.delta).toFixed(1)}°/h` : "");
+      const tv = changeArrow(tempNow, num(s.temp24hAgo), 0.5);
+      set(
+        "temp_vs_24h",
+        tv && tv.key !== "flat"
+          ? `${tv.delta > 0 ? "+" : "−"}${Math.abs(tv.delta).toFixed(1)}° vs 24h ago`
+          : "about the same as 24h ago"
+      );
+      const ht = changeArrow(stale ? null : num(s.humidityNow), num(s.humidity1hAgo), 2);
+      set("humidity_trend", ht && ht.key !== "flat" ? `${ht.arrow} ${Math.abs(ht.delta).toFixed(0)}%/h` : "");
 
       // Trend leans on "pressure now" — meaningless once the station is offline.
       const now = isStale() ? null : num(s.pressureNow);

@@ -1,6 +1,8 @@
 ---
 import Layout from "@/layouts/Layout.astro";
 import CurrentConditions from "@/components/CurrentConditions.astro";
+import RecordsSection from "@/components/RecordsSection.astro";
+import StationHealth from "@/components/StationHealth.astro";
 import { HistoryCharts } from "@/components/HistoryCharts";
 import { Skeleton } from "@/components/ui/skeleton";
 ---
@@ -15,6 +17,11 @@ import { Skeleton } from "@/components/ui/skeleton";
           <Skeleton className="h-32" />
           <Skeleton className="h-32" />
         </div>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Skeleton className="h-44" />
+          <Skeleton className="h-44" />
+          <Skeleton className="h-44" />
+        </div>
         <div class="grid grid-cols-1 gap-4 lg:grid-cols-4">
           <Skeleton className="h-40 lg:col-span-2" />
           <Skeleton className="h-40 lg:col-span-2" />
@@ -25,6 +32,18 @@ import { Skeleton } from "@/components/ui/skeleton";
         </div>
       </div>
     </CurrentConditions>
+  </section>
+
+  <section class="mb-10">
+    <StationHealth server:defer>
+      <Skeleton slot="fallback" className="h-40" />
+    </StationHealth>
+  </section>
+
+  <section class="mb-10">
+    <RecordsSection server:defer>
+      <Skeleton slot="fallback" className="h-64" />
+    </RecordsSection>
   </section>
 
   <section>

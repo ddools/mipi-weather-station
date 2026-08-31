@@ -15,3 +15,4 @@ dist/
 
 .claude/settings.local.json
 web/.vercel/
+.gstack/

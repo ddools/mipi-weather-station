@@ -1,0 +1,91 @@
+---
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getMoonInfo } from "@/lib/moon";
+
+// Icons for every phase, resolved to URLs at build time so the right one ships.
+import moonNew from "@meteocons/svg/flat/moon-new.svg?url";
+import moonWaxingCrescent from "@meteocons/svg/flat/moon-waxing-crescent.svg?url";
+import moonFirstQuarter from "@meteocons/svg/flat/moon-first-quarter.svg?url";
+import moonWaxingGibbous from "@meteocons/svg/flat/moon-waxing-gibbous.svg?url";
+import moonFull from "@meteocons/svg/flat/moon-full.svg?url";
+import moonWaningGibbous from "@meteocons/svg/flat/moon-waning-gibbous.svg?url";
+import moonLastQuarter from "@meteocons/svg/flat/moon-last-quarter.svg?url";
+import moonWaningCrescent from "@meteocons/svg/flat/moon-waning-crescent.svg?url";
+
+interface Props {
+  class?: string;
+}
+const { class: className } = Astro.props;
+
+const ICONS: Record<string, string> = {
+  "moon-new": moonNew,
+  "moon-waxing-crescent": moonWaxingCrescent,
+  "moon-first-quarter": moonFirstQuarter,
+  "moon-waxing-gibbous": moonWaxingGibbous,
+  "moon-full": moonFull,
+  "moon-waning-gibbous": moonWaningGibbous,
+  "moon-last-quarter": moonLastQuarter,
+  "moon-waning-crescent": moonWaningCrescent,
+};
+
+const now = new Date();
+const moon = getMoonInfo(now);
+const icon = ICONS[moon.icon] ?? moonFull;
+
+function dayLabel(d: Date): string {
+  return d.toLocaleDateString("en-IE", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: "Europe/Dublin",
+  });
+}
+function until(target: Date): string {
+  const hours = (target.getTime() - now.getTime()) / 3600_000;
+  if (hours < 1) return "under an hour";
+  if (hours < 48) return `${Math.round(hours)} h`;
+  return `${Math.round(hours / 24)} days`;
+}
+const untilFull = until(moon.nextFull);
+const untilNew = until(moon.nextNew);
+
+// The nearer of the two upcoming principal phases gets the headline countdown.
+const nextIsFull = moon.nextFull <= moon.nextNew;
+---
+
+<Card className={className}>
+  <CardHeader className="flex items-center gap-2">
+    <img src={icon} alt="" class="h-10 w-10" />
+    <CardTitle>Moon</CardTitle>
+  </CardHeader>
+  <CardContent>
+    <div class="flex items-baseline gap-2">
+      <span class="text-3xl font-semibold tabular-nums">{Math.round(moon.illuminationPct)}%</span>
+      <span class="text-base font-medium text-muted-foreground">{moon.phaseName}</span>
+    </div>
+    <p class="mt-0.5 text-sm text-muted-foreground tabular-nums">
+      {moon.ageDays.toFixed(1)} days since new · {moon.waxing ? "brightening" : "fading"}
+    </p>
+
+    <div class="mt-4 grid grid-cols-2 gap-4 text-sm">
+      <div>
+        <p class="text-muted-foreground">{nextIsFull ? "Full moon" : "New moon"}</p>
+        <p class="font-medium tabular-nums">
+          {dayLabel(nextIsFull ? moon.nextFull : moon.nextNew)}
+        </p>
+        <p class="text-xs text-muted-foreground tabular-nums">
+          in {nextIsFull ? untilFull : untilNew}
+        </p>
+      </div>
+      <div>
+        <p class="text-muted-foreground">{nextIsFull ? "New moon" : "Full moon"}</p>
+        <p class="font-medium tabular-nums">
+          {dayLabel(nextIsFull ? moon.nextNew : moon.nextFull)}
+        </p>
+        <p class="text-xs text-muted-foreground tabular-nums">
+          in {nextIsFull ? untilNew : untilFull}
+        </p>
+      </div>
+    </div>
+  </CardContent>
+</Card>
