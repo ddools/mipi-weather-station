@@ -278,12 +278,6 @@ const lastUpdatedAbs = latestReading?.recorded_at
             <div class="text-3xl font-semibold tabular-nums" data-field="air_quality">
               {Math.round(reading.air_quality)}
             </div>
-            <p class="mt-2 text-sm text-muted-foreground">
-              relative contaminants index · lower is cleaner
-            </p>
-            <p class="mt-1 text-xs text-muted-foreground/80">
-              Uncalibrated TGS2600 — trend only, not an AQI figure.
-            </p>
           </CardContent>
         </Card>
       )
