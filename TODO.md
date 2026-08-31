@@ -17,13 +17,19 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27. Remaining:
   clean-run clock restarted at 2026-08-27 21:46 BST after a deploy-session restart storm.
 - **Benchmarks** — live value updates within 60s of a new reading; mobile Lighthouse ≥ 90 (§2).
 - **CWOP uploader** — code done 2026-08-30 (`upload/cwop.py`, APRS-IS socket
-  client, 10 tests). **Registration submitted 2026-08-30**; CWOP processes new
-  accounts weekly on Wednesday, so the Site Id email is due ~2026-09-02 (90-day
-  deadline to finish or the site is dropped). When it lands: set
-  `uploaders.cwop.{enabled,station_id}` + `station.timezone` on the Pi, restart,
-  verify at `http://map.findu.com/<ID>` + <https://aprs.fi>, then email
-  cwop-support@noaa.gov to confirm the plotted location and get data flowing to
-  NOAA/MADIS. Passcode stays `-1` in `.env`. See [docs/cwop.md](docs/cwop.md) (§5).
+  client, 11 tests). **Id `GW7965` issued 2026-08-31** (MADIS id `G7965`, site
+  DUBLIN/IE, elevation recorded as 5 m) — the account exists but is **not
+  registered or active** until data reaches findu and we confirm by email.
+  Remaining: (1) `uploaders.cwop.{enabled: true, station_id: "GW7965"}` +
+  `station.timezone` on the Pi, restart; (2) verify at
+  <http://www.findu.com/cgi-bin/wx.cgi?call=GW7965> + <https://aprs.fi>;
+  (3) **reply to the cwop-support@noaa.gov welcome thread** — without that reply
+  nothing is activated; (4) wait for the weekly station-table build (Wednesdays,
+  cutoff Tuesday 02:00 ET — earliest appearance 2026-09-02); (5) once active, use
+  the wxqa.com form to fix the 5 m elevation (our config says 20 m). Passcode
+  stays `-1` in `.env`. Position comes from `station.latitude`/`longitude` in the
+  packets, so get those right before the first send. **90-day deadline:
+  2026-11-29.** Checklist in [docs/cwop.md](docs/cwop.md) (§5).
 - **WOW-BE uploader** — code done 2026-08-30 (`upload/wowbe.py`, 9 tests). JSON
   REST `POST wow.meteo.be/api/v2/send/wow`, WU-protocol fields, endpoint probed
   live (422 validation works). **Needs**: register a site at <https://wow.meteo.be>,
@@ -266,12 +272,15 @@ domain may come later).
       to `send_interval_s` (300 s) like Windy; records older than 10 min are
       dropped rather than backfilled (CWOP is realtime-only). Config block
       `uploaders.cwop` + `station.timezone` in `config.example.yaml`, passcode in
-      `.env` (`CWOP_PASSCODE`, default `-1`). 10 unit tests in `tests/test_cwop.py`.
-      **Registration submitted 2026-08-30** (wxqa.com signup); CWOP registers new
-      accounts weekly on Wednesday, Site Id email due ~2026-09-02. When it lands:
-      `enabled: true` + `station_id` + `station.timezone` on the Pi, restart,
-      verify on findu/aprs.fi, then email cwop-support@noaa.gov to confirm the
-      location. 90-day deadline to finish. Full notes: [docs/cwop.md](docs/cwop.md).
+      `.env` (`CWOP_PASSCODE`, default `-1`). 11 unit tests in `tests/test_cwop.py`.
+      **Id `GW7965` issued 2026-08-31** (registration submitted 2026-08-30; MADIS
+      id `G7965`, DUBLIN/IE). Not active yet: `enabled: true` +
+      `station_id: "GW7965"` + `station.timezone` on the Pi, restart, verify on
+      findu (`wx.cgi?call=GW7965`)/aprs.fi, then reply to the cwop-support@noaa.gov
+      welcome thread to confirm — CWOP only rebuilds its station table on
+      Wednesdays (cutoff Tue 02:00 ET). International ids use the `GW` prefix; the
+      uploader never inspects it. 90-day deadline 2026-11-29. Full notes:
+      [docs/cwop.md](docs/cwop.md).
 - [~] WOW-BE uploader — **code done 2026-08-30** (`upload/wowbe.py`, 9 tests).
       RMI Belgium's WOW reboot (`wow.meteo.be`) — the migration path now that the
       UK/IE WOW instances are being decommissioned. v2 is a JSON REST API
