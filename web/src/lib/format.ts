@@ -83,3 +83,34 @@ export function pressureTrend(
   if (delta < -0.5) return { key: "falling", arrow: "↓", label: "falling", deltaHpa: delta };
   return { key: "steady", arrow: "→", label: "steady", deltaHpa: delta };
 }
+
+// --- Generic trend -----------------------------------------------------------
+
+export type TrendKey = "up" | "flat" | "down";
+
+export interface Trend {
+  key: TrendKey;
+  /** ↑ ↗ → ↘ ↓ depending on magnitude relative to `steadyBand`. */
+  arrow: string;
+  /** now − past, signed, in the value's own unit. */
+  delta: number;
+}
+
+/**
+ * Direction of change between a past and a current value. `steadyBand` is the
+ * ± window (same unit as the values) inside which the change reads as "flat";
+ * a change of more than 3× the band gets the steeper arrow.
+ */
+export function trend(
+  now: number | null,
+  past: number | null,
+  steadyBand: number
+): Trend | null {
+  if (now === null || past === null || Number.isNaN(now) || Number.isNaN(past)) return null;
+  const delta = now - past;
+  const mag = Math.abs(delta);
+  if (mag <= steadyBand) return { key: "flat", arrow: "→", delta };
+  const steep = mag > steadyBand * 3;
+  if (delta > 0) return { key: "up", arrow: steep ? "↑" : "↗", delta };
+  return { key: "down", arrow: steep ? "↓" : "↘", delta };
+}

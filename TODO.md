@@ -122,10 +122,23 @@ domain may come later).
       averages in JS) rather than via a Postgres view/RPC. Fine at today's volume;
       revisit with server-side aggregation once the table has real history —
       pulling 43k raw rows for a 30d query will get slow eventually.
+      **2026-08-31 (PR #11):** `getHistory` was silently truncating every range to
+      PostgREST's 1000-row response cap (the oldest 1000 = ~17h), so SSR "today"
+      figures and the 7d/30d charts were stale. Now paged in `fetchRange`, capped
+      at 20k rows — the `readings_hourly` rollup is still the real fix.
 - [x] ECharts: temp/humidity/pressure line chart, rain bar chart, wind rose (polar
       bar, averaged by 16-point compass bucket) — all in `HistoryCharts.tsx`
       (client island). **Gauge dials for current temp/wind are not built** —
       only the three charts above exist so far.
+- [x] Derived + external dashboard panels (2026-08-31, PR #11): **Feels like**
+      (wind chill / humidex, `lib/derived.ts`), **trend arrows** on temp/humidity
+      + "vs 24h ago" (`lib/format.ts` `trend()`), **Records** card — all-time +
+      this-month extremes, month rain vs Dublin normal, wettest day, dry streak
+      (`lib/records.ts`, `RecordsSection.astro`), **Station health** — freshness,
+      completeness, uptime, gap, totals (`lib/health.ts`, `StationHealth.astro`),
+      **Moon** phase/illumination (`lib/moon.ts`, SunCalc port), **Pollen** —
+      Open-Meteo CAMS per-species (`lib/pollen.ts`). Station-health footer still
+      hardcodes "WU + Windy live, CWOP/WOW-BE coming" — update when those verify.
 - [x] Range switcher via shadcn `Tabs` (24h/7d/30d) — note: all three ranges fetch
       on mount (Radix keeps inactive `TabsContent` mounted), not just the active
       one. Fine at today's volume, worth lazy-loading later.

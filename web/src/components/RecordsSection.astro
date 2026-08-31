@@ -1,0 +1,124 @@
+---
+import { Card, CardContent } from "@/components/ui/card";
+import { getRecords, type ExtremeRecord } from "@/lib/records";
+import { msToKmh } from "@/lib/format";
+
+const records = await getRecords();
+
+function shortDate(iso: string | null): string {
+  if (!iso) return "";
+  return new Date(iso).toLocaleDateString("en-IE", {
+    day: "numeric",
+    month: "short",
+    timeZone: "Europe/Dublin",
+  });
+}
+
+// Gust records read better in km/h than the m/s we store.
+function displayValue(r: ExtremeRecord): string {
+  if (r.unit === "m/s") {
+    const kmh = msToKmh(r.value);
+    return kmh === null ? "—" : `${Math.round(kmh)} km/h`;
+  }
+  const digits = r.unit === "hPa" ? 0 : 1;
+  return `${r.value.toFixed(digits)} ${r.unit}`;
+}
+
+const rain = records.rain;
+const rawPct =
+  rain.monthToDateMm !== null ? (rain.monthToDateMm / rain.normalMm) * 100 : null;
+const rainVsNormalText =
+  rawPct === null
+    ? null
+    : rawPct > 0 && rawPct < 1
+      ? "under 1%"
+      : `${Math.round(rawPct)}%`;
+
+// This month's temperature range as one figure, plus its strongest gust.
+const byLabel = (rs: ExtremeRecord[], label: string) => rs.find((r) => r.label === label) ?? null;
+const monthWarm = byLabel(records.thisMonth, "Warmest");
+const monthCold = byLabel(records.thisMonth, "Coldest");
+const monthGust = byLabel(records.thisMonth, "Strongest gust");
+const monthTempRange =
+  monthWarm && monthCold ? `${monthCold.value.toFixed(1)} – ${monthWarm.value.toFixed(1)} °C` : null;
+---
+
+<Card>
+  <CardContent>
+    <div class="mb-4 flex items-baseline justify-between">
+      <h3 class="text-base font-semibold">Records</h3>
+      <span class="text-xs text-muted-foreground">since observations began</span>
+    </div>
+
+    <dl class="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-5">
+      {
+        records.allTime.map((r) => (
+          <div>
+            <dt class="text-sm text-muted-foreground">{r.label}</dt>
+            <dd class="mt-0.5 text-xl font-semibold tabular-nums">{displayValue(r)}</dd>
+            <dd class="text-xs text-muted-foreground tabular-nums">{shortDate(r.at)}</dd>
+          </div>
+        ))
+      }
+    </dl>
+
+    <div class="mt-6 border-t border-border pt-4">
+      <h4 class="mb-3 text-sm font-semibold text-muted-foreground">{records.monthName} so far</h4>
+      <dl class="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-5">
+        {
+          monthTempRange && (
+            <div>
+              <dt class="text-sm text-muted-foreground">Temperature range</dt>
+              <dd class="mt-0.5 text-lg font-semibold tabular-nums">{monthTempRange}</dd>
+            </div>
+          )
+        }
+        {
+          monthGust && (
+            <div>
+              <dt class="text-sm text-muted-foreground">Strongest gust</dt>
+              <dd class="mt-0.5 text-lg font-semibold tabular-nums">{displayValue(monthGust)}</dd>
+            </div>
+          )
+        }
+        <div>
+          <dt class="text-sm text-muted-foreground">Rainfall</dt>
+          <dd class="mt-0.5 text-lg font-semibold tabular-nums">
+            {rain.monthToDateMm === null ? "—" : `${rain.monthToDateMm.toFixed(1)} mm`}
+          </dd>
+          {
+            rainVsNormalText !== null && (
+              <dd class="text-xs text-muted-foreground tabular-nums">
+                {rainVsNormalText} of the {rain.normalMm.toFixed(0)} mm normal
+              </dd>
+            )
+          }
+        </div>
+        {
+          rain.wettestDay && (
+            <div>
+              <dt class="text-sm text-muted-foreground">Wettest day (30 d)</dt>
+              <dd class="mt-0.5 text-lg font-semibold tabular-nums">
+                {rain.wettestDay.mm.toFixed(1)} mm
+              </dd>
+              <dd class="text-xs text-muted-foreground tabular-nums">
+                {shortDate(rain.wettestDay.dateISO)}
+              </dd>
+            </div>
+          )
+        }
+        {
+          rain.dryStreakDays !== null && rain.dryStreakDays > 0 && (
+            <div>
+              <dt class="text-sm text-muted-foreground">Dry streak</dt>
+              <dd class="mt-0.5 text-lg font-semibold tabular-nums">
+                {rain.dryStreakDays} {rain.dryStreakDays === 1 ? "day" : "days"}
+              </dd>
+              <dd class="text-xs text-muted-foreground">under 0.2 mm</dd>
+            </div>
+          )
+        }
+      </dl>
+    </div>
+  </CardContent>
+</Card>

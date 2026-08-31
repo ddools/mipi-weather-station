@@ -1,0 +1,87 @@
+---
+import { Card, CardContent } from "@/components/ui/card";
+import { getStationHealth } from "@/lib/health";
+
+const h = await getStationHealth();
+
+const STATUS_STYLE = {
+  live: { label: "Healthy", dot: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400" },
+  delayed: { label: "Delayed", dot: "bg-amber-500", text: "text-amber-600 dark:text-amber-400" },
+  offline: { label: "No recent data", dot: "bg-red-500", text: "text-red-600 dark:text-red-400" },
+} as const;
+const s = STATUS_STYLE[h.status];
+
+function ago(sec: number | null): string {
+  if (sec === null) return "—";
+  if (sec < 90) return "just now";
+  const m = Math.round(sec / 60);
+  if (m < 60) return `${m} min ago`;
+  return `${Math.round(m / 60)} h ago`;
+}
+
+const tiles: { label: string; value: string; sub?: string }[] = [
+  {
+    label: "Last reading",
+    value: ago(h.lastReadingAgeSec),
+  },
+  {
+    label: "Completeness (24 h)",
+    value: `${Math.round(h.completeness24hPct)}%`,
+    sub: `${h.readings24h} of ~${h.expected24h}`,
+  },
+  {
+    label: "Uptime (24 h)",
+    value: `${h.uptime24hPct.toFixed(1)}%`,
+  },
+  {
+    label: "Largest gap (24 h)",
+    value:
+      h.largestGap24hMin === null
+        ? "—"
+        : h.largestGap24hMin < 2
+          ? "< 2 min"
+          : `${Math.round(h.largestGap24hMin)} min`,
+  },
+  {
+    label: "Total readings",
+    value: h.totalReadings === null ? "—" : h.totalReadings.toLocaleString("en-IE"),
+  },
+  {
+    label: "Collecting since",
+    value: h.collectingSince
+      ? new Date(h.collectingSince).toLocaleDateString("en-IE", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          timeZone: "Europe/Dublin",
+        })
+      : "—",
+    sub: h.daysCollecting ? `${h.daysCollecting} days` : undefined,
+  },
+];
+---
+
+<Card>
+  <CardContent>
+    <div class="mb-4 flex items-center justify-between">
+      <h3 class="text-base font-semibold">Station health</h3>
+      <span class="flex items-center gap-2 text-sm">
+        <span class={`inline-block h-2.5 w-2.5 rounded-full ${s.dot}`}></span>
+        <span class={`font-medium ${s.text}`}>{s.label}</span>
+      </span>
+    </div>
+
+    <dl class="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-6">
+      {
+        tiles.map((t) => (
+          <div>
+            <dt class="text-sm text-muted-foreground">{t.label}</dt>
+            <dd class="mt-0.5 text-lg font-semibold tabular-nums">{t.value}</dd>
+            {t.sub && <dd class="text-xs text-muted-foreground tabular-nums">{t.sub}</dd>}
+          </div>
+        ))
+      }
+    </dl>
+
+  </CardContent>
+</Card>
