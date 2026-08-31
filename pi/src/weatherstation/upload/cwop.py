@@ -3,8 +3,10 @@
 CWOP has no HTTP API: observations are pushed as APRS weather packets over a
 plain TCP socket to an APRS-IS server (cwop.aprs.net:14580), which feeds NOAA
 MADIS and, from there, National Weather Service forecast models. Non-ham
-stations use a CW/DW/EW id and the APRS-IS passcode ``-1``; licensed amateur
-operators use their callsign and a real passcode.
+stations use a CW/DW/EW id (US) or a GW id (international -- ours is GW7965)
+with the APRS-IS passcode ``-1``; licensed amateur operators use their callsign
+and a real passcode. The prefix is never inspected here: the id is used verbatim
+as the APRS callsign and on the login line.
 
 CWOP wants at most one report per ~5 minutes and only cares about *current*
 conditions, so this uploader:

@@ -76,11 +76,12 @@ uploaders:
     station_id: ""       # e.g. C9fexco — password goes in .env, not here
   cwop:
     enabled: false
-    station_id: ""        # CW/DW/EW id from wxqa.com/SIGN-UP.html (ham callsign if licensed)
+    station_id: ""        # id from wxqa.com/SIGN-UP.html — CW/DW/EW (US) or GW (international),
+                          # or your ham callsign if licensed. Ours is GW7965 (docs/cwop.md).
     server: "cwop.aprs.net"
     port: 14580
     send_interval_s: 300  # CWOP asks for one report per ~5 min, no more often
-    # Passcode goes in .env as CWOP_PASSCODE: "-1" for a CW/DW/EW id (the default),
+    # Passcode goes in .env as CWOP_PASSCODE: "-1" for a CW/DW/EW/GW id (the default),
     # a real APRS-IS passcode only if station_id is a licensed ham callsign.
   wowbe:                  # wow.meteo.be — RMI Belgium's WOW reboot (WU-protocol-compatible)
     enabled: false

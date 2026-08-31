@@ -92,7 +92,8 @@ WS_MOCK_SENSORS=1 weatherstation
 - [x] Weather Underground upload
 - [x] Windy Stations API v2 upload
 - [x] Wind rose, gauges, dark mode
-- [x] CWOP (APRS) upload — code complete; awaiting a station id ([docs/cwop.md](docs/cwop.md))
+- [x] CWOP (APRS) upload — code complete; id `GW7965` issued 2026-08-31, activation
+      in progress (send to findu → confirm with cwop-support) ([docs/cwop.md](docs/cwop.md))
 - [x] WOW-BE (wow.meteo.be) upload — code complete; needs a registered site ([docs/wowbe.md](docs/wowbe.md))
 
 ## Licence

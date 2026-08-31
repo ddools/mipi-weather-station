@@ -61,6 +61,18 @@ def test_format_packet_sub_zero_fahrenheit():
     assert "t-04" in packet
 
 
+def test_format_packet_international_gw_id():
+    """Ours is a GW id (non-US) — the prefix is passed through untouched."""
+    record = {"recorded_at": "2026-08-31T09:23:45+00:00", "temp_c": 20.0}
+    packet = format_packet("GW7965", _LAT, _LON, record, 0.0, 0.0, 0.0)
+    assert packet.startswith("GW7965>APRS,TCPIP*:@310923z5321.00N/00615.60W_")
+
+
+def test_station_id_is_upper_cased(tmp_path):
+    up = CWOPUploader(_cfg(tmp_path, station_id="gw7965"))
+    assert up._callsign == "GW7965"
+
+
 def test_rain_windows_sum_from_buffer(tmp_path):
     buf = LocalBuffer(tmp_path / "w.sqlite3")
     now = datetime.now(timezone.utc)
