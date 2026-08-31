@@ -9,6 +9,7 @@ import { RainRadar } from "@/components/RainRadar";
 import { getLatestReading, getTodaySummary } from "@/lib/supabase";
 import { degToCompass, fmt, beaufort, msToKmh, pressureTrend, trend as changeTrend } from "@/lib/format";
 import { feelsLike, dewPointComfort } from "@/lib/derived";
+import { airQualityBand, type AirBand } from "@/lib/air";
 import thermometerIcon from "@meteocons/svg/flat/thermometer.svg?url";
 import humidityIcon from "@meteocons/svg/flat/humidity.svg?url";
 import pressureHighIcon from "@meteocons/svg/flat/pressure-high.svg?url";
@@ -67,6 +68,14 @@ function humidityNote(rh: number | null | undefined): string {
   if (rh <= 45) return "dry air";
   return "relative humidity";
 }
+
+const air = airQualityBand(reading?.air_quality);
+const AIR_STYLE: Record<AirBand, { dot: string; text: string }> = {
+  good: { dot: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400" },
+  moderate: { dot: "bg-amber-500", text: "text-amber-600 dark:text-amber-400" },
+  poor: { dot: "bg-red-500", text: "text-red-600 dark:text-red-400" },
+  unknown: { dot: "bg-muted-foreground/40", text: "text-muted-foreground" },
+};
 
 const bft = beaufort(reading?.wind_speed_ms ?? null);
 const windKmh = msToKmh(reading?.wind_speed_ms ?? null);
@@ -275,9 +284,19 @@ const lastUpdatedAbs = latestReading?.recorded_at
             <CardTitle>Air quality</CardTitle>
           </CardHeader>
           <CardContent>
-            <div class="text-3xl font-semibold tabular-nums" data-field="air_quality">
-              {Math.round(reading.air_quality)}
+            <div class="flex items-center gap-2.5">
+              <span
+                data-field="air_dot"
+                class={`inline-block h-3 w-3 shrink-0 rounded-full ${AIR_STYLE[air.band].dot}`}
+              />
+              <span
+                data-field="air_quality"
+                class={`text-2xl font-semibold ${AIR_STYLE[air.band].text}`}
+              >
+                {air.label}
+              </span>
             </div>
+            <p class="mt-2 text-sm text-muted-foreground" data-field="air_note">{air.note}</p>
           </CardContent>
         </Card>
       )
@@ -405,6 +424,34 @@ const lastUpdatedAbs = latestReading?.recorded_at
     if (dp === null) return null;
     return (DEWPOINT_BANDS.find(([max]) => dp < max) ?? DEWPOINT_BANDS[DEWPOINT_BANDS.length - 1])[1];
   }
+
+  // Mirrors lib/air.ts. Class lists must match the AIR_STYLE map in the frontmatter
+  // so Tailwind keeps them in the build.
+  const AIR_BANDS = [
+    { max: 63, label: "Good", note: "nothing unusual in the air",
+      dot: "bg-emerald-500", text: ["text-emerald-600", "dark:text-emerald-400"] },
+    { max: 64.5, label: "Moderate", note: "slightly raised — cooking or solvents nearby",
+      dot: "bg-amber-500", text: ["text-amber-600", "dark:text-amber-400"] },
+    { max: Infinity, label: "Poor", note: "raised — a strong nearby source",
+      dot: "bg-red-500", text: ["text-red-600", "dark:text-red-400"] },
+  ];
+  const AIR_UNKNOWN = { label: "—", note: "sensor warming up", dot: "bg-muted-foreground/40", text: ["text-muted-foreground"] };
+  const ALL_AIR_DOTS = ["bg-emerald-500", "bg-amber-500", "bg-red-500", "bg-muted-foreground/40"];
+  const ALL_AIR_TEXT = [
+    "text-emerald-600", "dark:text-emerald-400", "text-amber-600", "dark:text-amber-400",
+    "text-red-600", "dark:text-red-400", "text-muted-foreground",
+  ];
+  function setAirQuality(v: number | null) {
+    const b = v === null ? AIR_UNKNOWN : (AIR_BANDS.find((x) => v <= x.max) ?? AIR_BANDS[2]);
+    set("air_quality", b.label);
+    set("air_note", b.note);
+    const dot = root()?.querySelector('[data-field="air_dot"]');
+    const label = root()?.querySelector('[data-field="air_quality"]');
+    ALL_AIR_DOTS.forEach((c) => dot?.classList.remove(c));
+    dot?.classList.add(b.dot);
+    ALL_AIR_TEXT.forEach((c) => label?.classList.remove(c));
+    b.text.forEach((c) => label?.classList.add(c));
+  }
   function changeArrow(now: number | null, past: number | null, band: number) {
     if (now === null || past === null) return null;
     const delta = now - past;
@@ -521,8 +568,7 @@ const lastUpdatedAbs = latestReading?.recorded_at
               ? "dry air"
               : "relative humidity"
       );
-      const aq = stale ? null : num(reading.air_quality);
-      set("air_quality", aq === null ? NO_VALUE : String(Math.round(aq)));
+      setAirQuality(stale ? null : num(reading.air_quality));
       set("wind_kmh", kmh(windMs));
       set("wind_ms", fmt(windMs, 1, " m/s"));
       set("wind_beaufort", beaufort(windMs));
