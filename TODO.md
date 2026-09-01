@@ -16,6 +16,16 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27. Remaining:
   network-partition (unplug) test, and a genuine 24h *uninterrupted* run — yesterday's
   clean-run clock restarted at 2026-08-27 21:46 BST after a deploy-session restart storm.
 - **Benchmarks** — live value updates within 60s of a new reading; mobile Lighthouse ≥ 90 (§2).
+- **Wind spike fix — deploy + data repair.** The station published a 70.6 m/s
+  (254 km/h) gust at 2026-09-01T12:29:10Z. Cause: the sampler divided each pulse
+  count by the nominal sample window rather than real elapsed time, and uploads
+  ran inline, so a 119 s upload stall let ~125 s of pulses be scored as 5 s
+  (the record was preceded by a 185.4 s gap against a 66.2 s median — the only
+  gap over 90 s in 1,299 rows). Collector fixed: real elapsed timing, uploads on
+  a background thread, a 55 m/s plausibility ceiling, and reed-switch debounce on
+  both the anemometer and rain gauge (`pi/tests/test_sampler.py`). **Remaining:**
+  (1) deploy the collector to the Pi and restart the service; (2) run
+  `docs/supabase-wind-spike-fix.sql` against the live project to null the bad row.
 - **CWOP uploader** — code done 2026-08-30 (`upload/cwop.py`, APRS-IS socket
   client, 11 tests). **Id `GW7965` issued 2026-08-31** (MADIS id `G7965`, site
   DUBLIN/IE, elevation recorded as 5 m) — the account exists but is **not
