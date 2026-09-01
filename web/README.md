@@ -47,3 +47,43 @@ apikey: {ANON_KEY}
 ```
 For 7d/30d ranges, downsample server-side in the API route (group by hour) to keep
 payloads small.
+
+## Dashboard tabs (added 2026-09-01)
+
+`index.astro` is split into three tabs via `DashboardTabs.astro` (an Astro
+wrapper with named slots — not the shadcn React `Tabs`, which can't take server
+islands as children). A small inline script toggles panel `hidden`, syncs the
+URL hash (`#now` / `#history` / `#ahead`) and remembers the last tab in
+`localStorage`. All three panels are always in the DOM, so server islands still
+stream and SEO is unaffected. Plan + rationale: [`docs/dashboard-tabs.md`](../docs/dashboard-tabs.md).
+
+A **glance hero** (`NowHero.astro`) renders **above** the tab bar, so it stays
+visible on every tab: big temp, sky icon + condition, feels-like, H/L,
+wind/humidity/pressure/rain, Live/Delayed/Offline; day/night gradient. Its own
+compact poll loop (`/api/current` 45 s, `/api/summary` 5 min) keeps it live. The
+sky icon/condition come from Open-Meteo `current` (`lib/forecast.ts:getCurrentSky`,
+15-min memo); `SkyIcon.astro` maps the basename (day + night variants) to a
+Meteocons glyph. The old status bar was removed from `CurrentConditions` — the
+hero owns the badge now.
+
+The tab bar carries a per-tab inline icon (activity / line-chart / calendar) and
+`text-base` labels.
+
+- **Now in detail** — the detail cards (temp, humidity, pressure, wind, rain
+  today, air quality), then `TidesSection` + rain radar. The Wind card carries a
+  `WindTrend` island: it polls `/api/recent?minutes=15` every 30 s and shows a
+  last-5-minutes read (picking up / easing / steady, plus veering/backing
+  direction) as a dual wind+gust sparkline.
+- **History** — `HistoryCharts` (`client:only="react"` — SSR added nothing but
+  Radix hydration mismatches; `EChart.tsx` defers `init` until its container has
+  a size), `RecordsSection`, `StationHealth`.
+- **Ahead** — `ForecastSection` (5-day) + Sun / Moon / Pollen.
+
+## External data sources (all Open-Meteo, free, no key)
+
+| Lib | API | Used by |
+|-----|-----|---------|
+| `lib/tides.ts` | marine-api (`sea_level_height_msl`) | Tides |
+| `lib/pollen.ts` | air-quality-api (CAMS pollen) | Pollen |
+| `lib/forecast.ts` | forecast (`/v1/forecast` daily) | 5-day forecast — 30-min in-memory cache |
+| `lib/forecast.ts:getCurrentSky` | forecast (`/v1/forecast` `current`) | Now-tab hero sky icon + condition — 15-min in-memory cache |

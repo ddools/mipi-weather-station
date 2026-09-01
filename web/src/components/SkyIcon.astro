@@ -1,0 +1,54 @@
+---
+// Renders one Meteocons "flat" weather glyph by basename. Every basename the
+// WMO map in lib/forecast.ts can produce is imported here so the right file
+// ships; anything unknown falls back to overcast-day.
+import clearDay from "@meteocons/svg/flat/clear-day.svg?url";
+import clearNight from "@meteocons/svg/flat/clear-night.svg?url";
+import partlyCloudyDay from "@meteocons/svg/flat/partly-cloudy-day.svg?url";
+import partlyCloudyNight from "@meteocons/svg/flat/partly-cloudy-night.svg?url";
+import partlyCloudyDayRain from "@meteocons/svg/flat/partly-cloudy-day-rain.svg?url";
+import partlyCloudyNightRain from "@meteocons/svg/flat/partly-cloudy-night-rain.svg?url";
+import overcastDay from "@meteocons/svg/flat/overcast-day.svg?url";
+import overcastNight from "@meteocons/svg/flat/overcast-night.svg?url";
+import fogDay from "@meteocons/svg/flat/fog-day.svg?url";
+import fogNight from "@meteocons/svg/flat/fog-night.svg?url";
+import drizzle from "@meteocons/svg/flat/drizzle.svg?url";
+import sleet from "@meteocons/svg/flat/sleet.svg?url";
+import rain from "@meteocons/svg/flat/rain.svg?url";
+import snow from "@meteocons/svg/flat/snow.svg?url";
+import thunderstormsDay from "@meteocons/svg/flat/thunderstorms-day.svg?url";
+import thunderstormsNight from "@meteocons/svg/flat/thunderstorms-night.svg?url";
+import thunderstormsDayRain from "@meteocons/svg/flat/thunderstorms-day-rain.svg?url";
+import thunderstormsNightRain from "@meteocons/svg/flat/thunderstorms-night-rain.svg?url";
+
+const MAP: Record<string, string> = {
+  "clear-day": clearDay,
+  "clear-night": clearNight,
+  "partly-cloudy-day": partlyCloudyDay,
+  "partly-cloudy-night": partlyCloudyNight,
+  "partly-cloudy-day-rain": partlyCloudyDayRain,
+  "partly-cloudy-night-rain": partlyCloudyNightRain,
+  "overcast-day": overcastDay,
+  "overcast-night": overcastNight,
+  "fog-day": fogDay,
+  "fog-night": fogNight,
+  drizzle,
+  sleet,
+  rain,
+  snow,
+  "thunderstorms-day": thunderstormsDay,
+  "thunderstorms-night": thunderstormsNight,
+  "thunderstorms-day-rain": thunderstormsDayRain,
+  "thunderstorms-night-rain": thunderstormsNightRain,
+};
+
+interface Props {
+  name: string;
+  class?: string;
+  alt?: string;
+}
+const { name, class: klass, alt = "" } = Astro.props;
+const src = MAP[name] ?? overcastDay;
+---
+
+<img src={src} alt={alt} class={klass} />

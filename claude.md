@@ -119,6 +119,22 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   islands, ECharts, shadcn/ui, Meteocons, tides, and a **rain-radar** map
   (`components/RainRadar.tsx`, Leaflet island + RainViewer tiles — see below).
   Not yet deployed to Vercel.
+- **Dashboard split into three tabs** (2026-09-01) — `Now in detail` / `History` /
+  `Ahead` via `components/DashboardTabs.astro` (Astro named-slot wrapper + inline
+  script; per-tab Lucide icon; hash + `localStorage` state).
+  A **glance hero** (`components/NowHero.astro` — big temp + sky icon/condition
+  from Open-Meteo `current` via `lib/forecast.ts:getCurrentSky` + `SkyIcon.astro`;
+  day/night gradient; own compact poll loop) renders **above** the tabs, so it's
+  visible on every tab. The old status bar was dropped from `CurrentConditions`.
+  `Now in detail` tab = the detail cards + `WindTrend` island (last-5-min
+  wind/gust trend, polls `/api/recent`) + **Tides** + rain radar.
+  `History` = charts + records + station health; `HistoryCharts` is now
+  `client:only="react"` (SSR only invited Radix hydration mismatches) and
+  `EChart.tsx` defers `echarts.init` until its container has a size.
+  `Ahead` = **5-day forecast** (`lib/forecast.ts` → Open-Meteo `/v1/forecast`,
+  WMO-code→Meteocons map, 30-min memo cache; a 4th Open-Meteo dependency
+  alongside marine/air-quality) + sun + moon + pollen.
+  Plan: `docs/dashboard-tabs.md`.
 - **CI live** (2026-08-27) — `.github/workflows/ci.yml`: `pi` job (ruff check +
   ruff format check + pytest on Py 3.9 & 3.13) and `web` job (`npm ci` + `astro
   build`). Runs on push-to-`main` and every PR.

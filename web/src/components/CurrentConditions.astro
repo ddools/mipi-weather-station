@@ -1,11 +1,7 @@
 ---
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Sparkline from "@/components/Sparkline.astro";
-import TidesSection from "@/components/TidesSection.astro";
-import SunSection from "@/components/SunSection.astro";
-import MoonSection from "@/components/MoonSection.astro";
-import PollenSection from "@/components/PollenSection.astro";
-import { RainRadar } from "@/components/RainRadar";
+import { WindTrend } from "@/components/WindTrend";
 import { getLatestReading, getTodaySummary } from "@/lib/supabase";
 import { degToCompass, fmt, beaufort, msToKmh, pressureTrend, trend as changeTrend } from "@/lib/format";
 import { feelsLike, dewPointComfort } from "@/lib/derived";
@@ -24,8 +20,8 @@ const [latestReading, summary] = await Promise.all([getLatestReading(), getToday
 
 // Live-data status from the age of the newest reading. The collector archives
 // every ~60s, so anything within a few minutes is "live"; a longer gap means
-// the Pi or its uplink is down.
-const STATUS_COLOR = { live: "#10b981", delayed: "#f59e0b", offline: "#ef4444" };
+// the Pi or its uplink is down. The visible status badge lives in the NowHero
+// tile above the tabs; here `status` only gates whether stale values show as N/A.
 function liveStatus(iso: string | null | undefined) {
   if (!iso) return { key: "offline" as const, label: "Offline" };
   const age = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -101,16 +97,6 @@ function renderCompass(deg: number | null): string {
 }
 
 const compassSvg = renderCompass(reading?.wind_dir_deg ?? null);
-
-const lastUpdatedAbs = latestReading?.recorded_at
-  ? new Date(latestReading.recorded_at).toLocaleString("en-IE", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: "Europe/Dublin",
-    })
-  : null;
 ---
 
 <div
@@ -118,29 +104,6 @@ const lastUpdatedAbs = latestReading?.recorded_at
   data-recorded-at={latestReading?.recorded_at ?? ""}
   data-wind-dir-deg={reading?.wind_dir_deg ?? ""}
 >
-  <div class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-    <span class="flex items-center gap-2 font-medium">
-      <span class="relative flex h-2.5 w-2.5">
-        <span
-          id="live-ping"
-          class:list={[
-            "absolute inline-flex h-full w-full rounded-full opacity-75",
-            { "animate-ping": status.key === "live" },
-          ]}
-          style={`background-color:${STATUS_COLOR[status.key]}`}
-        ></span>
-        <span
-          id="live-dot"
-          class="relative inline-flex h-2.5 w-2.5 rounded-full"
-          style={`background-color:${STATUS_COLOR[status.key]}`}
-        ></span>
-      </span>
-      <span id="live-label">{status.label}</span>
-    </span>
-    <span id="live-updated" class="text-muted-foreground">
-      {lastUpdatedAbs ? `Last updated ${lastUpdatedAbs}` : "Awaiting first reading"}
-    </span>
-  </div>
 
   <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
     <Card>
@@ -264,17 +227,21 @@ const lastUpdatedAbs = latestReading?.recorded_at
             </dd>
           </div>
         </dl>
-        <Sparkline
-          values={summary.spark.wind}
-          color="#10b981"
-          height={28}
-          class="mt-1 w-full basis-full text-muted-foreground/60"
-        />
+        <WindTrend client:load />
+        <div class="mt-1 basis-full">
+          <p class="text-xs text-muted-foreground">Last 24h</p>
+          <Sparkline
+            values={summary.spark.wind}
+            color="#10b981"
+            height={28}
+            class="mt-1 w-full text-muted-foreground/60"
+          />
+        </div>
       </CardContent>
     </Card>
   </div>
 
-  <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
     <Card>
       <CardHeader className="flex items-center gap-2">
         <img src={pressureIcon} alt="" class="h-10 w-10" />
@@ -326,10 +293,6 @@ const lastUpdatedAbs = latestReading?.recorded_at
       </CardContent>
     </Card>
 
-    <SunSection />
-    <MoonSection />
-    <PollenSection />
-
     {
       reading?.air_quality != null && (
         <Card>
@@ -355,11 +318,6 @@ const lastUpdatedAbs = latestReading?.recorded_at
         </Card>
       )
     }
-  </div>
-
-  <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
-    <TidesSection />
-    <RainRadar client:visible />
   </div>
 </div>
 
@@ -457,30 +415,6 @@ const lastUpdatedAbs = latestReading?.recorded_at
     return { key: delta > 0 ? "up" : "down", arrow: delta > 0 ? (steep ? "↑" : "↗") : (steep ? "↓" : "↘"), delta };
   }
 
-  function timeAgo(iso: string) {
-    const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-    if (seconds < 90) return "just now";
-    const minutes = Math.round(seconds / 60);
-    if (minutes < 60) return `${minutes}m ago`;
-    return `${Math.round(minutes / 60)}h ago`;
-  }
-
-  const STATUS = [
-    { key: "live", label: "Live", color: "#10b981", maxAge: 180 },
-    { key: "delayed", label: "Delayed", color: "#f59e0b", maxAge: 900 },
-    { key: "offline", label: "Offline", color: "#ef4444", maxAge: Infinity },
-  ];
-
-  function fmtAbsolute(iso: string) {
-    return new Date(iso).toLocaleString("en-IE", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: "Europe/Dublin",
-    });
-  }
-
   const root = () => document.getElementById("current-conditions");
   // The newest row is "stale" once it's over 15 min old — the station is offline
   // and its instantaneous readings no longer describe current conditions.
@@ -493,31 +427,6 @@ const lastUpdatedAbs = latestReading?.recorded_at
     const el = root()?.querySelector(`[data-field="${field}"]`);
     if (el) el.textContent = text;
   };
-
-  function updateStatus(iso: string | undefined) {
-    const label = document.getElementById("live-label");
-    const dot = document.getElementById("live-dot");
-    const ping = document.getElementById("live-ping");
-    const updated = document.getElementById("live-updated");
-    if (!label || !dot || !ping || !updated) return;
-
-    if (!iso) {
-      label.textContent = "Offline";
-      dot.style.backgroundColor = "#ef4444";
-      ping.style.backgroundColor = "#ef4444";
-      ping.classList.remove("animate-ping");
-      updated.textContent = "Awaiting first reading";
-      return;
-    }
-
-    const age = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-    const s = STATUS.find((x) => age <= x.maxAge)!;
-    label.textContent = s.label;
-    dot.style.backgroundColor = s.color;
-    ping.style.backgroundColor = s.color;
-    ping.classList.toggle("animate-ping", s.key === "live");
-    updated.textContent = `Last updated ${fmtAbsolute(iso)} · ${timeAgo(iso)}`;
-  }
 
   async function refreshCurrent() {
     try {
@@ -582,7 +491,6 @@ const lastUpdatedAbs = latestReading?.recorded_at
         temp !== null
           ? `${Math.round(temp)}° · Skerries Weather Station`
           : "Skerries Weather Station";
-      updateStatus(reading.recorded_at);
     } catch {
       // network hiccup — next interval will retry
     }
@@ -634,14 +542,7 @@ const lastUpdatedAbs = latestReading?.recorded_at
     }
   }
 
-  function tickAge() {
-    const recordedAt = root()?.dataset.recordedAt || undefined;
-    updateStatus(recordedAt);
-  }
-
-  tickAge();
   refreshCurrent(); // sets the tab title and reconciles any drift since SSR
-  setInterval(tickAge, 15_000);
   setInterval(refreshCurrent, 45_000);
   setInterval(refreshSummary, 5 * 60_000);
 </script>

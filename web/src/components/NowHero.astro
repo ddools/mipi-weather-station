@@ -1,0 +1,274 @@
+---
+// "Current conditions at a glance" — the headline tile, shown above the tabs so
+// it's always visible whichever tab is open. Its own small poll loop keeps it
+// live (the detail cards in the "Now in detail" tab poll separately).
+import SkyIcon from "@/components/SkyIcon.astro";
+import { getLatestReading, getTodaySummary } from "@/lib/supabase";
+import { getCurrentSky } from "@/lib/forecast";
+import { degToCompass, fmt, msToKmh } from "@/lib/format";
+import { feelsLike } from "@/lib/derived";
+
+const [latest, summary, sky] = await Promise.all([
+  getLatestReading(),
+  getTodaySummary(),
+  getCurrentSky(),
+]);
+
+const ageSec = latest?.recorded_at
+  ? (Date.now() - new Date(latest.recorded_at).getTime()) / 1000
+  : Infinity;
+const status =
+  ageSec <= 180
+    ? { key: "live", label: "Live", color: "#10b981" }
+    : ageSec <= 900
+      ? { key: "delayed", label: "Delayed", color: "#f59e0b" }
+      : { key: "offline", label: "Offline", color: "#ef4444" };
+
+// Offline → the newest row's instantaneous values no longer describe "now".
+const reading = status.key === "offline" ? null : latest;
+
+const feels = reading ? feelsLike(reading.temp_c, reading.wind_speed_ms, reading.dewpoint_c) : null;
+const windKmh = msToKmh(reading?.wind_speed_ms ?? null);
+const isNight = sky?.isDay === false;
+
+const lastUpdatedAbs = latest?.recorded_at
+  ? new Date(latest.recorded_at).toLocaleString("en-IE", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Europe/Dublin",
+    })
+  : null;
+
+const stats = [
+  {
+    label: "Wind",
+    field: "wind_kmh",
+    value: windKmh === null ? "N/A" : `${Math.round(windKmh)} km/h`,
+    sub: reading?.wind_dir_deg == null ? "" : `from ${degToCompass(reading.wind_dir_deg)}`,
+    subField: "wind_dir",
+  },
+  {
+    label: "Humidity",
+    field: "humidity",
+    value: fmt(reading?.humidity ?? null, 0, "%"),
+  },
+  {
+    label: "Pressure",
+    field: "pressure_msl_hpa",
+    value: fmt(reading?.pressure_msl_hpa ?? null, 0, " hPa"),
+  },
+  {
+    label: "Rain today",
+    field: "rain_today",
+    value: fmt(summary.rainToday, 1, " mm"),
+  },
+];
+---
+
+<div
+  id="now-hero"
+  data-recorded-at={latest?.recorded_at ?? ""}
+  class:list={[
+    "relative overflow-hidden rounded-2xl p-6 ring-1 ring-foreground/10 sm:p-8",
+    isNight
+      ? "bg-gradient-to-br from-indigo-950 via-slate-900 to-slate-950 text-slate-100"
+      : "bg-gradient-to-br from-sky-100 via-sky-50 to-amber-50 text-slate-900 dark:from-sky-950 dark:via-slate-900 dark:to-slate-950 dark:text-slate-100",
+  ]}
+>
+  <div class="mb-5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+    <span class="flex items-center gap-2 font-medium">
+      <span class="relative flex h-2.5 w-2.5">
+        <span
+          id="hero-ping"
+          class:list={[
+            "absolute inline-flex h-full w-full rounded-full opacity-75",
+            { "animate-ping": status.key === "live" },
+          ]}
+          style={`background-color:${status.color}`}
+        ></span>
+        <span
+          id="hero-dot"
+          class="relative inline-flex h-2.5 w-2.5 rounded-full"
+          style={`background-color:${status.color}`}
+        ></span>
+      </span>
+      <span id="hero-label">{status.label}</span>
+    </span>
+    <span id="hero-updated" class="opacity-70">
+      {lastUpdatedAbs ? `Last updated ${lastUpdatedAbs}` : "Awaiting first reading"}
+    </span>
+  </div>
+
+  <div class="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+    <div class="flex items-center gap-4 sm:gap-5">
+      <SkyIcon
+        name={sky?.icon ?? "overcast-day"}
+        alt={sky?.label ?? ""}
+        class="h-24 w-24 shrink-0 drop-shadow-sm sm:h-28 sm:w-28"
+      />
+      <div>
+        <div class="flex items-start gap-1">
+          <span
+            class="text-6xl font-semibold leading-none tabular-nums sm:text-7xl"
+            data-field="temp_hero"
+          >
+            {reading?.temp_c == null ? "—" : reading.temp_c.toFixed(1)}
+          </span>
+          <span class="mt-1 text-2xl opacity-70 sm:text-3xl">°C</span>
+        </div>
+        <p class="mt-3 text-xl font-medium">{sky?.label ?? "Current conditions"}</p>
+        <p class="text-sm opacity-70">
+          <span data-field="feels_hero">
+            {feels ? `Feels like ${feels.value.toFixed(1)}°` : "—"}
+          </span>
+          <span class="mx-1.5">·</span>
+          {"H "}<span data-field="temp_max">{fmt(summary.tempMax, 1, "°")}</span>
+          {" / L "}<span data-field="temp_min">{fmt(summary.tempMin, 1, "°")}</span>
+          {" today"}
+        </p>
+      </div>
+    </div>
+
+    <dl class="grid grid-cols-2 gap-x-10 gap-y-4 text-sm sm:gap-x-14">
+      {
+        stats.map((s) => (
+          <div>
+            <dt class="opacity-70">{s.label}</dt>
+            <dd class="text-xl font-semibold tabular-nums" data-field={s.field}>
+              {s.value}
+            </dd>
+            {s.subField && (
+              <dd class="mt-0.5 text-xs opacity-70">
+                from <span data-field={s.subField}>{degToCompass(reading?.wind_dir_deg ?? null)}</span>
+              </dd>
+            )}
+          </div>
+        ))
+      }
+    </dl>
+  </div>
+</div>
+
+<script>
+  const root = document.getElementById("now-hero");
+  if (root) {
+    const COMPASS = [
+      "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+      "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW",
+    ];
+    const NO_VALUE = "N/A";
+
+    const num = (v: unknown): number | null =>
+      typeof v === "number" && !Number.isNaN(v) ? v : null;
+    const fmt = (v: number | null, digits: number, unit: string) =>
+      v === null ? NO_VALUE : `${v.toFixed(digits)}${unit}`;
+    const kmh = (ms: number | null) => (ms === null ? NO_VALUE : `${Math.round(ms * 3.6)} km/h`);
+    const compass = (deg: number | null) =>
+      deg === null ? NO_VALUE : COMPASS[Math.round(deg / 22.5) % 16];
+
+    // Mirrors lib/derived.ts (client scripts inline their helpers — no bundler).
+    function feelsLike(tC: number | null, ws: number | null, dp: number | null) {
+      if (tC === null) return null;
+      const windKmh = ws === null ? 0 : Math.max(0, ws) * 3.6;
+      if (tC <= 10 && windKmh > 4.8) {
+        const v = Math.pow(windKmh, 0.16);
+        const wc = 13.12 + 0.6215 * tC - 11.37 * v + 0.3965 * tC * v;
+        if (wc < tC - 0.4) return wc;
+      }
+      if (tC >= 20 && dp !== null) {
+        const e = 6.11 * Math.exp(5417.753 * (1 / 273.16 - 1 / (273.15 + dp)));
+        const hx = tC + 0.5555 * (e - 10);
+        if (hx > tC + 0.4) return hx;
+      }
+      return tC;
+    }
+
+    const set = (field: string, text: string) => {
+      const el = root.querySelector(`[data-field="${field}"]`);
+      if (el) el.textContent = text;
+    };
+    const isStale = () => {
+      const iso = root.dataset.recordedAt;
+      return !iso || (Date.now() - new Date(iso).getTime()) / 1000 > 900;
+    };
+
+    const STATUS = [
+      { label: "Live", color: "#10b981", maxAge: 180, ping: true },
+      { label: "Delayed", color: "#f59e0b", maxAge: 900, ping: false },
+      { label: "Offline", color: "#ef4444", maxAge: Infinity, ping: false },
+    ];
+    function fmtAbsolute(iso: string) {
+      return new Date(iso).toLocaleString("en-IE", {
+        day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+        timeZone: "Europe/Dublin",
+      });
+    }
+    function updateStatus(iso: string | undefined) {
+      const label = document.getElementById("hero-label");
+      const dot = document.getElementById("hero-dot");
+      const ping = document.getElementById("hero-ping");
+      const updated = document.getElementById("hero-updated");
+      if (!label || !dot || !ping || !updated) return;
+      if (!iso) {
+        label.textContent = "Offline";
+        dot.style.backgroundColor = ping.style.backgroundColor = "#ef4444";
+        ping.classList.remove("animate-ping");
+        updated.textContent = "Awaiting first reading";
+        return;
+      }
+      const age = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+      const s = STATUS.find((x) => age <= x.maxAge)!;
+      label.textContent = s.label;
+      dot.style.backgroundColor = ping.style.backgroundColor = s.color;
+      ping.classList.toggle("animate-ping", s.ping);
+      updated.textContent = `Last updated ${fmtAbsolute(iso)}`;
+    }
+
+    async function refreshCurrent() {
+      try {
+        const res = await fetch("/api/current");
+        if (!res.ok) return;
+        const reading = await res.json();
+        if (!reading) return;
+        root.dataset.recordedAt = reading.recorded_at;
+        const stale = isStale();
+        const temp = stale ? null : num(reading.temp_c);
+        const windMs = stale ? null : num(reading.wind_speed_ms);
+        const dir = stale ? null : num(reading.wind_dir_deg);
+        const dewpoint = stale ? null : num(reading.dewpoint_c);
+
+        set("temp_hero", temp === null ? "—" : temp.toFixed(1));
+        const f = stale ? null : feelsLike(temp, windMs, dewpoint);
+        set("feels_hero", f === null ? "—" : `Feels like ${f.toFixed(1)}°`);
+        set("wind_kmh", kmh(windMs));
+        set("wind_dir", compass(dir));
+        set("humidity", fmt(stale ? null : num(reading.humidity), 0, "%"));
+        set("pressure_msl_hpa", fmt(stale ? null : num(reading.pressure_msl_hpa), 0, " hPa"));
+        updateStatus(reading.recorded_at);
+      } catch {
+        /* next interval retries */
+      }
+    }
+
+    async function refreshSummary() {
+      try {
+        const res = await fetch("/api/summary");
+        if (!res.ok) return;
+        const s = await res.json();
+        set("temp_max", fmt(num(s.tempMax), 1, "°"));
+        set("temp_min", fmt(num(s.tempMin), 1, "°"));
+        set("rain_today", fmt(num(s.rainToday), 1, " mm"));
+      } catch {
+        /* next interval retries */
+      }
+    }
+
+    updateStatus(root.dataset.recordedAt || undefined);
+    refreshCurrent();
+    setInterval(() => updateStatus(root.dataset.recordedAt || undefined), 15_000);
+    setInterval(refreshCurrent, 45_000);
+    setInterval(refreshSummary, 5 * 60_000);
+  }
+</script>

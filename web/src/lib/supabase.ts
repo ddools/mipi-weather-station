@@ -42,6 +42,18 @@ export async function getLatestReading(): Promise<Reading | null> {
   return rows[0] ?? null;
 }
 
+/** Raw rows from the last `minutes` minutes, oldest→newest. Small window
+ *  (< ~20 rows at a 60s archive interval), so no paging. Used by the Wind
+ *  tile's 5-minute trend. Returns [] when nothing covers the window. */
+export async function getRecentReadings(minutes = 15): Promise<Reading[]> {
+  const since = new Date(Date.now() - minutes * 60_000).toISOString();
+  const res = await restFetch(
+    `readings?select=${READING_COLUMNS}&recorded_at=gte.${since}&order=recorded_at.asc`
+  );
+  if (!res.ok) throw new Error(`Supabase error ${res.status}`);
+  return res.json();
+}
+
 export type HistoryRange = "24h" | "7d" | "30d";
 
 const RANGE_HOURS: Record<HistoryRange, number> = {
