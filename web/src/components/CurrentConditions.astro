@@ -218,91 +218,6 @@ const lastUpdatedAbs = latestReading?.recorded_at
       </CardContent>
     </Card>
 
-    <Card>
-      <CardHeader className="flex items-center gap-2">
-        <img src={pressureIcon} alt="" class="h-10 w-10" />
-        <CardTitle>Pressure</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div class="text-3xl font-semibold tabular-nums" data-field="pressure_msl_hpa">
-          {fmt(reading?.pressure_msl_hpa ?? null, 0, " hPa")}
-        </div>
-        <p class="mt-2 text-sm text-muted-foreground tabular-nums" id="pressure-trend">
-          {
-            trend
-              ? `${trend.arrow} ${trend.label} ${Math.abs(trend.deltaHpa).toFixed(1)} hPa / 3h`
-              : "sea-level adjusted"
-          }
-        </p>
-        <Sparkline
-          values={summary.spark.pressure}
-          color="#8b5cf6"
-          class="mt-3 w-full text-muted-foreground/60"
-        />
-      </CardContent>
-    </Card>
-
-    <Card>
-      <CardHeader className="flex items-center gap-2">
-        <img src={humidityIcon} alt="" class="h-10 w-10" />
-        <CardTitle>Humidity</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div class="flex items-baseline gap-2">
-          <span class="text-3xl font-semibold tabular-nums" data-field="humidity">
-            {fmt(reading?.humidity ?? null, 0, "%")}
-          </span>
-          <span class="text-sm text-muted-foreground tabular-nums" data-field="humidity_trend">
-            {humidityTrend && humidityTrend.key !== "flat"
-              ? `${humidityTrend.arrow} ${Math.abs(humidityTrend.delta).toFixed(0)}%/h`
-              : ""}
-          </span>
-        </div>
-        <p class="mt-2 text-sm text-muted-foreground" data-field="humidity_note">
-          {humidityNote(reading?.humidity)}
-        </p>
-        <Sparkline
-          values={summary.spark.humidity}
-          color="#3b82f6"
-          class="mt-3 w-full text-muted-foreground/60"
-        />
-      </CardContent>
-    </Card>
-  </div>
-
-  <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-    <SunSection />
-    <MoonSection />
-    <PollenSection />
-
-    {
-      reading?.air_quality != null && (
-        <Card>
-          <CardHeader className="flex items-center gap-2">
-            <img src={airQualityIcon} alt="" class="h-10 w-10" />
-            <CardTitle>Air quality</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div class="flex items-center gap-2.5">
-              <span
-                data-field="air_dot"
-                class={`inline-block h-3 w-3 shrink-0 rounded-full ${AIR_STYLE[air.band].dot}`}
-              />
-              <span
-                data-field="air_quality"
-                class={`text-2xl font-semibold ${AIR_STYLE[air.band].text}`}
-              >
-                {air.label}
-              </span>
-            </div>
-            <p class="mt-2 text-sm text-muted-foreground" data-field="air_note">{air.note}</p>
-          </CardContent>
-        </Card>
-      )
-    }
-  </div>
-
-  <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-4 lg:items-start">
     <Card className="lg:col-span-2">
       <CardHeader className="flex items-center gap-2">
         <img src={windIcon} alt="" class="h-10 w-10" />
@@ -357,8 +272,93 @@ const lastUpdatedAbs = latestReading?.recorded_at
         />
       </CardContent>
     </Card>
+  </div>
 
-    <TidesSection class="lg:col-span-2" />
+  <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <Card>
+      <CardHeader className="flex items-center gap-2">
+        <img src={pressureIcon} alt="" class="h-10 w-10" />
+        <CardTitle>Pressure</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div class="text-3xl font-semibold tabular-nums" data-field="pressure_msl_hpa">
+          {fmt(reading?.pressure_msl_hpa ?? null, 0, " hPa")}
+        </div>
+        <p class="mt-2 text-sm text-muted-foreground tabular-nums" id="pressure-trend">
+          {
+            trend
+              ? `${trend.arrow} ${trend.label} ${Math.abs(trend.deltaHpa).toFixed(1)} hPa / 3h`
+              : "sea-level adjusted"
+          }
+        </p>
+        <Sparkline
+          values={summary.spark.pressure}
+          color="#8b5cf6"
+          class="mt-3 w-full text-muted-foreground/60"
+        />
+      </CardContent>
+    </Card>
+
+    <Card>
+      <CardHeader className="flex items-center gap-2">
+        <img src={humidityIcon} alt="" class="h-10 w-10" />
+        <CardTitle>Humidity</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div class="flex items-baseline gap-2">
+          <span class="text-3xl font-semibold tabular-nums" data-field="humidity">
+            {fmt(reading?.humidity ?? null, 0, "%")}
+          </span>
+          <span class="text-sm text-muted-foreground tabular-nums" data-field="humidity_trend">
+            {humidityTrend && humidityTrend.key !== "flat"
+              ? `${humidityTrend.arrow} ${Math.abs(humidityTrend.delta).toFixed(0)}%/h`
+              : ""}
+          </span>
+        </div>
+        <p class="mt-2 text-sm text-muted-foreground" data-field="humidity_note">
+          {humidityNote(reading?.humidity)}
+        </p>
+        <Sparkline
+          values={summary.spark.humidity}
+          color="#3b82f6"
+          class="mt-3 w-full text-muted-foreground/60"
+        />
+      </CardContent>
+    </Card>
+
+    <SunSection />
+    <MoonSection />
+    <PollenSection />
+
+    {
+      reading?.air_quality != null && (
+        <Card>
+          <CardHeader className="flex items-center gap-2">
+            <img src={airQualityIcon} alt="" class="h-10 w-10" />
+            <CardTitle>Air quality</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div class="flex items-center gap-2.5">
+              <span
+                data-field="air_dot"
+                class={`inline-block h-3 w-3 shrink-0 rounded-full ${AIR_STYLE[air.band].dot}`}
+              />
+              <span
+                data-field="air_quality"
+                class={`text-2xl font-semibold ${AIR_STYLE[air.band].text}`}
+              >
+                {air.label}
+              </span>
+            </div>
+            <p class="mt-2 text-sm text-muted-foreground" data-field="air_note">{air.note}</p>
+          </CardContent>
+        </Card>
+      )
+    }
+  </div>
+
+  <div class="mt-4">
+    <TidesSection />
   </div>
 
   <div class="mt-4">
