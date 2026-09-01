@@ -203,6 +203,23 @@ const lastUpdatedAbs = latestReading?.recorded_at
 
     <Card>
       <CardHeader className="flex items-center gap-2">
+        <img src={rainIcon} alt="" class="h-10 w-10" />
+        <CardTitle>Rain today</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div class="text-3xl font-semibold tabular-nums" data-field="rain_today">
+          {fmt(summary.rainToday, 1, " mm")}
+        </div>
+        <p class="mt-2 text-sm text-muted-foreground tabular-nums">
+          last hour <span data-field="rain_last_hour">{fmt(summary.rainLastHour, 1, " mm")}</span>
+          <span class="mx-1">·</span>
+          24h <span data-field="rain_24h">{fmt(summary.rain24h, 1, " mm")}</span>
+        </p>
+      </CardContent>
+    </Card>
+
+    <Card>
+      <CardHeader className="flex items-center gap-2">
         <img src={pressureIcon} alt="" class="h-10 w-10" />
         <CardTitle>Pressure</CardTitle>
       </CardHeader>
@@ -251,30 +268,12 @@ const lastUpdatedAbs = latestReading?.recorded_at
         />
       </CardContent>
     </Card>
-
-    <SunSection />
   </div>
 
   <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <SunSection />
     <MoonSection />
     <PollenSection />
-
-    <Card>
-      <CardHeader className="flex items-center gap-2">
-        <img src={rainIcon} alt="" class="h-10 w-10" />
-        <CardTitle>Rain today</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div class="text-3xl font-semibold tabular-nums" data-field="rain_today">
-          {fmt(summary.rainToday, 1, " mm")}
-        </div>
-        <p class="mt-2 text-sm text-muted-foreground tabular-nums">
-          last hour <span data-field="rain_last_hour">{fmt(summary.rainLastHour, 1, " mm")}</span>
-          <span class="mx-1">·</span>
-          24h <span data-field="rain_24h">{fmt(summary.rain24h, 1, " mm")}</span>
-        </p>
-      </CardContent>
-    </Card>
 
     {
       reading?.air_quality != null && (
