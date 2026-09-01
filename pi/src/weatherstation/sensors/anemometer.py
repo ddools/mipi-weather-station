@@ -8,13 +8,18 @@ import threading
 
 class Anemometer:
     PULSES_PER_ROTATION = 2
+    # Reed switches chatter on close; undebounced, one pass of the cup magnet can
+    # register as several pulses and inflate the speed. 3 ms still admits 333
+    # pulses/s -- around 220 m/s of wind, far above anything the sampler's
+    # plausibility ceiling accepts, so this cannot clip a real reading.
+    BOUNCE_S = 0.003
 
     def __init__(self, pin: int) -> None:
         from gpiozero import Button
 
         self._count = 0
         self._lock = threading.Lock()
-        self._btn = Button(pin)
+        self._btn = Button(pin, bounce_time=self.BOUNCE_S)
         self._btn.when_pressed = self._spin
 
     def _spin(self) -> None:
