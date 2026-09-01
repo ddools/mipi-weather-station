@@ -1,0 +1,88 @@
+---
+import { Card, CardContent } from "@/components/ui/card";
+import { getForecast } from "@/lib/forecast";
+import { degToCompass } from "@/lib/format";
+
+import clearDay from "@meteocons/svg/flat/clear-day.svg?url";
+import partlyCloudyDay from "@meteocons/svg/flat/partly-cloudy-day.svg?url";
+import partlyCloudyDayRain from "@meteocons/svg/flat/partly-cloudy-day-rain.svg?url";
+import overcastDay from "@meteocons/svg/flat/overcast-day.svg?url";
+import fogDay from "@meteocons/svg/flat/fog-day.svg?url";
+import drizzle from "@meteocons/svg/flat/drizzle.svg?url";
+import sleet from "@meteocons/svg/flat/sleet.svg?url";
+import rain from "@meteocons/svg/flat/rain.svg?url";
+import snow from "@meteocons/svg/flat/snow.svg?url";
+import thunderstormsDay from "@meteocons/svg/flat/thunderstorms-day.svg?url";
+import thunderstormsDayRain from "@meteocons/svg/flat/thunderstorms-day-rain.svg?url";
+
+const ICONS: Record<string, string> = {
+  "clear-day": clearDay,
+  "partly-cloudy-day": partlyCloudyDay,
+  "partly-cloudy-day-rain": partlyCloudyDayRain,
+  "overcast-day": overcastDay,
+  "fog-day": fogDay,
+  drizzle,
+  sleet,
+  rain,
+  snow,
+  "thunderstorms-day": thunderstormsDay,
+  "thunderstorms-day-rain": thunderstormsDayRain,
+};
+
+const days = await getForecast();
+
+function temp(v: number | null): string {
+  return v === null ? "—" : `${Math.round(v)}°`;
+}
+---
+
+<Card>
+  <CardContent>
+    <div class="mb-4 flex items-baseline justify-between">
+      <h3 class="text-base font-semibold">5-day forecast</h3>
+      <span class="text-xs text-muted-foreground">Skerries</span>
+    </div>
+
+    {
+      !days ? (
+        <p class="text-sm text-muted-foreground">Forecast unavailable right now.</p>
+      ) : (
+        <>
+          <ol class="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 lg:grid-cols-5">
+            {days.map((d, i) => (
+              <li
+                class:list={[
+                  "flex flex-col items-center rounded-lg px-2 py-2 text-center",
+                  i === 0 && "bg-muted/60",
+                ]}
+              >
+                <span class="text-sm font-medium">{d.weekday}</span>
+                <img src={ICONS[d.icon] ?? overcastDay} alt={d.label} class="my-1 h-12 w-12" />
+                <span class="text-xs text-muted-foreground">{d.label}</span>
+                <span class="mt-1.5 tabular-nums">
+                  <span class="font-semibold">{temp(d.tempMax)}</span>
+                  <span class="mx-1 text-muted-foreground">/</span>
+                  <span class="text-muted-foreground">{temp(d.tempMin)}</span>
+                </span>
+                <span class="mt-1 text-xs text-muted-foreground tabular-nums">
+                  {d.precipMm !== null && d.precipMm >= 0.1
+                    ? `${d.precipMm.toFixed(1)} mm`
+                    : "dry"}
+                  {d.precipProbPct !== null && d.precipProbPct >= 5
+                    ? ` · ${Math.round(d.precipProbPct)}%`
+                    : ""}
+                </span>
+                <span class="mt-0.5 text-xs text-muted-foreground tabular-nums">
+                  {d.windMaxKmh === null
+                    ? ""
+                    : `${Math.round(d.windMaxKmh)} km/h ${degToCompass(d.windDirDeg)}`}
+                </span>
+              </li>
+            ))}
+          </ol>
+          <p class="mt-4 text-xs text-muted-foreground">Forecast: Open-Meteo · updates hourly</p>
+        </>
+      )
+    }
+  </CardContent>
+</Card>

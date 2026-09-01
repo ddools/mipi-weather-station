@@ -57,6 +57,37 @@ export function beaufort(ms: number | null): { force: number; label: string } | 
   return BEAUFORT.find((b) => ms < b.maxMs) ?? BEAUFORT[BEAUFORT.length - 1];
 }
 
+/** Vector (circular) mean of a set of compass bearings in degrees, 0–360.
+ *  Returns null for an empty list. De-noises a jittery wind vane. */
+export function circularMean(degs: number[]): number | null {
+  if (degs.length === 0) return null;
+  let x = 0;
+  let y = 0;
+  for (const d of degs) {
+    const r = (d * Math.PI) / 180;
+    x += Math.cos(r);
+    y += Math.sin(r);
+  }
+  if (x === 0 && y === 0) return null;
+  const mean = (Math.atan2(y, x) * 180) / Math.PI;
+  return (mean + 360) % 360;
+}
+
+/** Signed smallest angle from `from` to `to`, in degrees, −180..180.
+ *  Positive = clockwise (veering), negative = anticlockwise (backing). */
+export function angularDelta(from: number, to: number): number {
+  return ((to - from + 540) % 360) - 180;
+}
+
+export type VeerBack = "veering" | "backing" | "steady";
+
+/** Classify an `angularDelta` result. Under ~8° of movement reads as steady. */
+export function veerBack(delta: number, steadyBand = 8): VeerBack {
+  if (delta > steadyBand) return "veering";
+  if (delta < -steadyBand) return "backing";
+  return "steady";
+}
+
 // --- Pressure ------------------------------------------------------------------
 
 export type PressureTrendKey = "rising" | "steady" | "falling";

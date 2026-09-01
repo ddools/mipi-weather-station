@@ -1,51 +1,85 @@
 ---
 import Layout from "@/layouts/Layout.astro";
+import NowHero from "@/components/NowHero.astro";
+import DashboardTabs from "@/components/DashboardTabs.astro";
 import CurrentConditions from "@/components/CurrentConditions.astro";
-import RecordsSection from "@/components/RecordsSection.astro";
+import { RainRadar } from "@/components/RainRadar";
 import StationHealth from "@/components/StationHealth.astro";
+import RecordsSection from "@/components/RecordsSection.astro";
 import { HistoryCharts } from "@/components/HistoryCharts";
+import ForecastSection from "@/components/ForecastSection.astro";
+import SunSection from "@/components/SunSection.astro";
+import MoonSection from "@/components/MoonSection.astro";
+import PollenSection from "@/components/PollenSection.astro";
+import TidesSection from "@/components/TidesSection.astro";
 import { Skeleton } from "@/components/ui/skeleton";
 ---
 
 <Layout>
-  <section class="mb-10">
-    <CurrentConditions server:defer>
-      <div slot="fallback" class="space-y-4">
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Skeleton className="h-60" />
-          <Skeleton className="h-60" />
-          <Skeleton className="h-60" />
-          <Skeleton className="h-60" />
+  <div class="mb-8">
+    <NowHero server:defer>
+      <Skeleton slot="fallback" className="h-56 rounded-2xl sm:h-52" />
+    </NowHero>
+  </div>
+
+  <DashboardTabs>
+    <Fragment slot="now">
+      <CurrentConditions server:defer>
+        <div slot="fallback" class="space-y-4">
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Skeleton className="h-60" />
+            <Skeleton className="h-60" />
+            <Skeleton className="h-60" />
+            <Skeleton className="h-60" />
+          </div>
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Skeleton className="h-44" />
+            <Skeleton className="h-44" />
+            <Skeleton className="h-44" />
+          </div>
         </div>
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Skeleton className="h-44" />
-          <Skeleton className="h-44" />
-          <Skeleton className="h-44" />
-          <Skeleton className="h-44" />
-        </div>
-        <div class="grid grid-cols-1 gap-4 lg:grid-cols-4">
-          <Skeleton className="h-40 lg:col-span-2" />
-          <Skeleton className="h-40 lg:col-span-2" />
-        </div>
-        <Skeleton className="h-[420px]" />
+      </CurrentConditions>
+
+      <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
+        <TidesSection />
+        <RainRadar client:visible />
       </div>
-    </CurrentConditions>
-  </section>
+    </Fragment>
 
-  <section class="mb-10">
-    <StationHealth server:defer>
-      <Skeleton slot="fallback" className="h-40" />
-    </StationHealth>
-  </section>
+    <Fragment slot="history">
+      <section class="mb-10">
+        <StationHealth server:defer>
+          <Skeleton slot="fallback" className="h-40" />
+        </StationHealth>
+      </section>
 
-  <section class="mb-10">
-    <RecordsSection server:defer>
-      <Skeleton slot="fallback" className="h-64" />
-    </RecordsSection>
-  </section>
+      <section class="mb-10">
+        <RecordsSection server:defer>
+          <Skeleton slot="fallback" className="h-64" />
+        </RecordsSection>
+      </section>
 
-  <section>
-    <h2 class="mb-4 text-base font-semibold text-muted-foreground">History</h2>
-    <HistoryCharts client:load />
-  </section>
+      <section>
+        <h2 class="mb-4 text-base font-semibold text-muted-foreground">History</h2>
+        {/* client:only — the charts fetch their own data and render a spinner
+            first, so SSR adds nothing and only invites Radix/ECharts hydration
+            mismatches (worse now that the panel starts `hidden`). */}
+        <HistoryCharts client:only="react" />
+      </section>
+    </Fragment>
+
+    <Fragment slot="ahead">
+      <section class="mb-10">
+        <ForecastSection server:defer>
+          <Skeleton slot="fallback" className="h-56" />
+        </ForecastSection>
+      </section>
+
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <SunSection />
+        <MoonSection />
+        <PollenSection />
+      </div>
+    </Fragment>
+  </DashboardTabs>
 </Layout>
