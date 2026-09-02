@@ -12,10 +12,21 @@ interface Props {
   width?: number;
   height?: number;
   class?: string;
+  /** Explicit `[lo, hi]` y-domain. Omit to fit the series to its own extent —
+   *  pass one for a series whose absolute size matters, so a small day cannot
+   *  be auto-scaled up into looking like a big one. */
+  domain?: [number, number];
 }
-const { values, color = "currentColor", width = 120, height = 32, class: klass = "" } = Astro.props;
+const {
+  values,
+  color = "currentColor",
+  width = 120,
+  height = 32,
+  class: klass = "",
+  domain,
+} = Astro.props;
 
-const d = sparkPath(values, { width, height });
+const d = sparkPath(values, { width, height, domain });
 ---
 
 {
