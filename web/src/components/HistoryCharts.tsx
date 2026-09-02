@@ -68,7 +68,7 @@ function axisFormatter(range: Range) {
     range === "24h"
       ? { hour: "2-digit", minute: "2-digit", hour12: false }
       : range === "7d"
-        ? { weekday: "short", hour: "2-digit", hour12: false }
+        ? { weekday: "short", day: "numeric" }
         : { day: "numeric", month: "short" };
   const f = new Intl.DateTimeFormat(LOCALE, { ...opts, timeZone: TZ });
   return (value: string) => f.format(new Date(value));
@@ -377,7 +377,16 @@ function rainOption(data: Reading[], ctx: AxisCtx): EChartsOption {
       ...axisTooltip(ctx.range, ` mm / ${per}`, ctx.isDark, 1),
       axisPointer: { type: "shadow" as const },
     },
-    xAxis: { ...categoryXAxis({ ...ctx, times }), boundaryGap: true },
+    xAxis: {
+      ...categoryXAxis({ ...ctx, times }),
+      boundaryGap: true,
+      axisLabel: {
+        ...categoryXAxis({ ...ctx, times }).axisLabel,
+        // One bar = one hour (24h) or one whole day (7d/30d); label it as such
+        // rather than inheriting the line charts' formatter for the range.
+        formatter: axisFormatter(ctx.range === "24h" ? "24h" : "30d"),
+      },
+    },
     yAxis: {
       type: "value" as const,
       min: 0,

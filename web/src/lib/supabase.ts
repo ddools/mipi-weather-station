@@ -1,3 +1,5 @@
+import { circularMean } from "./format";
+
 export interface Reading {
   id: number;
   recorded_at: string;
@@ -276,6 +278,12 @@ function bucketHourly(rows: Reading[]): Reading[] {
         // rain accumulates — sum the bucket, don't average it; null if the hour
         // has no rain readings at all (a data gap, not a dry hour)
         avg[field] = values.length ? values.reduce((a, b) => a + b, 0) : null;
+      } else if (field === "wind_dir_deg") {
+        // Bearings wrap at 360°, so the arithmetic mean is wrong wherever an
+        // hour straddles north: 350° and 10° average to 180° — the exact
+        // opposite of the true direction — which silently spun the 7d/30d wind
+        // rose. Take the vector mean instead.
+        avg[field] = circularMean(values);
       } else {
         avg[field] = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
       }
