@@ -21,7 +21,10 @@ function displayValue(r: ExtremeRecord): string {
     return kmh === null ? "—" : `${Math.round(kmh)} km/h`;
   }
   const digits = r.unit === "hPa" ? 0 : 1;
-  return `${r.value.toFixed(digits)} ${r.unit}`;
+  // Degrees hug the number ("17.1°C"); word-like units get a space ("1011 hPa").
+  // The site used both spellings for the same quantity before.
+  const gap = r.unit === "°C" ? "" : " ";
+  return `${r.value.toFixed(digits)}${gap}${r.unit}`;
 }
 
 const rain = records.rain;
@@ -40,7 +43,7 @@ const monthWarm = byLabel(records.thisMonth, "Warmest");
 const monthCold = byLabel(records.thisMonth, "Coldest");
 const monthGust = byLabel(records.thisMonth, "Strongest gust");
 const monthTempRange =
-  monthWarm && monthCold ? `${monthCold.value.toFixed(1)} – ${monthWarm.value.toFixed(1)} °C` : null;
+  monthWarm && monthCold ? `${monthCold.value.toFixed(1)} – ${monthWarm.value.toFixed(1)}°C` : null;
 ---
 
 <Card>
@@ -97,7 +100,7 @@ const monthTempRange =
         {
           rain.wettestDay && (
             <div>
-              <dt class="text-sm text-muted-foreground">Wettest day (30 d)</dt>
+              <dt class="text-sm text-muted-foreground">Wettest day (30 days)</dt>
               <dd class="mt-0.5 text-lg font-semibold tabular-nums">
                 {rain.wettestDay.mm.toFixed(1)} mm
               </dd>

@@ -19,32 +19,43 @@ function ago(sec: number | null): string {
   return `${Math.round(m / 60)} h ago`;
 }
 
+// "Completeness" and "Uptime" sat side by side as two near-identical
+// percentages with nothing to say what distinguished them. They measure
+// different things — one counts readings, the other counts time — so name them
+// for what they count and caption the threshold that separates them.
+const gapMin = h.gapAllowanceMin;
+const gapText = Number.isInteger(gapMin) ? `${gapMin}` : gapMin.toFixed(1);
+
 const tiles: { label: string; value: string; sub?: string }[] = [
   {
     label: "Last reading",
     value: ago(h.lastReadingAgeSec),
+    sub: "expected every 60s",
   },
   {
-    label: "Completeness (24 h)",
-    value: `${Math.round(h.completeness24hPct)}%`,
-    sub: `${h.readings24h} of ~${h.expected24h}`,
+    label: "Readings received",
+    value: `${h.completeness24hPct.toFixed(1)}%`,
+    sub: `${h.readings24h} of ~${h.expected24h} in 24 h`,
   },
   {
-    label: "Uptime (24 h)",
+    label: "Time online",
     value: `${h.uptime24hPct.toFixed(1)}%`,
+    sub: `24 h, outside gaps over ${gapText} min`,
   },
   {
-    label: "Largest gap (24 h)",
+    label: "Largest gap",
     value:
       h.largestGap24hMin === null
         ? "—"
         : h.largestGap24hMin < 2
           ? "< 2 min"
           : `${Math.round(h.largestGap24hMin)} min`,
+    sub: "in the last 24 h",
   },
   {
     label: "Total readings",
     value: h.totalReadings === null ? "—" : h.totalReadings.toLocaleString("en-IE"),
+    sub: "all time",
   },
   {
     label: "Collecting since",

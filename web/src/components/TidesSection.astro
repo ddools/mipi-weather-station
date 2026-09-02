@@ -224,14 +224,14 @@ const nowPct = nowDot ? (nowDot.x / VB_W) * 100 : 0;
               <p class="text-muted-foreground">Next high</p>
               <p class="font-medium tabular-nums">
                 {formatTime(status.nextHigh?.time)}
-                {status.nextHigh && ` · ${status.nextHigh.heightM.toFixed(1)}m`}
+                {status.nextHigh && ` · ${status.nextHigh.heightM.toFixed(1)} m`}
               </p>
             </div>
             <div>
               <p class="text-muted-foreground">Next low</p>
               <p class="font-medium tabular-nums">
                 {formatTime(status.nextLow?.time)}
-                {status.nextLow && ` · ${status.nextLow.heightM.toFixed(1)}m`}
+                {status.nextLow && ` · ${status.nextLow.heightM.toFixed(1)} m`}
               </p>
             </div>
           </div>

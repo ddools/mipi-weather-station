@@ -52,31 +52,48 @@ function temp(v: number | null): string {
             {days.map((d, i) => (
               <li
                 class:list={[
-                  "flex flex-col items-center rounded-lg px-2 py-2 text-center",
-                  i === 0 && "bg-muted/60",
+                  "flex flex-col items-center rounded-lg px-3 py-2 text-center",
+                  i === 0 && "bg-muted/60 ring-1 ring-border",
                 ]}
               >
                 <span class="text-sm font-medium">{d.weekday}</span>
-                <img src={ICONS[d.icon] ?? overcastDay} alt={d.label} class="my-1 h-12 w-12" />
+                <img src={ICONS[d.icon] ?? overcastDay} alt={d.label} class="my-1 h-14 w-14" />
                 <span class="text-xs text-muted-foreground">{d.label}</span>
                 <span class="mt-1.5 tabular-nums">
                   <span class="font-semibold">{temp(d.tempMax)}</span>
-                  <span class="mx-1 text-muted-foreground">/</span>
+                  <span class="mx-1 text-muted-foreground" aria-hidden="true">/</span>
                   <span class="text-muted-foreground">{temp(d.tempMin)}</span>
                 </span>
-                <span class="mt-1 text-xs text-muted-foreground tabular-nums">
-                  {d.precipMm !== null && d.precipMm >= 0.1
-                    ? `${d.precipMm.toFixed(1)} mm`
-                    : "dry"}
-                  {d.precipProbPct !== null && d.precipProbPct >= 5
-                    ? ` · ${Math.round(d.precipProbPct)}%`
-                    : ""}
+                <span class="sr-only">
+                  high {temp(d.tempMax)}, low {temp(d.tempMin)}
                 </span>
-                <span class="mt-0.5 text-xs text-muted-foreground tabular-nums">
-                  {d.windMaxKmh === null
-                    ? ""
-                    : `${Math.round(d.windMaxKmh)} km/h ${degToCompass(d.windDirDeg)}`}
-                </span>
+
+                {/* "3.4 mm · 62%" gave two unlabelled numbers in two different
+                    units. Name them: what falls, and how likely it is. */}
+                <dl class="mx-auto mt-2 w-full max-w-40 space-y-0.5 text-xs text-muted-foreground tabular-nums">
+                  <div class="flex justify-between gap-2">
+                    <dt>Rain</dt>
+                    <dd class="font-medium text-foreground/80">
+                      {d.precipMm !== null && d.precipMm >= 0.1
+                        ? `${d.precipMm.toFixed(1)} mm`
+                        : "none"}
+                    </dd>
+                  </div>
+                  <div class="flex justify-between gap-2">
+                    <dt>Chance</dt>
+                    <dd class="font-medium text-foreground/80">
+                      {d.precipProbPct === null ? "—" : `${Math.round(d.precipProbPct)}%`}
+                    </dd>
+                  </div>
+                  <div class="flex justify-between gap-2">
+                    <dt>Wind</dt>
+                    <dd class="font-medium text-foreground/80">
+                      {d.windMaxKmh === null
+                        ? "—"
+                        : `${Math.round(d.windMaxKmh)} km/h ${degToCompass(d.windDirDeg)}`}
+                    </dd>
+                  </div>
+                </dl>
               </li>
             ))}
           </ol>

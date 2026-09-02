@@ -6,6 +6,9 @@ import { getHistory, restFetch } from "./supabase";
 
 const NOMINAL_INTERVAL_S = 60; // sampling.archive_interval_s
 const EXPECTED_24H = Math.round((24 * 3600) / NOMINAL_INTERVAL_S); // 1440
+// A gap wider than this counts as the station being *off*, not as a dropped
+// sample. It is what separates the two percentages below, so the UI prints it.
+const GAP_ALLOWANCE = 2.5;
 
 export interface StationHealth {
   lastReadingAgeSec: number | null;
@@ -15,6 +18,10 @@ export interface StationHealth {
   completeness24hPct: number;
   largestGap24hMin: number | null;
   uptime24hPct: number;
+  /** Minutes without a reading before the station counts as offline rather than
+   *  as having dropped a sample. Captions the difference between the two
+   *  percentages: completeness counts readings, uptime counts time. */
+  gapAllowanceMin: number;
   totalReadings: number | null;
   collectingSince: string | null;
   daysCollecting: number | null;
@@ -67,7 +74,7 @@ export async function getStationHealth(): Promise<StationHealth> {
   // Gaps between consecutive readings across the 24h window.
   let largestGapMs = 0;
   let downtimeMs = 0;
-  const gapAllowanceMs = NOMINAL_INTERVAL_S * 1000 * 2.5;
+  const gapAllowanceMs = NOMINAL_INTERVAL_S * 1000 * GAP_ALLOWANCE;
   for (let i = 1; i < times.length; i++) {
     const gap = times[i] - times[i - 1];
     if (gap > largestGapMs) largestGapMs = gap;
@@ -97,6 +104,7 @@ export async function getStationHealth(): Promise<StationHealth> {
     completeness24hPct,
     largestGap24hMin: times.length > 1 ? largestGapMs / 60_000 : null,
     uptime24hPct,
+    gapAllowanceMin: (NOMINAL_INTERVAL_S * GAP_ALLOWANCE) / 60,
     totalReadings: total,
     collectingSince: firstISO,
     daysCollecting,

@@ -41,7 +41,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://weather.der
     </script>
   </head>
   <body class="flex min-h-screen flex-col bg-background text-foreground">
-    <header class="mx-auto flex w-full items-start justify-between px-4 py-6 sm:px-6 lg:px-8">
+    <header class="mx-auto flex w-full max-w-[1400px] items-start justify-between gap-4 px-4 py-6 sm:px-6 lg:px-8">
       <div class="flex items-center gap-3">
         <svg
           viewBox="0 0 14 14"
@@ -53,8 +53,12 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://weather.der
         </svg>
         <div>
           <h1 class="text-lg font-semibold">{title}</h1>
-          <p class="mt-0.5 text-xs text-muted-foreground tabular-nums">
-            Skerries, Co. Dublin · 53.58°N 6.11°W · readings every 60s
+          <p class="mt-0.5 flex flex-wrap gap-x-2 text-xs text-muted-foreground tabular-nums">
+            <span>Skerries, Co.&nbsp;Dublin</span>
+            <span class="hidden sm:inline" aria-hidden="true">·</span>
+            <span class="hidden sm:inline">53.58°N&nbsp;6.11°W</span>
+            <span aria-hidden="true">·</span>
+            <span>readings every 60s</span>
           </p>
         </div>
       </div>
@@ -77,10 +81,10 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://weather.der
       </button>
       </div>
     </header>
-    <main class="mx-auto w-full flex-1 px-4 pb-16 sm:px-6 lg:px-8">
+    <main class="mx-auto w-full max-w-[1400px] flex-1 px-4 pb-16 sm:px-6 lg:px-8">
       <slot />
     </main>
-    <footer class="mx-auto w-full px-4 pb-10 text-xs text-muted-foreground sm:px-6 lg:px-8">
+    <footer class="mx-auto w-full max-w-[1400px] px-4 pb-10 text-xs text-muted-foreground sm:px-6 lg:px-8">
       <p>
         Built by <a
           class="underline underline-offset-2 hover:text-foreground"
