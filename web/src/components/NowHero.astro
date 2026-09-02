@@ -46,23 +46,26 @@ const stats = [
     label: "Wind",
     field: "wind_kmh",
     value: windKmh === null ? "N/A" : `${Math.round(windKmh)} km/h`,
-    sub: reading?.wind_dir_deg == null ? "" : `from ${degToCompass(reading.wind_dir_deg)}`,
+    sub: "",
     subField: "wind_dir",
   },
   {
     label: "Humidity",
     field: "humidity",
     value: fmt(reading?.humidity ?? null, 0, "%"),
+    sub: "relative",
   },
   {
     label: "Pressure",
     field: "pressure_msl_hpa",
     value: fmt(reading?.pressure_msl_hpa ?? null, 0, " hPa"),
+    sub: "at sea level",
   },
   {
     label: "Rain today",
     field: "rain_today",
     value: fmt(summary.rainToday, 1, " mm"),
+    sub: "since midnight",
   },
 ];
 ---
@@ -96,12 +99,12 @@ const stats = [
       </span>
       <span id="hero-label">{status.label}</span>
     </span>
-    <span id="hero-updated" class="opacity-70">
+    <span id="hero-updated" class="opacity-80">
       {lastUpdatedAbs ? `Last updated ${lastUpdatedAbs}` : "Awaiting first reading"}
     </span>
   </div>
 
-  <div class="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+  <div class="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between sm:gap-10">
     <div class="flex items-center gap-4 sm:gap-5">
       <SkyIcon
         name={sky?.icon ?? "overcast-day"}
@@ -116,34 +119,44 @@ const stats = [
           >
             {reading?.temp_c == null ? "—" : reading.temp_c.toFixed(1)}
           </span>
-          <span class="mt-1 text-2xl opacity-70 sm:text-3xl">°C</span>
+          <span class="mt-1 text-2xl opacity-80 sm:text-3xl">°C</span>
         </div>
         <p class="mt-3 text-xl font-medium">{sky?.label ?? "Current conditions"}</p>
-        <p class="text-sm opacity-70">
+        <p class="mt-1 text-sm opacity-80 tabular-nums">
           <span data-field="feels_hero">
             {feels ? `Feels like ${feels.value.toFixed(1)}°` : "—"}
           </span>
-          <span class="mx-1.5">·</span>
-          {"H "}<span data-field="temp_max">{fmt(summary.tempMax, 1, "°")}</span>
-          {" / L "}<span data-field="temp_min">{fmt(summary.tempMin, 1, "°")}</span>
+          <span class="mx-1.5" aria-hidden="true">·</span>
+          {"High "}<span data-field="temp_max">{fmt(summary.tempMax, 1, "°")}</span>
+          {" · Low "}<span data-field="temp_min">{fmt(summary.tempMin, 1, "°")}</span>
           {" today"}
         </p>
       </div>
     </div>
 
-    <dl class="grid grid-cols-2 gap-x-10 gap-y-4 text-sm sm:gap-x-14">
+    <dl class="grid grid-cols-2 gap-y-5 sm:grid-cols-4 sm:gap-y-0">
       {
-        stats.map((s) => (
-          <div>
-            <dt class="opacity-70">{s.label}</dt>
-            <dd class="text-xl font-semibold tabular-nums" data-field={s.field}>
+        stats.map((s, i) => (
+          <div
+            class:list={[
+              "px-4 first:pl-0 sm:px-5",
+              i > 0 && "border-l border-current/15",
+              i === 2 && "border-l-0 sm:border-l",
+            ]}
+          >
+            <dt class="text-xs font-medium uppercase tracking-wide opacity-70">{s.label}</dt>
+            <dd class="mt-1 text-xl font-semibold tabular-nums sm:text-2xl" data-field={s.field}>
               {s.value}
             </dd>
-            {s.subField && (
-              <dd class="mt-0.5 text-xs opacity-70">
-                from <span data-field={s.subField}>{degToCompass(reading?.wind_dir_deg ?? null)}</span>
-              </dd>
-            )}
+            <dd class="mt-0.5 text-xs opacity-80 tabular-nums">
+              {s.subField ? (
+                <>
+                  from <span data-field={s.subField}>{degToCompass(reading?.wind_dir_deg ?? null)}</span>
+                </>
+              ) : (
+                s.sub
+              )}
+            </dd>
           </div>
         ))
       }

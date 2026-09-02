@@ -108,6 +108,26 @@ const rainSparkDomain: [number, number] = [
   Math.max(summary.rainToday ?? 0, RAIN_SPARK_MIN_MM),
 ];
 
+// A sparkline auto-scales to its own extent, so the same shape can mean a 0.4°
+// wobble or a 12° swing. Print the range it is drawn against underneath, or the
+// line is decoration rather than data.
+function sparkRange(values: (number | null)[], digits: number, unit: string): string | null {
+  const nums = values.filter((v): v is number => v !== null && !Number.isNaN(v));
+  if (nums.length < 2) return null;
+  const lo = Math.min(...nums);
+  const hi = Math.max(...nums);
+  if (hi - lo < Math.pow(10, -digits)) return `steady at ${lo.toFixed(digits)}${unit}`;
+  return `${lo.toFixed(digits)} – ${hi.toFixed(digits)}${unit}`;
+}
+const tempSparkRange = sparkRange(summary.spark.temp, 1, "°C");
+const pressureSparkRange = sparkRange(summary.spark.pressure, 0, " hPa");
+const humiditySparkRange = sparkRange(summary.spark.humidity, 0, "%");
+const windSparkRange = sparkRange(
+  summary.spark.wind.map((v) => (v === null ? null : v * 3.6)),
+  0,
+  " km/h"
+);
+
 ---
 
 <div
@@ -122,7 +142,7 @@ const rainSparkDomain: [number, number] = [
         <img src={thermometerIcon} alt="" class="h-10 w-10" />
         <CardTitle>Temperature</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-1 flex-col">
         <div class="flex items-baseline gap-2">
           <span class="text-3xl font-semibold tabular-nums" data-field="temp_c">
             {fmt(reading?.temp_c ?? null, 1, "°C")}
@@ -133,18 +153,24 @@ const rainSparkDomain: [number, number] = [
               : ""}
           </span>
         </div>
-        <p class="mt-2 text-sm text-muted-foreground tabular-nums">
-          <span class="text-foreground/70">H</span> <span data-field="temp_max"
-            >{fmt(summary.tempMax, 1, "°")}</span
-          ><span class="mx-1.5">·</span><span class="text-foreground/70">L</span> <span
-            data-field="temp_min">{fmt(summary.tempMin, 1, "°")}</span
-          ><span class="ml-1.5 text-xs">today</span>
-          <span class="mx-1.5">·</span><span data-field="temp_vs_24h">
-            {tempVs24h && tempVs24h.key !== "flat"
-              ? `${tempVs24h.delta > 0 ? "+" : "−"}${Math.abs(tempVs24h.delta).toFixed(1)}° vs 24h`
-              : "≈ 24h ago"}
-          </span>
-        </p>
+        <dl class="mt-3 grid grid-cols-3 gap-2 text-sm tabular-nums">
+          <div>
+            <dt class="text-xs text-muted-foreground">High today</dt>
+            <dd class="font-medium" data-field="temp_max">{fmt(summary.tempMax, 1, "°")}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-muted-foreground">Low today</dt>
+            <dd class="font-medium" data-field="temp_min">{fmt(summary.tempMin, 1, "°")}</dd>
+          </div>
+          <div>
+            <dt class="text-xs text-muted-foreground">vs 24h ago</dt>
+            <dd class="font-medium" data-field="temp_vs_24h">
+              {tempVs24h && tempVs24h.key !== "flat"
+                ? `${tempVs24h.delta > 0 ? "+" : "−"}${Math.abs(tempVs24h.delta).toFixed(1)}°`
+                : "about the same"}
+            </dd>
+          </div>
+        </dl>
 
         <dl class="mt-3 border-t border-border/60 pt-3 text-sm">
           <div class="flex items-baseline justify-between gap-2">
@@ -167,11 +193,17 @@ const rainSparkDomain: [number, number] = [
           </p>
         </dl>
 
-        <Sparkline
-          values={summary.spark.temp}
-          color="#ef4444"
-          class="mt-3 w-full text-muted-foreground/60"
-        />
+        <div class="mt-auto pt-4">
+          <Sparkline
+            values={summary.spark.temp}
+            color="#ef4444"
+            class="w-full text-muted-foreground/60"
+          />
+          <p class="mt-1 flex justify-between text-xs text-muted-foreground tabular-nums">
+            <span>Last 24 hours</span>
+            <span>{tempSparkRange}</span>
+          </p>
+        </div>
       </CardContent>
     </Card>
 
@@ -180,23 +212,37 @@ const rainSparkDomain: [number, number] = [
         <img src={rainIcon} alt="" class="h-10 w-10" />
         <CardTitle>Rain today</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-1 flex-col">
         <div class="text-3xl font-semibold tabular-nums" data-field="rain_today">
           {fmt(summary.rainToday, 1, " mm")}
         </div>
-        <p class="mt-2 text-sm text-muted-foreground tabular-nums">
-          last hour <span data-field="rain_last_hour">{fmt(summary.rainLastHour, 1, " mm")}</span>
-          <span class="mx-1">·</span>
-          24h <span data-field="rain_24h">{fmt(summary.rain24h, 1, " mm")}</span>
-        </p>
+        <p class="mt-1 text-sm text-muted-foreground">since midnight</p>
 
-        <Sparkline
-          values={summary.spark.rain}
-          domain={rainSparkDomain}
-          color="#38bdf8"
-          class="mt-3 w-full text-muted-foreground/60"
-        />
-        <p class="mt-1 text-xs text-muted-foreground">accumulating since midnight</p>
+        <dl class="mt-3 grid grid-cols-2 gap-2 text-sm tabular-nums">
+          <div>
+            <dt class="text-xs text-muted-foreground">Last hour</dt>
+            <dd class="font-medium" data-field="rain_last_hour">
+              {fmt(summary.rainLastHour, 1, " mm")}
+            </dd>
+          </div>
+          <div>
+            <dt class="text-xs text-muted-foreground">Last 24 hours</dt>
+            <dd class="font-medium" data-field="rain_24h">{fmt(summary.rain24h, 1, " mm")}</dd>
+          </div>
+        </dl>
+
+        <div class="mt-auto pt-4">
+          <Sparkline
+            values={summary.spark.rain}
+            domain={rainSparkDomain}
+            color="#38bdf8"
+            class="w-full text-muted-foreground/60"
+          />
+          <p class="mt-1 flex justify-between text-xs text-muted-foreground tabular-nums">
+            <span>Running total today</span>
+            <span data-field="rain_today_spark">{fmt(summary.rainToday, 1, " mm")}</span>
+          </p>
+        </div>
       </CardContent>
     </Card>
 
@@ -248,13 +294,16 @@ const rainSparkDomain: [number, number] = [
         </dl>
         <WindTrend client:load />
         <div class="mt-1 basis-full">
-          <p class="text-xs text-muted-foreground">Last 24h</p>
           <Sparkline
             values={summary.spark.wind}
             color="#10b981"
             height={28}
-            class="mt-1 w-full text-muted-foreground/60"
+            class="w-full text-muted-foreground/60"
           />
+          <p class="mt-1 flex justify-between text-xs text-muted-foreground tabular-nums">
+            <span>Last 24 hours</span>
+            <span>{windSparkRange}</span>
+          </p>
         </div>
       </CardContent>
     </Card>
@@ -266,7 +315,7 @@ const rainSparkDomain: [number, number] = [
         <img src={pressureIcon} alt="" class="h-10 w-10" />
         <CardTitle>Pressure</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-1 flex-col">
         <div class="text-3xl font-semibold tabular-nums" data-field="pressure_msl_hpa">
           {fmt(reading?.pressure_msl_hpa ?? null, 0, " hPa")}
         </div>
@@ -277,11 +326,17 @@ const rainSparkDomain: [number, number] = [
               : "sea-level adjusted"
           }
         </p>
-        <Sparkline
-          values={summary.spark.pressure}
-          color="#8b5cf6"
-          class="mt-3 w-full text-muted-foreground/60"
-        />
+        <div class="mt-auto pt-4">
+          <Sparkline
+            values={summary.spark.pressure}
+            color="#8b5cf6"
+            class="w-full text-muted-foreground/60"
+          />
+          <p class="mt-1 flex justify-between text-xs text-muted-foreground tabular-nums">
+            <span>Last 24 hours</span>
+            <span>{pressureSparkRange}</span>
+          </p>
+        </div>
       </CardContent>
     </Card>
 
@@ -290,7 +345,7 @@ const rainSparkDomain: [number, number] = [
         <img src={humidityIcon} alt="" class="h-10 w-10" />
         <CardTitle>Humidity</CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-1 flex-col">
         <div class="flex items-baseline gap-2">
           <span class="text-3xl font-semibold tabular-nums" data-field="humidity">
             {fmt(reading?.humidity ?? null, 0, "%")}
@@ -304,11 +359,17 @@ const rainSparkDomain: [number, number] = [
         <p class="mt-2 text-sm text-muted-foreground" data-field="humidity_note">
           {humidityNote(reading?.humidity)}
         </p>
-        <Sparkline
-          values={summary.spark.humidity}
-          color="#3b82f6"
-          class="mt-3 w-full text-muted-foreground/60"
-        />
+        <div class="mt-auto pt-4">
+          <Sparkline
+            values={summary.spark.humidity}
+            color="#3b82f6"
+            class="w-full text-muted-foreground/60"
+          />
+          <p class="mt-1 flex justify-between text-xs text-muted-foreground tabular-nums">
+            <span>Last 24 hours</span>
+            <span>{humiditySparkRange}</span>
+          </p>
+        </div>
       </CardContent>
     </Card>
 
@@ -525,6 +586,7 @@ const rainSparkDomain: [number, number] = [
       set("temp_min", fmt(num(s.tempMin), 1, "°"));
       set("wind_gust_max_kmh", kmh(num(s.gustMax)));
       set("rain_today", fmt(num(s.rainToday), 1, " mm"));
+      set("rain_today_spark", fmt(num(s.rainToday), 1, " mm"));
       set("rain_last_hour", fmt(num(s.rainLastHour), 1, " mm"));
       set("rain_24h", fmt(num(s.rain24h), 1, " mm"));
 
@@ -536,8 +598,8 @@ const rainSparkDomain: [number, number] = [
       set(
         "temp_vs_24h",
         tv && tv.key !== "flat"
-          ? `${tv.delta > 0 ? "+" : "−"}${Math.abs(tv.delta).toFixed(1)}° vs 24h`
-          : "≈ 24h ago"
+          ? `${tv.delta > 0 ? "+" : "−"}${Math.abs(tv.delta).toFixed(1)}°`
+          : "about the same"
       );
       const ht = changeArrow(stale ? null : num(s.humidityNow), num(s.humidity1hAgo), 2);
       set("humidity_trend", ht && ht.key !== "flat" ? `${ht.arrow} ${Math.abs(ht.delta).toFixed(0)}%/h` : "");

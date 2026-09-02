@@ -25,16 +25,16 @@ const tiles: { label: string; value: string; sub?: string }[] = [
     value: ago(h.lastReadingAgeSec),
   },
   {
-    label: "Completeness (24 h)",
+    label: "Completeness (24 hours)",
     value: `${Math.round(h.completeness24hPct)}%`,
     sub: `${h.readings24h} of ~${h.expected24h}`,
   },
   {
-    label: "Uptime (24 h)",
+    label: "Uptime (24 hours)",
     value: `${h.uptime24hPct.toFixed(1)}%`,
   },
   {
-    label: "Largest gap (24 h)",
+    label: "Largest gap (24 hours)",
     value:
       h.largestGap24hMin === null
         ? "—"

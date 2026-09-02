@@ -18,9 +18,9 @@ const ICONS: Record<string, string> = {
 };
 
 const tabs = [
-  { id: "now", label: "Now in detail" },
-  { id: "history", label: "History" },
-  { id: "ahead", label: "Ahead" },
+  { id: "now", label: "Now in detail", shortLabel: "Now" },
+  { id: "history", label: "History", shortLabel: "History" },
+  { id: "ahead", label: "Ahead", shortLabel: "Ahead" },
 ] as const;
 ---
 
@@ -40,7 +40,7 @@ const tabs = [
           aria-controls={`panel-${t.id}`}
           aria-selected={i === 0 ? "true" : "false"}
           tabindex={i === 0 ? 0 : -1}
-          class="-mb-px flex shrink-0 items-center gap-2 border-b-2 border-transparent px-4 py-3 text-base font-medium text-muted-foreground transition-colors hover:text-foreground aria-selected:border-foreground aria-selected:text-foreground"
+          class="-mb-px flex shrink-0 items-center gap-2 border-b-2 border-transparent px-3 py-3 text-base font-medium text-muted-foreground transition-colors hover:text-foreground aria-selected:border-foreground aria-selected:text-foreground sm:px-4"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -56,7 +56,8 @@ const tabs = [
             class="h-5 w-5 shrink-0"
             set:html={ICONS[t.id]}
           />
-          {t.label}
+          <span class="sm:hidden">{t.shortLabel}</span>
+          <span class="hidden sm:inline">{t.label}</span>
         </button>
       ))
     }
