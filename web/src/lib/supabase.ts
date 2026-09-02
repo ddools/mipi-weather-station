@@ -111,6 +111,9 @@ export interface TodaySummary {
   rainToday: number | null;
   rainLastHour: number | null;
   rain24h: number | null;
+  /** current rain intensity in mm/h, from the rain measured over the last
+   *  ~15 minutes scaled to an hourly rate. null when no rows cover that window. */
+  rainRateNow: number | null;
   /** sea-level pressure now and ~3h ago, for the trend indicator. */
   pressureNow: number | null;
   pressure3hAgo: number | null;
@@ -161,6 +164,17 @@ function cumulativeRain(rows: Reading[]): number[] {
   });
 }
 
+/**
+ * Current rain intensity in mm/h: the rain measured across `rows` scaled from the
+ * window `minutes` to an hourly rate. null when none of the rows carry a rain
+ * reading (a gap) — distinct from 0, a genuinely dry window.
+ */
+function rainRate(rows: Reading[], minutes: number): number | null {
+  const total = sumRain(rows);
+  if (total === null) return null;
+  return (total / minutes) * 60;
+}
+
 /** Total rain over the rows, or null if none of them actually carry a rain reading. */
 function sumRain(rows: Reading[]): number | null {
   const measured = rows.filter((r) => r.rain_mm !== null && !Number.isNaN(r.rain_mm));
@@ -182,6 +196,10 @@ export async function getTodaySummary(): Promise<TodaySummary> {
   const hourAgo = now - 3600_000;
   const lastHourRows = rows.filter((r) => new Date(r.recorded_at).getTime() >= hourAgo);
 
+  const RATE_WINDOW_MIN = 15;
+  const rateWindowAgo = now - RATE_WINDOW_MIN * 60_000;
+  const rateWindowRows = rows.filter((r) => new Date(r.recorded_at).getTime() >= rateWindowAgo);
+
   const latest = rows[rows.length - 1] ?? null;
 
   return {
@@ -192,6 +210,7 @@ export async function getTodaySummary(): Promise<TodaySummary> {
     rainToday: sumRain(todayRows),
     rainLastHour: sumRain(lastHourRows),
     rain24h: sumRain(rows),
+    rainRateNow: rainRate(rateWindowRows, RATE_WINDOW_MIN),
     pressureNow: latest?.pressure_msl_hpa ?? null,
     // Row nearest each offset, but only if it lands within a tolerance window —
     // otherwise a data gap would produce a bogus "trend".

@@ -17,6 +17,20 @@ export function fmt(value: number | null, digits = 1, unit = ""): string {
   return `${value.toFixed(digits)}${unit}`;
 }
 
+/**
+ * Words for a current rain rate in mm/h. `null` (no recent readings) reads as a
+ * gap; `0` is a genuinely dry spell. Bands follow the usual met-service cuts
+ * (light < 2.5, moderate < 7.6, heavy above).
+ */
+export function rainIntensity(mmPerHour: number | null): string {
+  if (mmPerHour === null || Number.isNaN(mmPerHour)) return "no recent data";
+  if (mmPerHour <= 0) return "dry";
+  if (mmPerHour < 0.5) return "a trace";
+  if (mmPerHour < 2.5) return "light rain";
+  if (mmPerHour < 7.6) return "moderate rain";
+  return "heavy rain";
+}
+
 export function timeAgo(iso: string): string {
   const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
   if (seconds < 90) return "just now";
