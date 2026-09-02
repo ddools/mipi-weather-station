@@ -118,12 +118,16 @@ export interface TodaySummary {
   temp24hAgo: number | null;
   humidityNow: number | null;
   humidity1hAgo: number | null;
-  /** ~48-point downsample of the last 24h, oldest→newest, for card sparklines. */
+  /** ~48-point downsample of the last 24h, oldest→newest, for card sparklines.
+   *  `rain` is the odd one out: rainfall is an accumulation, not a level, so it
+   *  is the running total since local midnight (matching the `rainToday`
+   *  headline, which is its last point) rather than a 24h series of rates. */
   spark: {
     temp: (number | null)[];
     pressure: (number | null)[];
     humidity: (number | null)[];
     wind: (number | null)[];
+    rain: (number | null)[];
   };
 }
 
@@ -142,6 +146,19 @@ function min(values: (number | null)[]): number | null {
   const nums = values.filter((v): v is number => v !== null && !Number.isNaN(v));
   return nums.length ? Math.min(...nums) : null;
 }
+/**
+ * Running rain total across the rows, oldest→newest — the shape of the day's
+ * accumulation. Rows with no rain reading carry the total forward unchanged
+ * rather than breaking the line: a failed sensor cycle is not a reset to zero.
+ */
+function cumulativeRain(rows: Reading[]): number[] {
+  let total = 0;
+  return rows.map((r) => {
+    if (r.rain_mm !== null && !Number.isNaN(r.rain_mm)) total += r.rain_mm;
+    return total;
+  });
+}
+
 /** Total rain over the rows, or null if none of them actually carry a rain reading. */
 function sumRain(rows: Reading[]): number | null {
   const measured = rows.filter((r) => r.rain_mm !== null && !Number.isNaN(r.rain_mm));
@@ -187,6 +204,7 @@ export async function getTodaySummary(): Promise<TodaySummary> {
       pressure: downsample(rows.map((r) => r.pressure_msl_hpa), 48),
       humidity: downsample(rows.map((r) => r.humidity), 48),
       wind: downsample(rows.map((r) => r.wind_speed_ms), 48),
+      rain: downsample(cumulativeRain(todayRows), 48),
     },
   };
 }
