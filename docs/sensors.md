@@ -183,6 +183,38 @@ Note that the fallback in (1) also applies for a single cycle whenever a probe
 read fails its CRC. That's normal and self-correcting; the collector logs it at
 most once every 15 minutes so it doesn't drown the journal.
 
+## Troubleshooting: rain totals look far too low
+
+A tipping bucket that has stopped tipping is indistinguishable from dry weather
+in the data — there is no error, no gap, just a flat zero. The counting path is
+interrupt-driven end to end (reed switch → `RainGauge._tip` → drained every wind
+sample → summed per archive record → `tips × rain_bucket_mm`), and the dashboard
+sums those millimetres over the local day, so a low total almost always means
+the gauge really did not tip.
+
+```
+weatherstation-doctor --rain
+```
+
+reads the collector's own SQLite buffer and prints tips per hour for the last
+24 hours, the total, and when the gauge last tipped. Roughly 3–4 tips an hour is
+steady light rain (~1 mm/h); one or two tips across a wet morning is a fault.
+
+To separate a blocked gauge from a dead switch, tip the bucket by hand with the
+collector stopped (it holds GPIO 6 while running):
+
+```
+sudo systemctl stop weatherstation
+weatherstation-doctor --rain-watch
+sudo systemctl start weatherstation
+```
+
+- **Tips register by hand but not in rain** — the switch, wiring and counting
+  path are all fine, so the funnel is blocked (leaves, silt, a spider's web in
+  the throat) or the bucket is fouled and cannot rock freely. Check the gauge is
+  level, too: off-level, it needs more water on one side to tip.
+- **Nothing registers by hand** — the reed switch or its wiring to GPIO 6.
+
 ## Provisioning gotchas hit during bring-up
 
 - Raspberry Pi OS trixie (Debian 13) ships `python3-lgpio` as a system package, but

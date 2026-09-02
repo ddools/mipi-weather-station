@@ -9,7 +9,22 @@ See the [main README](../README.md) for the full project.
 .venv/bin/weatherstation-doctor
 ```
 
-Reads all three of the kit's thermometers side by side (DS18B20 probe, BMP085,
-HTU21D), shows which one the collector is publishing as air temperature, and
-explains the difference. Run it first if the station reads warmer or cooler than
-the forecast — see [troubleshooting](../docs/sensors.md#troubleshooting-the-station-reads-several-degrees-too-warm).
+Checks the two sensors that most often go quietly wrong, and explains what it
+finds:
+
+- **Thermometers** — all three side by side (DS18B20 probe, BMP085, HTU21D),
+  marking which one is being published as air temperature.
+  ([troubleshooting](../docs/sensors.md#troubleshooting-the-station-reads-several-degrees-too-warm))
+- **Rain gauge** — tips per hour for the last 24h from the collector's buffer,
+  so a bucket that has stopped tipping is visible rather than looking like dry
+  weather.
+  ([troubleshooting](../docs/sensors.md#troubleshooting-rain-totals-look-far-too-low))
+
+```
+weatherstation-doctor --temp          # thermometer section only
+weatherstation-doctor --rain          # rain section only
+weatherstation-doctor --rain-watch    # live tip counter; needs the collector stopped
+```
+
+`config.yaml` is found relative to the installation, so the command works from
+any directory.
