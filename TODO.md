@@ -280,6 +280,31 @@ domain may come later).
       rejections once past the 5-minute window (verified via `journalctl`
       after deploy, plus a direct `curl` against the real endpoint with the
       real credentials before wiring it in — both returned clean `200`s).
+- [x] **Wedged in production and fixed (2026-09-03).** The station went silent
+      on Windy while Supabase/WU stayed healthy — the cursors are per-uploader,
+      so nothing surfaced it. `journalctl` showed the same record (2455) being
+      rejected once a minute with HTTP 400 and two messages:
+  - `winddir must be an integer number` — the **root cause**. The vane reports
+    the 16 compass points as `index * 22.5` (`sensors/wind_vane.py:47`), so the
+    eight intercardinals are fractional. `upload/windy.py` was the only uploader
+    that passed `wind_dir_deg` through raw; WU and WOW-BE already `round()` it.
+  - `time must not be more than 2 hours in the past` — the **consequence**.
+    `upload/base.py:flush` stops at the first failure to keep ordering, so the
+    rejected record blocked the cursor, aged past Windy's 2h window, and could
+    never be accepted again. Permanent head-of-line block.
+      Fixes: round `winddir`; drop records older than 1h55m rather than retrying
+      them forever (the rule `upload/cwop.py` already applies). Also switched the
+      rate-limit sentinel from `0.0` to `-inf` — `time.monotonic()` counts from
+      boot, so `0.0` made the first 5 minutes of records after every reboot look
+      like they fell inside the 5-minute window and get skipped.
+- [x] `tests/test_windy.py` — 9 tests. There were **none** before, which is why
+      a field-format bug shipped; each of the three fixes above fails the suite
+      when reverted on its own.
+- [ ] No per-uploader health is visible anywhere: `web/src/lib/health.ts:3`
+      notes upload status "lives only on the Pi", and the Pi has no tool that
+      shows it (`weatherstation-doctor` covers thermometers and rain only). A
+      wedged cursor is invisible until someone greps journald. Worth an
+      `uploads` doctor section: per-uploader cursor, backlog depth, last error.
 
 ## 5. Polish (plan.MD Recommendations #5, Details/E)
 
