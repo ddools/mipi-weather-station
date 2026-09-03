@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Sparkline from "@/components/Sparkline.astro";
 import { WindTrend } from "@/components/WindTrend";
 import { getLatestReading, getTodaySummary } from "@/lib/supabase";
-import { degToCompass, fmt, beaufort, msToKmh, pressureTrend, trend as changeTrend } from "@/lib/format";
+import { degToCompass, fmt, beaufort, msToKmh, pressureTrend, rainIntensity, trend as changeTrend } from "@/lib/format";
 import { feelsLike, dewPointComfort } from "@/lib/derived";
 import { airQualityBand, type AirBand } from "@/lib/air";
 import thermometerIcon from "@meteocons/svg/flat/thermometer.svg?url";
@@ -103,6 +103,10 @@ function renderCompass(deg: number | null): string {
 }
 
 const compassSvg = renderCompass(reading?.wind_dir_deg ?? null);
+
+// "Right now" rain intensity — only meaningful while the station is live, so it
+// follows `reading` (nulled when offline) rather than the day-total figures.
+const rainRateNow = reading ? summary.rainRateNow : null;
 const rainSparkDomain: [number, number] = [
   0,
   Math.max(summary.rainToday ?? 0, RAIN_SPARK_MIN_MM),
@@ -213,10 +217,19 @@ const windSparkRange = sparkRange(
         <CardTitle>Rain today</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col">
-        <div class="text-3xl font-semibold tabular-nums" data-field="rain_today">
-          {fmt(summary.rainToday, 1, " mm")}
+        <div class="flex items-baseline gap-2">
+          <span class="text-3xl font-semibold tabular-nums" data-field="rain_today">
+            {fmt(summary.rainToday, 1, " mm")}
+          </span>
+          <span class="text-sm text-muted-foreground">since midnight</span>
         </div>
-        <p class="mt-1 text-sm text-muted-foreground">since midnight</p>
+        <p class="mt-1 text-sm text-muted-foreground tabular-nums">
+          <span class="font-medium text-foreground" data-field="rain_rate_now"
+            >{fmt(rainRateNow, 1, " mm/h")}</span
+          > right now <span class="mx-1">·</span> <span data-field="rain_intensity"
+            >{rainIntensity(rainRateNow)}</span
+          >
+        </p>
 
         <dl class="mt-3 grid grid-cols-2 gap-2 text-sm tabular-nums">
           <div>
@@ -433,6 +446,15 @@ const windSparkRange = sparkRange(
   function compass(deg: number | null) {
     return deg === null ? NO_VALUE : COMPASS[Math.round(deg / 22.5) % 16];
   }
+  // Mirrors lib/format.ts:rainIntensity.
+  function rainIntensity(mmPerHour: number | null) {
+    if (mmPerHour === null) return "no recent data";
+    if (mmPerHour <= 0) return "dry";
+    if (mmPerHour < 0.5) return "a trace";
+    if (mmPerHour < 2.5) return "light rain";
+    if (mmPerHour < 7.6) return "moderate rain";
+    return "heavy rain";
+  }
 
   // Mirrors lib/derived.ts — the client script inlines its helpers (no bundler).
   function feelsLike(tC: number | null, ws: number | null, dp: number | null) {
@@ -591,6 +613,9 @@ const windSparkRange = sparkRange(
       set("rain_24h", fmt(num(s.rain24h), 1, " mm"));
 
       const stale = isStale();
+      const rainRateNow = stale ? null : num(s.rainRateNow);
+      set("rain_rate_now", fmt(rainRateNow, 1, " mm/h"));
+      set("rain_intensity", rainIntensity(rainRateNow));
       const tempNow = stale ? null : num(s.tempNow);
       const tt = changeArrow(tempNow, num(s.temp1hAgo), 0.3);
       set("temp_trend", tt && tt.key !== "flat" ? `${tt.arrow} ${Math.abs(tt.delta).toFixed(1)}°/h` : "");
