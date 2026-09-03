@@ -115,6 +115,16 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   (`WINDY_STATION_PASSWORD`, not an "API key" — that's a different, account-
   level concept in Windy's API). Windy also rate-limits to once per 5 min per
   station, handled client-side in the uploader. See TODO.md for the full story.
+  **Wedged 2026-09-02, fixed 2026-09-03**: Windy requires an *integer*
+  `winddir`, and the vane's 16 points are `index * 22.5`, so the eight
+  intercardinals were rejected HTTP 400. Because `upload/base.py:flush` stops
+  at the first failure to preserve ordering, the rejected record blocked the
+  cursor and then aged past Windy's 2h `time` limit — a permanent head-of-line
+  block that took the station off Windy while every other destination stayed
+  green. Fixed by rounding `winddir` and dropping records older than 1h55m.
+  **Lesson: a rejected record blocks its uploader's cursor forever unless the
+  uploader has a staleness escape hatch.** Every realtime destination needs
+  one; check any new uploader for it.
 - **Astro site live in `web/`** (2026-08-27) — full dashboard with server
   islands, ECharts, shadcn/ui, Meteocons, tides, and a **rain-radar** map
   (`components/RainRadar.tsx`, Leaflet island + RainViewer tiles — see below).
