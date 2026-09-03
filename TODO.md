@@ -300,11 +300,22 @@ domain may come later).
 - [x] `tests/test_windy.py` — 9 tests. There were **none** before, which is why
       a field-format bug shipped; each of the three fixes above fails the suite
       when reverted on its own.
-- [ ] No per-uploader health is visible anywhere: `web/src/lib/health.ts:3`
-      notes upload status "lives only on the Pi", and the Pi has no tool that
-      shows it (`weatherstation-doctor` covers thermometers and rain only). A
-      wedged cursor is invisible until someone greps journald. Worth an
-      `uploads` doctor section: per-uploader cursor, backlog depth, last error.
+- [x] **`uploads` section in `weatherstation-doctor`** (2026-09-03) — per-
+      destination cursor, backlog depth, age of the oldest unsent record, and
+      the reason it stopped. `upload_state` gained `last_error`/`last_error_at`,
+      written by `upload/base.py:flush` from an uploader's `last_error` and
+      cleared by the next successful `mark_sent`, so it always says why a
+      destination is stuck *now* rather than what once broke. Old buffers are
+      migrated with `ALTER TABLE` at startup. A backlog only counts as a stall
+      once its oldest unsent record is >10 min old, since uploads run behind by
+      design. `docs/uploads.md` writes up the failure mode. 12 tests.
+- [x] **WOW-BE staleness guard** (2026-09-03) — it rounds `winddir` so it was
+      never exposed to the Windy bug, but it was the one live uploader that
+      would retry a rejected record forever. Bound is 24h: it accepts backfill,
+      so this is only a wedge backstop, not an API limit.
+- [ ] `wunderground` still has no staleness guard. Lower risk (WU accepts old
+      `dateutc` and we have never seen it reject one), but it is the last live
+      uploader that can wedge permanently — see the table in `docs/uploads.md`.
 
 ## 5. Polish (plan.MD Recommendations #5, Details/E)
 

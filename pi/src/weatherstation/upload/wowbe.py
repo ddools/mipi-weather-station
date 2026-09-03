@@ -18,6 +18,14 @@ limited. 429 is treated as a retryable failure (the base flush() loop pauses the
 backlog and retries next tick); 403/422 fail loudly and also retry, on the
 assumption a fix (correct key, backend change) will land eventually.
 
+That retry-forever stance needs an escape hatch, because flush() stops at the
+first failure to preserve ordering: one permanently unacceptable record pins the
+cursor and every later record queues behind it. That is exactly how the Windy
+uploader silently took its station offline for two days (see upload/windy.py), so
+records past _MAX_AGE_S are dropped here rather than retried indefinitely. WOW-BE
+publishes no explicit age limit, so this is our own bound on how stale an
+observation is still worth submitting, not an API constraint.
+
 API reference: https://wow.meteo.be/docs/api/
 """
 
@@ -35,6 +43,10 @@ from .base import Uploader
 log = logging.getLogger(__name__)
 
 _URL = "https://wow.meteo.be/api/v2/send/wow"
+# A day. Deliberately looser than Windy's 1h55m (which tracks a documented API
+# limit) and CWOP's 10min (a realtime-only network): WOW-BE accepts backfill, so
+# this is only a backstop against one bad record wedging the queue forever.
+_MAX_AGE_S = 86400
 
 
 class WowBeUploader(Uploader):
@@ -54,6 +66,15 @@ class WowBeUploader(Uploader):
             dt = dt.replace(tzinfo=timezone.utc)
         dt = dt.astimezone(timezone.utc)
         now_utc = datetime.now(timezone.utc)
+
+        age_s = (now_utc - dt).total_seconds()
+        if age_s > _MAX_AGE_S:
+            # Retrying would block every fresher record behind it. Drop it and
+            # let the cursor advance.
+            log.warning(
+                "wowbe: dropping record older than %ds (%s)", _MAX_AGE_S, record["recorded_at"]
+            )
+            return True
 
         rain_1h_mm, rain_today_mm = sum_rain_since(
             self._sqlite_path,
@@ -90,9 +111,11 @@ class WowBeUploader(Uploader):
             r = requests.post(self._url, json=body, timeout=15)
         except requests.RequestException as e:
             log.warning("wowbe: request failed: %s", e)
+            self.last_error = f"request failed: {e}"
             return False
 
         if r.status_code == 200:
             return True
         log.warning("wowbe: HTTP %d, body=%r", r.status_code, r.text[:300])
+        self.last_error = f"HTTP {r.status_code}: {r.text[:300]}"
         return False

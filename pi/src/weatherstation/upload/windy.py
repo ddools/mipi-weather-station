@@ -112,4 +112,5 @@ class WindyUploader(Uploader):
             self._last_sent_at = now
         else:
             log.warning("windy: HTTP %d, body=%r", r.status_code, r.text[:200])
+            self.last_error = f"HTTP {r.status_code}: {r.text[:200]}"
         return ok

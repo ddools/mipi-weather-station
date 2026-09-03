@@ -124,7 +124,14 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   green. Fixed by rounding `winddir` and dropping records older than 1h55m.
   **Lesson: a rejected record blocks its uploader's cursor forever unless the
   uploader has a staleness escape hatch.** Every realtime destination needs
-  one; check any new uploader for it.
+  one; check any new uploader for it. Written up in `docs/uploads.md`, with the
+  per-uploader age bounds in a table.
+- **`weatherstation-doctor --uploads`** (2026-09-03) — the outage above was
+  invisible for two days because each destination has its own buffer cursor, so
+  Supabase/WU/the website stayed green throughout. The doctor now prints each
+  destination's cursor, backlog, oldest unsent record and last error;
+  `upload_state` carries `last_error`/`last_error_at`, cleared on the next
+  successful send. Buffers predating those columns are migrated at startup.
 - **Astro site live in `web/`** (2026-08-27) — full dashboard with server
   islands, ECharts, shadcn/ui, Meteocons, tides, and a **rain-radar** map
   (`components/RainRadar.tsx`, Leaflet island + RainViewer tiles — see below).

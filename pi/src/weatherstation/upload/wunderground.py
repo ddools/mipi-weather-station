@@ -49,4 +49,5 @@ class WundergroundUploader(Uploader):
         ok = r.ok and "success" in r.text.lower()
         if not ok:
             log.warning("wunderground: HTTP %d, body=%r", r.status_code, r.text[:200])
+            self.last_error = f"HTTP {r.status_code}: {r.text[:200]}"
         return ok
