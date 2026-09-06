@@ -139,6 +139,58 @@ def test_send_interval_is_configurable(tmp_path, monkeypatch):
     assert len(calls) == 3
 
 
+def test_drops_stale_records_instead_of_blocking_the_cursor(tmp_path, monkeypatch):
+    """A record WOW would refuse must never wedge everything behind it (cf. #18)."""
+    calls = []
+    monkeypatch.setattr(
+        "weatherstation.upload.wow.requests.get",
+        lambda url, params=None, timeout=None: (calls.append(params), FakeResponse(200))[1],
+    )
+    up = WowUploader(_cfg(tmp_path))
+    stale = _record(recorded_at=(datetime.now(timezone.utc) - timedelta(hours=2)).isoformat())
+    assert up.send(stale) is True  # marked delivered so flush() keeps draining
+    assert calls == []  # ...but nothing was actually sent
+
+
+def test_stale_drop_does_not_consume_the_throttle_window(tmp_path, monkeypatch):
+    """Dropping a backlog must not delay the first fresh record behind it."""
+    calls = []
+    monkeypatch.setattr(
+        "weatherstation.upload.wow.requests.get",
+        lambda url, params=None, timeout=None: (calls.append(params), FakeResponse(200))[1],
+    )
+    up = WowUploader(_cfg(tmp_path))
+    now = datetime.now(timezone.utc)
+    for hrs in (5, 4, 3, 2):
+        up.send(_record(recorded_at=(now - timedelta(hours=hrs)).isoformat()))
+    assert calls == []
+    assert up.send(_record()) is True  # the fresh one goes out immediately
+    assert len(calls) == 1
+
+
+def test_stale_run_logs_once_then_quiets_down(tmp_path, monkeypatch, caplog):
+    """A long replay must not bury the `wow: HTTP ...` lines that need attention."""
+    _capture(monkeypatch)
+    up = WowUploader(_cfg(tmp_path))
+    now = datetime.now(timezone.utc)
+    with caplog.at_level("WARNING", logger="weatherstation.upload.wow"):
+        for hrs in (5, 4, 3, 2):
+            up.send(_record(recorded_at=(now - timedelta(hours=hrs)).isoformat()))
+    assert len([r for r in caplog.records if "dropping" in r.message]) == 1
+
+
+def test_first_record_after_a_reboot_is_sent(tmp_path, monkeypatch):
+    """time.monotonic() counts from boot, so the initial window must be open."""
+    calls = []
+    monkeypatch.setattr(
+        "weatherstation.upload.wow.requests.get",
+        lambda url, params=None, timeout=None: (calls.append(params), FakeResponse(200))[1],
+    )
+    monkeypatch.setattr("weatherstation.upload.wow.time.monotonic", lambda: 12.0)
+    assert WowUploader(_cfg(tmp_path)).send(_record()) is True
+    assert len(calls) == 1
+
+
 @pytest.mark.parametrize(
     ("status", "expected"),
     [(200, True), (429, True), (400, False), (401, False), (403, False), (500, False)],

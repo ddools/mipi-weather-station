@@ -75,6 +75,24 @@ backfill.** That suits a live observations map, and the local SQLite buffer plus
 Supabase remain the complete history. `uploaders.wow.send_interval_s` tunes the
 window if WOW's limit ever changes.
 
+### Stale records are dropped, not retried
+
+Readings older than **one hour** are dropped (marked delivered without being
+sent) instead of being retried forever.
+
+This is a guarantee of progress, not a mirror of a documented server rule.
+`upload/base.py:flush()` stops at the first failure to preserve ordering, so any
+record WOW will never accept blocks every fresher record behind it — permanently.
+That is exactly the head-of-line block that took the station offline on Windy
+([#18](https://github.com/ddools/mipi-weather-station/pull/18)), and it would be
+harder to diagnose here: WOW's blanket `400` would not tell us the reading was
+too old, so it would read as a credential problem.
+
+The first drop of a run logs at `WARNING`, the rest at `DEBUG` — replaying a long
+outage would otherwise bury the `wow: HTTP ...` lines that do need attention.
+Dropping costs nothing: with the 5-minute throttle WOW only ever sees one record
+in five, and the full history lives in SQLite and Supabase.
+
 ### Response handling
 
 | Status | Meaning | `send()` |
@@ -82,6 +100,9 @@ window if WOW's limit ever changes.
 | `200` | accepted | `True` |
 | `429` | sent too soon / duplicate reading — WOW already holds this window | `True`, and the throttle window restarts |
 | `400` | **everything else**: unknown site, wrong PIN, bad field or unit | `False`, logged, retried next tick |
+
+(A reading older than an hour never reaches the table above — it is dropped
+first; see below.)
 
 WOW returns a bare `400 Bad Request` with an empty body for anything it won't
 accept — it does not distinguish "no such site" from "wrong PIN" from "bad
