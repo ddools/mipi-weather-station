@@ -37,6 +37,7 @@ def load(path: str | Path = "config.yaml") -> Config:
         windy_station_password=os.getenv("WINDY_STATION_PASSWORD", ""),
         cwop_passcode=os.getenv("CWOP_PASSCODE", "-1"),
         wowbe_auth_key=os.getenv("WOWBE_AUTH_KEY", ""),
+        wow_auth_key=os.getenv("WOW_AUTH_KEY", ""),
     )
     return cfg
 

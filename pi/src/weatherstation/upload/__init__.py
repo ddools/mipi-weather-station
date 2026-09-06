@@ -30,4 +30,9 @@ def build_uploaders(cfg: Config) -> list:
         from .wowbe import WowBeUploader
 
         ups.append(WowBeUploader(cfg))
+    wow = u.get("wow")  # optional block: absent in configs predating WOW/WOW-IE support
+    if wow and wow.get("enabled") and wow.get("station_id") and cfg.env.wow_auth_key:
+        from .wow import WowUploader
+
+        ups.append(WowUploader(cfg))
     return ups

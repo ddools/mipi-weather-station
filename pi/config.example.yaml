@@ -87,3 +87,11 @@ uploaders:
     enabled: false
     station_id: ""        # WOW-BE Site ID from your site page on wow.meteo.be
     # Authentication key (PIN) goes in .env as WOWBE_AUTH_KEY.
+  wow:                    # UK Met Office WOW — the network behind Met Éireann's wow.met.ie.
+                          # Register the site at wow.metoffice.gov.uk (wow.met.ie is display only);
+                          # Irish sites then appear on the WOW-IE map. Being decommissioned
+                          # late 2026 — see docs/wow-ie.md.
+    enabled: false
+    station_id: ""        # WOW Site ID from your site page, verbatim (a GUID or a number)
+    send_interval_s: 300  # WOW wants >= 5 min between readings; sending faster earns 429s
+    # Authentication key (6-digit PIN) goes in .env as WOW_AUTH_KEY.
