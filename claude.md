@@ -48,7 +48,12 @@ Key decisions already made — do not re-litigate without asking:
   CWOP (APRS weather packets over a raw socket to cwop.aprs.net:14580 — code done
   2026-08-30, `upload/cwop.py`; id `GW7965` issued 2026-08-31, activation in
   progress. See [docs/cwop.md](docs/cwop.md)).
-  **Do NOT target Met Office/Met Éireann WOW** — decommissioning late 2026.
+  **Met Office / Met Éireann WOW** (wow.met.ie) — uploader done 2026-09-06
+  (`upload/wow.py`), query-string `GET wow.metoffice.gov.uk/automaticreading`.
+  Deliberately short-lived: the Met Office began retiring WOW in Jan 2026 and
+  decommissions it late 2026, so this runs *alongside* WOW-BE and gets switched
+  off when it stops answering. wow.met.ie is display-only — registration and
+  uploads both go to wow.metoffice.gov.uk. See [docs/wow-ie.md](docs/wow-ie.md).
   **WOW-BE** (wow.meteo.be, RMI Belgium's WOW reboot) — uploader done 2026-08-30
   (`upload/wowbe.py`), JSON REST `POST /api/v2/send/wow`, WU-protocol field set.
   See [docs/wowbe.md](docs/wowbe.md).
@@ -163,6 +168,14 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   `upload/_rain.py`. Not wired live: register at wow.meteo.be, then
   `uploaders.wowbe.{enabled,station_id}` + `station.timezone`. See
   [docs/wowbe.md](docs/wowbe.md).
+- **WOW/WOW-IE uploader written** (2026-09-06, `upload/wow.py` + `tests/test_wow.py`,
+  13 tests) — old-style WOW protocol: `GET wow.metoffice.gov.uk/automaticreading`
+  with `siteid` + `siteAuthenticationKey` (6-digit PIN) as query params, WU field
+  set minus `absbaromin`. Self-throttles to one reading per 5 min (WOW 429s past
+  that), so WOW gets one record in five and no backfill. Shares `upload/_rain.py`
+  with CWOP/WOW-BE. Not wired live: register a site at wow.metoffice.gov.uk, then
+  `WOW_AUTH_KEY` in `.env` + `uploaders.wow.{enabled,station_id}` +
+  `station.timezone`. See [docs/wow-ie.md](docs/wow-ie.md).
 - **TGS2600 air quality** now has collector + dashboard support
   (`sensors/air_quality.py`, `sensors.air_quality.enabled` — off by default,
   uncalibrated 0–100 relative index; see docs/sensors.md "TGS2600 air quality");
@@ -276,6 +289,15 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
 - WU wants **imperial** (°F, inHg, mph, inches) and UTC `dateutc`; response body must
   contain "success".
 - Windy upload pressure is **Pa**, not hPa.
+- **`wow.met.ie` is not an upload endpoint.** It answers `GET /automaticreading`
+  with HTTP 200 and the site's HTML shell — point a station at it and you upload
+  nothing, silently. Observations go to `wow.metoffice.gov.uk/automaticreading`;
+  WOW-IE only *displays* Irish sites from that network (and takes ~2 h to do so).
+  WOW also returns a bare `400 Bad Request` with an empty body for every
+  rejection — unknown site, wrong PIN, bad field alike — so a 400 is almost
+  always credentials, not payload. Don't confuse `uploaders.wow` (this) with
+  `uploaders.wowbe` (wow.meteo.be): separate networks, registrations, `.env` keys
+  and `upload_state` cursors.
 - CWOP has **no HTTP API** — it's APRS packets over a raw TCP socket, and APRS-IS
   never acks the observation, so `send()` returning `True` only means the socket
   round-trip worked. Verify real landing on aprs.fi/findu, not from logs. CWOP is

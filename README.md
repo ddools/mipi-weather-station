@@ -19,7 +19,8 @@ Live at: **a standalone domain (TBD — not yet registered)**
   automatically (store-and-forward).
 - Pushes readings to a **Supabase (Postgres)** cloud database that powers the website.
 - Optionally publishes to **Weather Underground**, **Windy** (Stations API v2),
-  **CWOP** (NOAA MADIS), and **WOW-BE** (wow.meteo.be) via pluggable uploader modules.
+  **CWOP** (NOAA MADIS), **WOW-BE** (wow.meteo.be) and **WOW / WOW-IE**
+  (wow.met.ie) via pluggable uploader modules.
 - An **Astro** front end (on Vercel) renders live conditions and history charts.
 
 ## Architecture
@@ -31,9 +32,10 @@ Live at: **a standalone domain (TBD — not yet registered)**
 │                                  │         │
 │                              upload/       │──▶ Supabase (Postgres)
 │               (supabase, wunderground,     │──▶ Weather Underground
-│                windy, cwop, wowbe, ...)    │──▶ Windy
+│                windy, cwop, wowbe, wow)    │──▶ Windy
 │                                            │──▶ CWOP / NOAA MADIS (APRS-IS)
 │                                            │──▶ WOW-BE (wow.meteo.be)
+│                                            │──▶ WOW / WOW-IE (wow.met.ie)
 └────────────────────────────────────────────┘
                                                    │
                               Astro site on Vercel ┘
@@ -81,7 +83,7 @@ WS_MOCK_SENSORS=1 weatherstation
 - `config.yaml` — station metadata (lat/lon/elevation), GPIO pins, calibration
   constants, sample/archive intervals, which uploaders are enabled.
 - `.env` — secrets only (Supabase service key, WU station key, Windy password,
-  CWOP passcode, WOW-BE auth key). Never committed; see `.env.example`.
+  CWOP passcode, WOW-BE auth key, WOW auth key). Never committed; see `.env.example`.
 
 ## Roadmap
 
@@ -95,6 +97,8 @@ WS_MOCK_SENSORS=1 weatherstation
 - [x] CWOP (APRS) upload — code complete; id `GW7965` issued 2026-08-31, activation
       in progress (send to findu → confirm with cwop-support) ([docs/cwop.md](docs/cwop.md))
 - [x] WOW-BE (wow.meteo.be) upload — code complete; needs a registered site ([docs/wowbe.md](docs/wowbe.md))
+- [x] WOW / WOW-IE (wow.met.ie) upload — code complete; needs a site registered at
+      wow.metoffice.gov.uk. Note WOW is decommissioning late 2026 ([docs/wow-ie.md](docs/wow-ie.md))
 
 ## Licence
 

@@ -45,6 +45,13 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27. Remaining:
   live (422 validation works). **Needs**: register a site at <https://wow.meteo.be>,
   put the PIN in `.env` as `WOWBE_AUTH_KEY`, set `uploaders.wowbe.{enabled,station_id}`
   + `station.timezone` on the Pi. See [docs/wowbe.md](docs/wowbe.md) (§5).
+- **WOW / WOW-IE uploader** — code done 2026-09-06 (`upload/wow.py`, 13 tests).
+  Query-string `GET wow.metoffice.gov.uk/automaticreading`, WU-protocol fields,
+  5-min client-side throttle. **Needs**: register a site at
+  <https://wow.metoffice.gov.uk> (*not* wow.met.ie — that's display only), put the
+  6-digit PIN in `.env` as `WOW_AUTH_KEY`, set `uploaders.wow.{enabled,station_id}`
+  + `station.timezone` on the Pi. **Time-boxed: WOW is decommissioning late 2026**,
+  so do it soon or not at all. See [docs/wow-ie.md](docs/wow-ie.md) (§5).
 - **Supabase retention job** — SQL written (`docs/supabase-retention.sql`), not yet
   run against the live project; repoint the 7d/30d queries at `readings_hourly` after (§5).
 - **README screenshots** of the live dashboard (§5).
@@ -341,6 +348,26 @@ domain may come later).
       responses confirm shape. **Needs**: register a site at <https://wow.meteo.be>,
       `WOWBE_AUTH_KEY` in `.env`, `uploaders.wowbe.{enabled,station_id}` +
       `station.timezone` on the Pi. Full notes: [docs/wowbe.md](docs/wowbe.md).
+- [~] WOW / WOW-IE uploader — **code done 2026-09-06** (`upload/wow.py`, 13 tests).
+      wow.met.ie is Met Éireann's *display* front-end onto the UK Met Office WOW
+      network — registration and uploads both happen on wow.metoffice.gov.uk, and
+      `wow.met.ie/automaticreading` just serves the HTML shell (a 200 that uploads
+      nothing). Protocol is the old query-string `GET /automaticreading`:
+      `siteid` + `siteAuthenticationKey` (6-digit PIN) as query params, WU-protocol
+      field set minus `absbaromin` (not in WOW's parameter list), `dateutc` as
+      `YYYY-MM-DD HH:MM:SS` UTC. WOW wants ≥5 min between readings and 429s past
+      that, so the uploader self-throttles like Windy — skips inside the window and
+      reports success, giving one record in five with no backfill. `429` counts as
+      delivered; `400` is WOW's blanket rejection for unknown site / wrong PIN /
+      bad field, with an empty body (probed live 2026-09-06 — no differentiated
+      validation, unlike WOW-BE's 422s). Shares `upload/_rain.py` with CWOP/WOW-BE.
+      **Needs**: a site registered at <https://wow.metoffice.gov.uk>, `WOW_AUTH_KEY`
+      in `.env`, `uploaders.wow.{enabled,station_id}` + `station.timezone` on the
+      Pi; then allow ~2 h for the WOW-IE map to show it.
+      **Caveat: the Met Office began retiring WOW in Jan 2026, full decommissioning
+      late 2026** — this is a deliberately short-lived destination, run alongside
+      WOW-BE (the successor) and switched off when it stops answering. Full notes:
+      [docs/wow-ie.md](docs/wow-ie.md).
 - [x] GitHub Actions CI: `.github/workflows/ci.yml` (2026-08-27) — two jobs on
       push-to-`main` + every PR:
   - **pi**: `ruff check` + `ruff format --check` + `pytest` on Python 3.9 & 3.13.
