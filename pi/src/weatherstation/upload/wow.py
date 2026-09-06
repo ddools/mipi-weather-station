@@ -22,8 +22,17 @@ record in five rather than a backfilled history, which suits a live observations
 map; the local SQLite buffer remains the complete record.
 
 WOW answers a bare `400 Bad Request` for anything it won't accept -- unknown
-site, wrong PIN, bad field -- with no detail in the body, so a rejection here
-means "check the Site ID and PIN on the site page first".
+site, wrong PIN, bad field, and quite possibly an over-age reading -- with no
+detail in the body, so a rejection here means "check the Site ID and PIN on the
+site page first".
+
+That opacity is why records older than `_MAX_AGE_S` are dropped rather than
+retried. `upload/base.py:flush()` stops at the first failure to preserve
+ordering, so a record WOW will never accept blocks every fresher one behind it
+forever -- the head-of-line block that took the station offline on Windy
+(#18). WOW does not document an age limit and its 400 would not tell us we had
+hit one, so the cap is a guarantee of progress rather than a mirror of a known
+server rule.
 
 Caveat: the Met Office began retiring WOW in January 2026 and plans full
 decommissioning in late 2026, after which WOW-IE stops displaying uploads. See
@@ -46,6 +55,12 @@ log = logging.getLogger(__name__)
 
 _URL = "https://wow.metoffice.gov.uk/automaticreading"
 _MIN_INTERVAL_S = 300  # WOW asks for >= 5 min between readings; 429 past that
+# Bound on how stale a reading may be when we send it. Generous enough that a
+# short outage still backfills its most recent hour, tight enough that a record
+# WOW refuses cannot wedge the cursor for longer than that. With the 5-minute
+# throttle WOW only ever gets one record in five anyway, so dropping the rest of
+# a backlog costs nothing the SQLite buffer and Supabase do not already hold.
+_MAX_AGE_S = 3600
 
 
 class WowUploader(Uploader):
@@ -59,11 +74,15 @@ class WowUploader(Uploader):
         self._interval_s = float(c.get("send_interval_s", _MIN_INTERVAL_S))
         self._tz = cfg.station.get("timezone", "UTC")
         self._sqlite_path = str(cfg.storage.sqlite_path)
-        self._last_sent_at = 0.0
+        # -inf, not 0.0: time.monotonic() counts from boot, so 0.0 would make
+        # every record in the first 5 minutes after a reboot look like it fell
+        # inside the rate-limit window and get skipped.
+        self._last_sent_at = float("-inf")
+        self._dropping = False  # mid-run of stale records; keeps the log readable
 
     def send(self, record: dict) -> bool:
         now = time.monotonic()
-        if self._last_sent_at and now - self._last_sent_at < self._interval_s:
+        if now - self._last_sent_at < self._interval_s:
             return True  # inside WOW's 5-minute window — skip, not a failure
 
         dt = datetime.fromisoformat(record["recorded_at"].replace("Z", "+00:00"))
@@ -71,6 +90,22 @@ class WowUploader(Uploader):
             dt = dt.replace(tzinfo=timezone.utc)
         dt = dt.astimezone(timezone.utc)
         now_utc = datetime.now(timezone.utc)
+
+        if (now_utc - dt).total_seconds() > _MAX_AGE_S:
+            # Too stale to be worth a slot on a live observations map, and a
+            # candidate for the 400 that would block everything behind it. Drop
+            # it and let the cursor advance. Only the first of a run is a
+            # warning: replaying a long outage would otherwise bury the
+            # `wow: HTTP ...` lines that do need attention.
+            log.log(
+                logging.DEBUG if self._dropping else logging.WARNING,
+                "wow: dropping record older than %ds (%s)",
+                _MAX_AGE_S,
+                record["recorded_at"],
+            )
+            self._dropping = True
+            return True
+        self._dropping = False
 
         rain_1h_mm, rain_today_mm = sum_rain_since(
             self._sqlite_path,
