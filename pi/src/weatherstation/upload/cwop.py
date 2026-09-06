@@ -198,6 +198,7 @@ class CWOPUploader(Uploader):
                     resp = sock.recv(4096).decode("ascii", "replace")
                     if "invalid" in resp.lower():
                         log.warning("cwop: server rejected login: %s", resp.strip())
+                        self.last_error = f"server rejected login: {resp.strip()}"
                         return False
                 sock.sendall((packet + "\r\n").encode("ascii"))
                 time.sleep(1.0)  # let the packet flush before the socket closes
@@ -205,4 +206,5 @@ class CWOPUploader(Uploader):
             return True
         except OSError as e:
             log.warning("cwop: socket error talking to %s:%s: %s", self._host, self._port, e)
+            self.last_error = f"socket error talking to {self._host}:{self._port}: {e}"
             return False

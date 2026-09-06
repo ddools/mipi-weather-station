@@ -8,12 +8,16 @@ Two sections, both printed by default:
 * **Rain gauge.** A tipping bucket that has stopped tipping looks exactly like
   dry weather in the data, so this reads the collector's own SQLite buffer and
   shows how many tips it has actually recorded, and when.
+* **Uploads.** Each destination has its own cursor into the buffer, so one can
+  be stuck for days while the others stay perfectly healthy and the dashboard
+  looks fine. This shows how far behind each one is and why it stopped.
 
 Run it on the Pi, in the same virtualenv as the collector — from anywhere, the
 config file is found relative to the installation:
 
     ~/mipi-weather-station/pi/.venv/bin/weatherstation-doctor
     weatherstation-doctor --rain-watch     # tip the bucket by hand and watch
+    weatherstation-doctor --uploads        # per-destination upload health only
 """
 
 from __future__ import annotations
@@ -37,6 +41,10 @@ _SELF_HEATING_THRESHOLD_C = 3.0
 # a truncated table can disagree with the 'last tip' line below it, which is
 # exactly the sort of thing that sends you chasing the wrong fault.
 _RAIN_WINDOW_H = 24
+
+# A cursor this far behind the newest reading is not "briefly catching up".
+# The archive interval is 60s, so this is ~10 records.
+_BACKLOG_STALL_S = 600
 
 # The kit's bucket, from config.example.yaml — only a fallback for when the real
 # config can't be read.
@@ -175,6 +183,19 @@ def _temp_verdict(
         "is not what is inflating this reading. The published temperature is the",
         "probe's, and if it reads too warm the cause is siting, not the hardware:",
     ] + _SITING_NOTES
+
+
+def _buffer_path(cfg, cfg_path: Path | None) -> Path | None:
+    """Locate the collector's SQLite buffer from config.
+
+    sqlite_path is relative to the collector's working directory, which is the
+    directory holding config.yaml -- not wherever the doctor was invoked from.
+    """
+    if not cfg:
+        return None
+    raw = cfg.storage.get("sqlite_path", "data/weather.sqlite3")
+    base = cfg_path.resolve().parent if cfg_path else Path.cwd()
+    return Path(raw) if Path(raw).is_absolute() else base / raw
 
 
 def print_thermometers(cfg) -> None:
@@ -346,11 +367,7 @@ def print_rain(cfg, cfg_path: Path | None) -> None:
             # Say so rather than silently labelling the hourly table in UTC —
             # a table an hour out is worse than one that admits it.
             print(f"  note    : unknown timezone {tz_name!r}; hours shown in UTC")
-        raw = cfg.storage.get("sqlite_path", "data/weather.sqlite3")
-        # sqlite_path is relative to the collector's working directory, which is
-        # the directory holding config.yaml.
-        base = cfg_path.resolve().parent if cfg_path else Path.cwd()
-        db_path = Path(raw) if Path(raw).is_absolute() else base / raw
+        db_path = _buffer_path(cfg, cfg_path)
 
     if db_path is None or not db_path.exists():
         print(f"  buffer  : not found ({db_path or 'no config'})")
@@ -433,6 +450,146 @@ def watch_rain(cfg, seconds: int) -> None:
         print(f"switch or its wiring to GPIO {pin}.")
 
 
+# ----------------------------------------------------------------------- uploads
+
+
+@dataclass
+class UploaderState:
+    name: str
+    last_sent_id: int
+    backlog: int
+    oldest_unsent: datetime | None
+    last_error: str | None
+    last_error_at: str | None
+
+
+def _read_upload_state(db_path: Path) -> tuple[list[UploaderState], int, datetime | None]:
+    """Per-uploader cursors plus the newest reading, read-only.
+
+    Read-only on purpose: the collector is normally running against this same
+    file, and a diagnostic must never take a write lock out from under it.
+    """
+    db = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=5)
+    try:
+        row = db.execute("SELECT COALESCE(MAX(id), 0), COUNT(*) FROM readings").fetchone()
+        max_id = row[0]
+        have = {c[1] for c in db.execute("PRAGMA table_info(upload_state)")}
+        # A buffer written before the error columns existed still reports cursors.
+        errors = "last_error, last_error_at" if "last_error" in have else "NULL, NULL"
+        rows = db.execute(
+            f"SELECT uploader, last_sent_id, {errors} FROM upload_state ORDER BY uploader"
+        ).fetchall()
+
+        states = []
+        for name, last_sent_id, last_error, last_error_at in rows:
+            backlog = db.execute(
+                "SELECT COUNT(*) FROM readings WHERE id > ?", (last_sent_id,)
+            ).fetchone()[0]
+            oldest = db.execute(
+                "SELECT recorded_at FROM readings WHERE id > ? ORDER BY id LIMIT 1",
+                (last_sent_id,),
+            ).fetchone()
+            states.append(
+                UploaderState(
+                    name=name,
+                    last_sent_id=last_sent_id,
+                    backlog=backlog,
+                    oldest_unsent=_parse_utc(oldest[0]) if oldest else None,
+                    last_error=last_error,
+                    last_error_at=last_error_at,
+                )
+            )
+
+        newest = db.execute("SELECT recorded_at FROM readings ORDER BY id DESC LIMIT 1").fetchone()
+        return states, max_id, _parse_utc(newest[0]) if newest else None
+    finally:
+        db.close()
+
+
+def _parse_utc(value: str) -> datetime | None:
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+
+
+def _fmt_age(seconds: float) -> str:
+    if seconds < 90:
+        return f"{seconds:.0f}s"
+    if seconds < 5400:
+        return f"{seconds / 60:.0f}m"
+    if seconds < 172800:
+        return f"{seconds / 3600:.1f}h"
+    return f"{seconds / 86400:.1f}d"
+
+
+def _upload_verdict(states: list[UploaderState], now: datetime) -> list[str]:
+    stalled = [
+        s
+        for s in states
+        if s.oldest_unsent is not None
+        and (now - s.oldest_unsent).total_seconds() > _BACKLOG_STALL_S
+    ]
+    if not stalled:
+        if any(s.backlog for s in states):
+            return ["Every destination is current or catching up normally."]
+        return ["Every destination is up to date."]
+
+    lines = []
+    for s in stalled:
+        age = _fmt_age((now - s.oldest_unsent).total_seconds())
+        lines.append(f"{s.name} is stuck {age} behind at record {s.last_sent_id + 1}.")
+        if s.last_error:
+            lines.append(f"  it refused that record with: {s.last_error}")
+        else:
+            lines.append("  no reason recorded — check the log for the HTTP status:")
+            lines.append(f"  journalctl -u weatherstation | grep -i {s.name}")
+    lines.append("")
+    lines.append("A cursor stops at the first record a destination refuses, to keep the")
+    lines.append("readings in order, so everything newer is queued behind that one record.")
+    lines.append("Fix the cause and the backlog drains on its own; the other destinations")
+    lines.append("are unaffected, which is why the website can look healthy throughout.")
+    return lines
+
+
+def print_uploads(cfg, cfg_path: Path | None) -> None:
+    print("uploads")
+    print()
+    db_path = _buffer_path(cfg, cfg_path)
+    if db_path is None or not db_path.exists():
+        print(f"  buffer  : not found ({db_path or 'no config'})")
+        print()
+        print("  Without the collector's SQLite buffer there is nothing to read here.")
+        return
+
+    try:
+        states, max_id, newest = _read_upload_state(db_path)
+    except sqlite3.Error as e:
+        print(f"  buffer  : unreadable — {e}")
+        return
+
+    now = datetime.now(timezone.utc)
+    print(f"  buffer  : {db_path}")
+    newest_age = f" ({_fmt_age((now - newest).total_seconds())} ago)" if newest else ""
+    print(f"  latest  : record {max_id}{newest_age}")
+    print()
+
+    if not states:
+        print("  No uploader has recorded a cursor yet — none has run against this buffer.")
+        return
+
+    print(f"  {'destination':<14}{'cursor':>8}{'behind':>9}{'oldest unsent':>16}")
+    for s in states:
+        age = "—"
+        if s.oldest_unsent is not None:
+            age = _fmt_age((now - s.oldest_unsent).total_seconds())
+        print(f"  {s.name:<14}{s.last_sent_id:>8}{s.backlog:>9}{age:>16}")
+    print()
+    for line in _upload_verdict(states, now):
+        print(f"  {line}" if line else "")
+
+
 # ------------------------------------------------------------------------------- cli
 
 
@@ -440,6 +597,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--temp", action="store_true", help="thermometer section only")
     parser.add_argument("--rain", action="store_true", help="rain gauge section only")
+    parser.add_argument("--uploads", action="store_true", help="per-destination upload health only")
     parser.add_argument(
         "--rain-watch",
         nargs="?",
@@ -462,16 +620,22 @@ def main() -> None:
     print(f"  config  : {cfg_path or 'not found'}{f' — {cfg_err}' if cfg_err else ''}")
     print()
 
-    show_temp = args.temp or not args.rain
-    show_rain = args.rain or not args.temp
-    if show_temp:
-        print_thermometers(cfg)
-    if show_temp and show_rain:
-        print()
-        print("-" * 72)
-        print()
-    if show_rain:
-        print_rain(cfg, cfg_path)
+    # No section flag means all of them; any flag means only what was asked for.
+    picked = args.temp or args.rain or args.uploads
+    sections = []
+    if args.temp or not picked:
+        sections.append(lambda: print_thermometers(cfg))
+    if args.rain or not picked:
+        sections.append(lambda: print_rain(cfg, cfg_path))
+    if args.uploads or not picked:
+        sections.append(lambda: print_uploads(cfg, cfg_path))
+
+    for i, section in enumerate(sections):
+        if i:
+            print()
+            print("-" * 72)
+            print()
+        section()
 
 
 if __name__ == "__main__":

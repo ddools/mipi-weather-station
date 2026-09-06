@@ -29,4 +29,5 @@ class SupabaseUploader(Uploader):
         ok = r.status_code in (200, 201, 409)
         if not ok:
             log.warning("supabase: HTTP %d, body=%r", r.status_code, r.text[:200])
+            self.last_error = f"HTTP {r.status_code}: {r.text[:200]}"
         return ok

@@ -120,3 +120,21 @@ def test_send_network_error_is_failure(tmp_path, monkeypatch):
 
     monkeypatch.setattr("weatherstation.upload.wowbe.requests.post", boom)
     assert WowBeUploader(_cfg(tmp_path)).send(_record()) is False
+
+
+def test_stale_record_is_dropped_not_retried(tmp_path, monkeypatch):
+    """flush() stops at the first failure, so a permanently unacceptable record
+    pins the cursor and blocks every later one -- how the Windy uploader took
+    its station offline for two days."""
+    sent = _capture(monkeypatch)
+    old = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
+    assert WowBeUploader(_cfg(tmp_path)).send(_record(recorded_at=old)) is True
+    assert sent == {}  # marked sent without a request
+
+
+def test_a_day_old_record_is_still_backfilled(tmp_path, monkeypatch):
+    """WOW-BE accepts backfill; the age bound is only a wedge backstop."""
+    sent = _capture(monkeypatch)
+    recent = (datetime.now(timezone.utc) - timedelta(hours=6)).isoformat()
+    assert WowBeUploader(_cfg(tmp_path)).send(_record(recorded_at=recent)) is True
+    assert sent["json"]["siteid"] == "12345"
