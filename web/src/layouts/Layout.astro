@@ -1,5 +1,6 @@
 ---
 import "@/styles/global.css";
+import StationLinks from "@/components/StationLinks.astro";
 
 interface Props {
   title?: string;
@@ -85,6 +86,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://weather.der
       <slot />
     </main>
     <footer class="mx-auto w-full max-w-[1400px] px-4 pb-10 text-xs text-muted-foreground sm:px-6 lg:px-8">
+      <StationLinks class="mb-6" />
       <p>
         Built by <a
           class="underline underline-offset-2 hover:text-foreground"
