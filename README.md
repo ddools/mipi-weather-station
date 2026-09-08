@@ -94,8 +94,8 @@ WS_MOCK_SENSORS=1 weatherstation
 - [x] Weather Underground upload
 - [x] Windy Stations API v2 upload
 - [x] Wind rose, gauges, dark mode
-- [x] CWOP (APRS) upload — code complete; id `GW7965` issued 2026-08-31, activation
-      in progress (send to findu → confirm with cwop-support) ([docs/cwop.md](docs/cwop.md))
+- [x] CWOP (APRS) upload — live; id `GW7965` (MADIS `G7965`), registered
+      2026-08-31 and activated 2026-09-08 ([docs/cwop.md](docs/cwop.md))
 - [x] WOW-BE (wow.meteo.be) upload — code complete; needs a registered site ([docs/wowbe.md](docs/wowbe.md))
 - [x] WOW / WOW-IE (wow.met.ie) upload — code complete; needs a site registered at
       wow.metoffice.gov.uk. Note WOW is decommissioning late 2026 ([docs/wow-ie.md](docs/wow-ie.md))

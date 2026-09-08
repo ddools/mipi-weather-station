@@ -26,20 +26,16 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27. Remaining:
   both the anemometer and rain gauge (`pi/tests/test_sampler.py`). **Remaining:**
   (1) deploy the collector to the Pi and restart the service; (2) run
   `docs/supabase-wind-spike-fix.sql` against the live project to null the bad row.
-- **CWOP uploader** — code done 2026-08-30 (`upload/cwop.py`, APRS-IS socket
-  client, 11 tests). **Id `GW7965` issued 2026-08-31** (MADIS id `G7965`, site
-  DUBLIN/IE, elevation recorded as 5 m) — the account exists but is **not
-  registered or active** until data reaches findu and we confirm by email.
-  Remaining: (1) `uploaders.cwop.{enabled: true, station_id: "GW7965"}` +
-  `station.timezone` on the Pi, restart; (2) verify at
-  <http://www.findu.com/cgi-bin/wx.cgi?call=GW7965> + <https://aprs.fi>;
-  (3) **reply to the cwop-support@noaa.gov welcome thread** — without that reply
-  nothing is activated; (4) wait for the weekly station-table build (Wednesdays,
-  cutoff Tuesday 02:00 ET — earliest appearance 2026-09-02); (5) once active, use
-  the wxqa.com form to fix the 5 m elevation (our config says 20 m). Passcode
-  stays `-1` in `.env`. Position comes from `station.latitude`/`longitude` in the
-  packets, so get those right before the first send. **90-day deadline:
-  2026-11-29.** Checklist in [docs/cwop.md](docs/cwop.md) (§5).
+- **CWOP uploader** — done. Code 2026-08-30 (`upload/cwop.py`, APRS-IS socket
+  client, 11 tests); id `GW7965` issued 2026-08-31; **site registered/activated
+  2026-09-08** (MADIS id `G7965`, DUBLIN/IE, lat/lon 53.58467/-6.13983 taken from
+  our own packets). Enabled on the Pi with passcode `-1` in `.env`. Only loose end:
+  CWOP records elevation as **5 m** where `station.elevation_m` is **20** — pick
+  the right figure and fix the other side. CWOP's copy is edited at
+  <https://madis.ncep.noaa.gov/cwop_signup.shtml> → *Existing Account Update*
+  (the old wxqa.com form is gone; email/call-sign changes still go through
+  cwop-support@noaa.gov), and edits only land on the weekly Wednesday
+  station-table build (cutoff Tuesday 02:00). See [docs/cwop.md](docs/cwop.md).
 - **WOW-BE uploader** — code done 2026-08-30 (`upload/wowbe.py`, 9 tests). JSON
   REST `POST wow.meteo.be/api/v2/send/wow`, WU-protocol fields, endpoint probed
   live (422 validation works). **Needs**: register a site at <https://wow.meteo.be>,
@@ -155,7 +151,9 @@ domain may come later).
       completeness, uptime, gap, totals (`lib/health.ts`, `StationHealth.astro`),
       **Moon** phase/illumination (`lib/moon.ts`, SunCalc port), **Pollen** —
       Open-Meteo CAMS per-species (`lib/pollen.ts`). Station-health footer still
-      hardcodes "WU + Windy live, CWOP/WOW-BE coming" — update when those verify.
+      hardcoded "WU + Windy live, CWOP/WOW-BE coming" — since superseded by
+      `StationLinks.astro` / `lib/stations.ts`, which lists CWOP (`GW7965`, live
+      2026-09-08) with its aprs.fi link.
 - [x] Range switcher via shadcn `Tabs` (24h/7d/30d) — note: all three ranges fetch
       on mount (Radix keeps inactive `TabsContent` mounted), not just the active
       one. Fine at today's volume, worth lazy-loading later.
@@ -326,7 +324,7 @@ domain may come later).
 
 ## 5. Polish (plan.MD Recommendations #5, Details/E)
 
-- [~] CWOP (APRS) uploader — **code done 2026-08-30** (`upload/cwop.py`).
+- [x] CWOP (APRS) uploader — **live 2026-09-08**; code done 2026-08-30 (`upload/cwop.py`).
       From-scratch APRS-IS client: opens a plain TCP socket to
       `cwop.aprs.net:14580`, logs in (`user <ID> pass <passcode> vers ...`), sends
       one APRS complete-weather-report packet, closes. Formatter converts to the
@@ -340,13 +338,15 @@ domain may come later).
       `uploaders.cwop` + `station.timezone` in `config.example.yaml`, passcode in
       `.env` (`CWOP_PASSCODE`, default `-1`). 11 unit tests in `tests/test_cwop.py`.
       **Id `GW7965` issued 2026-08-31** (registration submitted 2026-08-30; MADIS
-      id `G7965`, DUBLIN/IE). Not active yet: `enabled: true` +
-      `station_id: "GW7965"` + `station.timezone` on the Pi, restart, verify on
-      findu (`wx.cgi?call=GW7965`)/aprs.fi, then reply to the cwop-support@noaa.gov
-      welcome thread to confirm — CWOP only rebuilds its station table on
-      Wednesdays (cutoff Tue 02:00 ET). International ids use the `GW` prefix; the
-      uploader never inspects it. 90-day deadline 2026-11-29. Full notes:
-      [docs/cwop.md](docs/cwop.md).
+      id `G7965`, DUBLIN/IE), **site registered/activated 2026-09-08** after the
+      packets showed at findu (`wx.cgi?call=GW7965`)/aprs.fi and we replied to the
+      cwop-support@noaa.gov welcome thread. CWOP's record now carries our position
+      (53.58467/-6.13983, straight from the packets) and elevation 5 m — the one
+      thing still open, since `station.elevation_m` says 20. Later account edits go
+      through <https://madis.ncep.noaa.gov/cwop_signup.shtml> (*Existing Account
+      Update*) and only land on the weekly Wednesday build (cutoff Tue 02:00).
+      International ids use the `GW` prefix; the uploader never inspects it. Full
+      notes: [docs/cwop.md](docs/cwop.md).
 - [~] WOW-BE uploader — **code done 2026-08-30** (`upload/wowbe.py`, 9 tests).
       RMI Belgium's WOW reboot (`wow.meteo.be`) — the migration path now that the
       UK/IE WOW instances are being decommissioned. v2 is a JSON REST API

@@ -59,8 +59,8 @@ catches up and only ever sends fresh observations.
 
 ## Our station: GW7965
 
-Registered **2026-08-31** (welcome mail from cwop-support). What CWOP holds for
-the account:
+Registered 2026-08-31, **activated 2026-09-08** (second mail from cwop-support:
+"your site has been registered/activated"). What CWOP holds for the account:
 
 | field | value |
 | --- | --- |
@@ -68,47 +68,55 @@ the account:
 | MADIS id | `G7965` |
 | site | DUBLIN, IE |
 | elevation | 5 m |
-| lat/lon | *blank in CWOP's record* — set from the first packets we send |
+| lat/lon | 53.58467, -6.13983 |
 | contact | the address the signup form was submitted with |
 | passcode | `-1` (not a ham callsign) |
 
-Two things about that record:
+The lat/lon on the record is the position our own packets put on findu — CWOP
+takes the site location from the data, not from the signup form, so
+`station.latitude` / `station.longitude` in `pi/config.yaml` is what is plotted.
 
-- **The position is ours to set.** CWOP takes the site location from the packets
-  landing at findu, i.e. `station.latitude` / `station.longitude` in
-  `pi/config.yaml`. Get those right *before* the first send — the initial lat/lon
-  is what gets plotted, and fixing it afterwards is another round trip with
-  cwop-support.
-- **Elevation is recorded as 5 m**, while `station.elevation_m` in our config is
-  20. It only affects CWOP's own metadata (we send sea-level pressure, already
-  corrected on the Pi), but worth correcting once the account is active.
+**Elevation is recorded as 5 m**, while `station.elevation_m` in our config is
+20. It only affects CWOP's own metadata (we send sea-level pressure, already
+corrected on the Pi), but the two should agree — decide which figure is right for
+the site and fix the other. Changing CWOP's copy is the account form below;
+changing ours is `pi/config.yaml` plus a collector restart.
 
 International sites get a `GW####` id rather than the `CW`/`DW`/`EW` prefixes most
 CWOP documentation mentions. Nothing in the protocol treats it differently and the
 passcode is still `-1`; `upload/cwop.py` never looks at the prefix.
 
-### Activation checklist
+### Activation checklist — done
 
-The id exists but the account is **not registered or active** until data is seen at
-findu *and* we confirm by email. In order:
-
-1. [ ] Set `uploaders.cwop.{enabled,station_id}` + `station.timezone` on the Pi
-   (Setup below), restart the collector.
-2. [ ] Verify the packets are arriving:
+1. [x] `uploaders.cwop.{enabled,station_id}` + `station.timezone` set on the Pi
+   (Setup below), collector restarted.
+2. [x] Packets confirmed arriving at
    <http://www.findu.com/cgi-bin/wx.cgi?call=GW7965> (and
-   <https://aprs.fi/#!call=a%2FGW7965>). A "Sorry" page means the data is not
-   reaching findu — that is a config problem on our side, not an account problem.
-3. [ ] Reply to the cwop-support@noaa.gov welcome thread confirming findu shows
-   data. **Without this reply the account is never activated.**
-4. [ ] Wait for the weekly station-table build: **Wednesdays**, cutoff **Tuesday
-   02:00 ET**. Nothing appears in CWOP or MADIS in between. Registering on
-   2026-08-31 means the earliest possible appearance is the 2026-09-02 build, and
-   only if 1–3 are done before the cutoff.
-5. [ ] A second CWOP email confirms full activation. Only then does the wxqa.com
-   web form allow account edits (the elevation above, for one).
+   <https://aprs.fi/#!call=a%2FGW7965>). A "Sorry" page there means the data is not
+   reaching findu — a config problem on our side, not an account problem.
+3. [x] Replied to the cwop-support@noaa.gov welcome thread confirming findu had
+   data. **Without that reply the account is never activated.**
+4. [x] Weekly station-table build passed; activation mail received 2026-09-08.
+   The 90-day deadline (2026-11-29) no longer applies.
 
-**Deadline: 2026-11-29** — no data at findu within 90 days of registration and the
-id is deleted, meaning a fresh signup for a new one.
+The one thing left over is the 5 m / 20 m elevation mismatch above.
+
+### Changing the account afterwards
+
+Make any lat/lon or call-sign change on the *device* first — CWOP's record follows
+the packets.
+
+- **Email address and call sign** — no web form; email cwop-support@noaa.gov.
+- **Everything else** (lat, lon, elevation, city, state, country, zip, website,
+  webcam, name) — <https://madis.ncep.noaa.gov/cwop_signup.shtml> → *Existing
+  Account Update*. Enter the CWOP id and the registration email, click any field
+  to autofill the current record; if it does not autofill, the email is wrong.
+  Fill in the changes plus the security code (not case sensitive) and submit — a
+  rejected code is usually spurious, refresh it and retry. (This replaces the
+  older wxqa.com edit form.)
+
+Edits are not instant either: the station table is rebuilt **every Wednesday**,
+cutoff **Tuesday 02:00**, and nothing shows in CWOP or MADIS until that build.
 
 ## Setup
 
@@ -119,7 +127,7 @@ id is deleted, meaning a fresh signup for a new one.
    site is removed. If you hold an amateur radio licence, skip the form — email
    cwop-support@noaa.gov with your callsign, town, zip and elevation-in-metres and
    use the callsign as the id instead. (Ours: submitted 2026-08-30, `GW7965`
-   issued 2026-08-31 — see above.)
+   issued 2026-08-31, activated 2026-09-08 — see above.)
 2. **`pi/.env`** — leave `CWOP_PASSCODE=-1` for a CW/DW/EW/GW id. Only set a real
    [APRS-IS passcode](http://www.aprs-is.net/SendOnlyPorts.aspx) if `station_id`
    is a ham callsign.
@@ -134,8 +142,9 @@ id is deleted, meaning a fresh signup for a new one.
    ```
 4. Restart the collector. Watch `journalctl -u weatherstation -f` for
    `cwop: sent GW7965>APRS,...` lines (one per ~5 min).
-5. Check findu/aprs.fi a few minutes later, then finish the activation checklist
-   above — the packets alone do not register the account.
+5. Check findu/aprs.fi a few minutes later. For a *new* id, the packets alone do
+   not register the account — finish the activation checklist above. Ours is
+   already active.
 
 ## Gotchas
 
