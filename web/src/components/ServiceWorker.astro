@@ -1,0 +1,51 @@
+---
+/**
+ * Registers (or, in dev, tears down) the service worker in `public/sw.js`.
+ *
+ * The worker is only registered from a production build. A worker sitting in
+ * front of the dev server would serve cached build output over HMR, so `astro
+ * dev` instead unregisters anything a previous production visit on this origin
+ * left behind and drops its caches.
+ */
+---
+
+{
+  import.meta.env.PROD ? (
+    <script is:inline>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", async () => {
+          try {
+            const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+
+            // The browser only checks for a new worker on navigation and about
+            // once a day. An installed dashboard can stay open far longer than
+            // that, so re-check when it comes back to the foreground — at most
+            // once an hour.
+            let lastCheck = Date.now();
+            document.addEventListener("visibilitychange", () => {
+              if (document.visibilityState !== "visible") return;
+              if (Date.now() - lastCheck < 60 * 60 * 1000) return;
+              lastCheck = Date.now();
+              registration.update().catch(() => {});
+            });
+          } catch {
+            // An unavailable worker only costs offline support; never block the page.
+          }
+        });
+      }
+    </script>
+  ) : (
+    <script is:inline>
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          for (const registration of registrations) registration.unregister();
+        });
+        if (window.caches) {
+          caches.keys().then((names) => {
+            for (const name of names) if (name.startsWith("ws-")) caches.delete(name);
+          });
+        }
+      }
+    </script>
+  )
+}

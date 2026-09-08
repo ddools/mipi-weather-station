@@ -157,6 +157,14 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   WMO-code→Meteocons map, 30-min memo cache; a 4th Open-Meteo dependency
   alongside marine/air-quality) + sun + moon + pollen.
   Plan: `docs/dashboard-tabs.md`.
+- **Installable PWA** (2026-09-08) — `web/public/manifest.webmanifest` +
+  `web/public/sw.js` + `web/src/components/ServiceWorker.astro` (mounted from
+  `Layout.astro`) + `web/src/pages/offline.astro`. Icons in `web/public/icons/`
+  are generated from `favicon.svg` by `npm run icons` (needs `rsvg-convert`).
+  Caching is network-first for navigations and for `/api/*` + `/_server-islands/*`
+  (so an offline launch shows the last readings seen), cache-first for the
+  content-hashed `/_astro/*`, and cross-origin requests are left alone. Full
+  table in `web/README.md`.
 - **CI live** (2026-08-27) — `.github/workflows/ci.yml`: `pi` job (ruff check +
   ruff format check + pytest on Py 3.9 & 3.13) and `web` job (`npm ci` + `astro
   build`). Runs on push-to-`main` and every PR.
@@ -322,3 +330,12 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   unique index on `recorded_at` to make retries idempotent.
 - `pyproject.toml` readme must stay `pi/README.md` (setuptools can't reference
   `../README.md`).
+- **The service worker only registers from a production build.**
+  `ServiceWorker.astro` branches on `import.meta.env.PROD`; under `astro dev` it
+  renders the opposite script, which unregisters any worker left behind by a
+  production visit to the same origin and drops its `ws-*` caches — a worker in
+  front of the dev server would serve cached build output over HMR. So `astro
+  dev` can't exercise it: `astro build`, then serve `web/.vercel/output/static`.
+  Bump `CACHE_VERSION` in `web/public/sw.js` whenever the caching strategy
+  changes — it names the caches, and `activate` deletes every cache not in
+  `CURRENT_CACHES`, so editing the code without bumping it strands old entries.

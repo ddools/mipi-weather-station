@@ -1,0 +1,35 @@
+---
+/**
+ * Offline fallback, served by the service worker when a navigation fails and no
+ * copy of the requested page is cached. Prerendered and entirely self-contained
+ * — it must never need the network or Supabase to render.
+ */
+import Layout from "@/layouts/Layout.astro";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+---
+
+<!-- No title override: Layout renders it as the site header, which should stay the station name. -->
+<Layout>
+  <Card className="mx-auto max-w-md">
+    <CardHeader>
+      <CardTitle>You're offline</CardTitle>
+    </CardHeader>
+    <CardContent className="space-y-4 text-sm text-muted-foreground">
+      <p>
+        The station keeps recording either way — the Pi buffers every reading locally and uploads
+        the backlog once it's back online. This page will reload itself as soon as you have a
+        connection again.
+      </p>
+      <Button id="retry" variant="outline" size="sm">Try again</Button>
+    </CardContent>
+  </Card>
+
+  <script is:inline>
+    (function () {
+      const retry = () => location.replace("/");
+      document.getElementById("retry")?.addEventListener("click", retry);
+      window.addEventListener("online", retry);
+    })();
+  </script>
+</Layout>

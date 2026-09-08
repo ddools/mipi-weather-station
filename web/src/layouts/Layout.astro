@@ -1,6 +1,7 @@
 ---
 import "@/styles/global.css";
 import StationLinks from "@/components/StationLinks.astro";
+import ServiceWorker from "@/components/ServiceWorker.astro";
 
 interface Props {
   title?: string;
@@ -19,6 +20,13 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://weather.der
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="alternate icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" sizes="180x180" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#eceff4" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#2b303b" media="(prefers-color-scheme: dark)" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Skerries Wx" />
     <link rel="canonical" href={canonical.href} />
     <title>{title}</title>
     <meta name="description" content={description} />
@@ -40,6 +48,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://weather.der
         }
       })();
     </script>
+    <ServiceWorker />
   </head>
   <body class="flex min-h-screen flex-col bg-background text-foreground">
     <header class="mx-auto flex w-full max-w-[1400px] items-start justify-between gap-4 px-4 py-6 sm:px-6 lg:px-8">

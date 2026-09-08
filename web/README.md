@@ -87,3 +87,43 @@ The tab bar carries a per-tab inline icon (activity / line-chart / calendar) and
 | `lib/pollen.ts` | air-quality-api (CAMS pollen) | Pollen |
 | `lib/forecast.ts` | forecast (`/v1/forecast` daily) | 5-day forecast — 30-min in-memory cache |
 | `lib/forecast.ts:getCurrentSky` | forecast (`/v1/forecast` `current`) | Now-tab hero sky icon + condition — 15-min in-memory cache |
+
+## PWA (added 2026-09-08)
+
+The dashboard is installable and works offline. Four pieces:
+
+| File | Role |
+|------|------|
+| `public/manifest.webmanifest` | Name, `display: standalone`, `start_url: /`, theme/background colours, icon set |
+| `public/icons/` | 192/512 `any` + 192/512 `maskable` + a 180px `apple-touch-icon`, all generated from `public/favicon.svg` (dark-slate ground, light windmill, so one icon reads on any home screen) |
+| `public/sw.js` | The service worker — caching only, no push or background sync |
+| `src/components/ServiceWorker.astro` | Registration, mounted from `Layout.astro` |
+| `src/pages/offline.astro` | Prerendered fallback the worker serves when a navigation fails and nothing is cached |
+
+**Caching strategy**, by request kind:
+
+| Kind | Strategy | Why |
+|------|----------|-----|
+| Navigations | network-first → last page seen → `/offline` | The dashboard must never show a stale page while online |
+| `/api/*`, `/_server-islands/*` | network-first → last good response | An offline launch still shows the last readings it saw |
+| `/_astro/*` | cache-first | Filenames are content-hashed, so they're immutable |
+| Other same-origin static | stale-while-revalidate | Icons, favicons, manifest |
+| Cross-origin | not intercepted | Open-Meteo, RainViewer frames, Esri basemap tiles — caching third-party tiles would bloat storage for no gain |
+
+Two things to know before editing it:
+
+- **The worker only registers from a production build.** `ServiceWorker.astro`
+  branches on `import.meta.env.PROD`; under `astro dev` it renders the opposite
+  script, which unregisters any worker a previous production visit on the same
+  origin left behind and drops its `ws-*` caches. A worker in front of the dev
+  server would serve cached build output over HMR. To exercise it locally, run
+  `astro build` and serve `.vercel/output/static`.
+- **Bump `CACHE_VERSION` in `public/sw.js` whenever the strategy changes.** It
+  names the caches, and `activate` deletes every cache not in `CURRENT_CACHES`.
+  Changing the code without bumping it leaves the old entries in place.
+
+Regenerate the icons after changing `public/favicon.svg`:
+
+```bash
+npm run icons   # needs rsvg-convert (brew install librsvg)
+```

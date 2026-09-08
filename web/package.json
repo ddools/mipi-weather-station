@@ -10,7 +10,8 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "verify:tides": "node scripts/verify-tides.mjs"
+    "verify:tides": "node scripts/verify-tides.mjs",
+    "icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
     "@astrojs/react": "^6.0.4",
