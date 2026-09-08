@@ -26,12 +26,18 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27. Remaining:
   both the anemometer and rain gauge (`pi/tests/test_sampler.py`). **Remaining:**
   (1) deploy the collector to the Pi and restart the service; (2) run
   `docs/supabase-wind-spike-fix.sql` against the live project to null the bad row.
+- **Station elevation is 16 m** (confirmed 2026-09-08), corrected in
+  `config.example.yaml`. **Remaining:** set `station.elevation_m: 16` in the Pi's
+  own `pi/config.yaml` (gitignored, was 20) and restart the collector —
+  sea-level pressure is derived from it (`core/units.sea_level_pressure_hpa`),
+  so every network we upload to sees the change. CWOP's account record separately
+  says 5 m; fix that on their form (see the CWOP item below).
 - **CWOP uploader** — done. Code 2026-08-30 (`upload/cwop.py`, APRS-IS socket
   client, 11 tests); id `GW7965` issued 2026-08-31; **site registered/activated
   2026-09-08** (MADIS id `G7965`, DUBLIN/IE, lat/lon 53.58467/-6.13983 taken from
   our own packets). Enabled on the Pi with passcode `-1` in `.env`. Only loose end:
-  CWOP records elevation as **5 m** where `station.elevation_m` is **20** — pick
-  the right figure and fix the other side. CWOP's copy is edited at
+  CWOP records elevation as **5 m**; the site is **16 m** (now
+  `station.elevation_m` everywhere) — fix CWOP's copy. It is edited at
   <https://madis.ncep.noaa.gov/cwop_signup.shtml> → *Existing Account Update*
   (the old wxqa.com form is gone; email/call-sign changes still go through
   cwop-support@noaa.gov), and edits only land on the weekly Wednesday
@@ -342,7 +348,7 @@ domain may come later).
       packets showed at findu (`wx.cgi?call=GW7965`)/aprs.fi and we replied to the
       cwop-support@noaa.gov welcome thread. CWOP's record now carries our position
       (53.58467/-6.13983, straight from the packets) and elevation 5 m — the one
-      thing still open, since `station.elevation_m` says 20. Later account edits go
+      thing still open, since the site is 16 m. Later account edits go
       through <https://madis.ncep.noaa.gov/cwop_signup.shtml> (*Existing Account
       Update*) and only land on the weekly Wednesday build (cutoff Tue 02:00).
       International ids use the `GW` prefix; the uploader never inspects it. Full

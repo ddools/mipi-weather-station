@@ -174,8 +174,8 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   uploader passes the id through verbatim). **Live**: registered and activated
   2026-09-08 after the packets showed at findu and we replied to
   cwop-support@noaa.gov. Passcode `-1` (in `.env` as `CWOP_PASSCODE`). Account
-  details, the account-edit form and the open 5 m / 20 m elevation mismatch are in
-  [docs/cwop.md](docs/cwop.md).
+  details, the account-edit form and the open elevation fix (CWOP's record says
+  5 m; the site is 16 m) are in [docs/cwop.md](docs/cwop.md).
 - **WOW-BE uploader written** (2026-08-30, `upload/wowbe.py` + `tests/test_wowbe.py`,
   9 tests) — JSON REST `POST wow.meteo.be/api/v2/send/wow`, WU-protocol field set,
   Site ID + `WOWBE_AUTH_KEY` (PIN). Shares rain-accumulation code with CWOP in

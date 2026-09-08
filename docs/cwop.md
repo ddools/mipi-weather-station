@@ -67,7 +67,7 @@ Registered 2026-08-31, **activated 2026-09-08** (second mail from cwop-support:
 | CWOP id (APRS callsign) | `GW7965` |
 | MADIS id | `G7965` |
 | site | DUBLIN, IE |
-| elevation | 5 m |
+| elevation | 5 m — **wrong**, the site is at 16 m (see below) |
 | lat/lon | 53.58467, -6.13983 |
 | contact | the address the signup form was submitted with |
 | passcode | `-1` (not a ham callsign) |
@@ -76,11 +76,11 @@ The lat/lon on the record is the position our own packets put on findu — CWOP
 takes the site location from the data, not from the signup form, so
 `station.latitude` / `station.longitude` in `pi/config.yaml` is what is plotted.
 
-**Elevation is recorded as 5 m**, while `station.elevation_m` in our config is
-20. It only affects CWOP's own metadata (we send sea-level pressure, already
-corrected on the Pi), but the two should agree — decide which figure is right for
-the site and fix the other. Changing CWOP's copy is the account form below;
-changing ours is `pi/config.yaml` plus a collector restart.
+**The site is 16 m above sea level.** That is what `station.elevation_m` is set
+to (and what the sea-level pressure we upload is corrected for), but CWOP's own
+record still says 5 m — a leftover from the signup form. It only affects CWOP's
+metadata, since the pressure is already corrected on the Pi, but the two should
+agree: fix CWOP's copy with the account form below.
 
 International sites get a `GW####` id rather than the `CW`/`DW`/`EW` prefixes most
 CWOP documentation mentions. Nothing in the protocol treats it differently and the
@@ -99,7 +99,8 @@ passcode is still `-1`; `upload/cwop.py` never looks at the prefix.
 4. [x] Weekly station-table build passed; activation mail received 2026-09-08.
    The 90-day deadline (2026-11-29) no longer applies.
 
-The one thing left over is the 5 m / 20 m elevation mismatch above.
+The one thing left over is CWOP's 5 m elevation, which should be 16 m — the
+account form below.
 
 ### Changing the account afterwards
 
