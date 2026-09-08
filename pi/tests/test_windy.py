@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from weatherstation.config import Config
 from weatherstation.core.records import Record
 from weatherstation.store import LocalBuffer
@@ -19,6 +21,7 @@ class FakeResponse:
 def _cfg(tmp_path):
     return Config(
         {
+            "station": {"timezone": "Europe/Dublin"},
             "storage": {"sqlite_path": str(tmp_path / "w.sqlite3")},
             "uploaders": {"windy": {"enabled": True, "station_id": "C9fexco"}},
             "env": {"windy_station_password": "sekrit"},
@@ -135,3 +138,19 @@ def test_flush_advances_past_a_stale_backlog(tmp_path, monkeypatch):
     assert buffer.pending("windy") == []  # nothing left wedged
     assert sent["params"]["time"] == fresh.recorded_at  # the fresh one went out
     assert sent["params"]["winddir"] == 22
+
+
+def test_precip_is_an_hourly_accumulation_not_the_interval(tmp_path, monkeypatch):
+    """Windy's precipitation params are all "over the past hour", so `precip`
+    is summed from the buffer -- not the record's own single-interval rain_mm."""
+    buf = LocalBuffer(tmp_path / "w.sqlite3")
+    now = datetime.now(timezone.utc)
+    for mins in (5, 30, 90):  # two inside the hour, one outside
+        rec = Record(rain_mm=0.5)
+        rec.recorded_at = (now - timedelta(minutes=mins)).isoformat()
+        buf.append(rec)
+
+    sent = _capture(monkeypatch)
+    WindyUploader(_cfg(tmp_path)).send(_record(rain_mm=0.0))
+
+    assert sent["params"]["precip"] == pytest.approx(1.0)

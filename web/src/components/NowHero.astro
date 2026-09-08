@@ -239,7 +239,7 @@ const stats = [
       updated.textContent = `Last updated ${fmtAbsolute(iso)}`;
     }
 
-    async function refreshCurrent() {
+    const refreshCurrent = async () => {
       try {
         const res = await fetch("/api/current");
         if (!res.ok) return;
@@ -263,9 +263,9 @@ const stats = [
       } catch {
         /* next interval retries */
       }
-    }
+    };
 
-    async function refreshSummary() {
+    const refreshSummary = async () => {
       try {
         const res = await fetch("/api/summary");
         if (!res.ok) return;
@@ -276,7 +276,7 @@ const stats = [
       } catch {
         /* next interval retries */
       }
-    }
+    };
 
     updateStatus(root.dataset.recordedAt || undefined);
     refreshCurrent();

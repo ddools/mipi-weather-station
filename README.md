@@ -4,7 +4,21 @@ Open-source software for the **Oracle Raspberry Pi Weather Station** kit — a f
 build in Dublin, Ireland. Rewritten from scratch to replace the (now defunct) official
 Oracle/Raspberry Pi Foundation stack.
 
-Live at: **a standalone domain (TBD — not yet registered)**
+Live at **[weather.dermotdooley.com](https://weather.dermotdooley.com)** (a dedicated
+domain may follow).
+
+## Screenshots
+
+| Dashboard — "Now in detail" | History — 24h / 7d / 30d |
+|---|---|
+| [![Live dashboard](docs/screenshots/dashboard-light.png)](https://weather.dermotdooley.com) | [![History charts in dark mode](docs/screenshots/dashboard-history-dark.png)](https://weather.dermotdooley.com/#history) |
+
+<p align="center">
+  <img src="docs/screenshots/dashboard-mobile.png" alt="The dashboard on a phone" width="320">
+</p>
+
+Real readings from the station in Skerries, Co. Dublin — the hero updates every 45s,
+and a new reading reaches the site about 5s after the Pi records it.
 
 ## What it does
 
@@ -90,7 +104,8 @@ WS_MOCK_SENSORS=1 weatherstation
 - [x] Repo scaffold, package structure
 - [x] Sensor bring-up & calibration (air sensor → wind → rain → vane)
 - [x] SQLite buffer + Supabase uploader (store-and-forward)
-- [x] Astro site (own domain TBD, shadcn/ui): server-island live panel + history charts
+- [x] Astro site on Vercel (shadcn/ui): server-island live panel + history charts —
+      live at [weather.dermotdooley.com](https://weather.dermotdooley.com)
 - [x] Weather Underground upload
 - [x] Windy Stations API v2 upload
 - [x] Wind rose, gauges, dark mode

@@ -33,6 +33,7 @@ from datetime import datetime, timezone
 
 import requests
 
+from ._rain import rain_hour_and_day
 from .base import Uploader
 
 log = logging.getLogger(__name__)
@@ -44,12 +45,12 @@ _MIN_INTERVAL_S = 300  # Windy rejects more frequent updates per station
 _MAX_AGE_S = 6900  # 1h55m
 
 
-def _age_s(recorded_at: str) -> float:
-    """Seconds between `recorded_at` and now. Naive timestamps are read as UTC."""
+def _parse_utc(recorded_at: str) -> datetime:
+    """`recorded_at` as an aware UTC datetime. Naive timestamps are read as UTC."""
     dt = datetime.fromisoformat(recorded_at.replace("Z", "+00:00"))
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
-    return (datetime.now(timezone.utc) - dt).total_seconds()
+    return dt.astimezone(timezone.utc)
 
 
 class WindyUploader(Uploader):
@@ -58,6 +59,8 @@ class WindyUploader(Uploader):
     def __init__(self, cfg) -> None:
         self._password = cfg.env.windy_station_password
         self._station = cfg.uploaders.windy.station_id
+        self._tz = cfg.station.get("timezone", "UTC")
+        self._sqlite_path = str(cfg.storage.sqlite_path)
         # -inf, not 0.0: time.monotonic() counts from boot, so 0.0 would make
         # every record in the first 5 minutes after a reboot look like it fell
         # inside the rate-limit window and get skipped.
@@ -68,7 +71,8 @@ class WindyUploader(Uploader):
         if now - self._last_sent_at < _MIN_INTERVAL_S:
             return True  # within Windy's 5-minute window — skip, not a failure
 
-        if _age_s(record["recorded_at"]) > _MAX_AGE_S:
+        dt = _parse_utc(record["recorded_at"])
+        if (datetime.now(timezone.utc) - dt).total_seconds() > _MAX_AGE_S:
             # Windy will refuse it for age; retrying would block every fresher
             # record behind it forever. Drop it and let the cursor advance.
             log.warning(
@@ -95,8 +99,10 @@ class WindyUploader(Uploader):
             params["gust"] = record["wind_gust_ms"]
         if record.get("wind_dir_deg") is not None:
             params["winddir"] = round(record["wind_dir_deg"])  # Windy requires an integer
-        if record.get("rain_mm") is not None:
-            params["precip"] = record["rain_mm"]
+        # NOT record["rain_mm"], which is only this interval's rain: Windy's
+        # precipitation params are all "over the past hour", so this is summed
+        # from the buffer like every other destination's rain field.
+        params["precip"] = round(rain_hour_and_day(self._sqlite_path, self._tz, dt)[0], 3)
         if record.get("dewpoint_c") is not None:
             params["dewpoint"] = record["dewpoint_c"]
 

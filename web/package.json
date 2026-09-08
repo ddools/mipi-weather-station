@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
+    "check": "astro check",
     "preview": "astro preview",
     "astro": "astro",
     "verify:tides": "node scripts/verify-tides.mjs",
@@ -39,6 +40,8 @@
     "esbuild": true
   },
   "devDependencies": {
-    "@types/leaflet": "^1.9.22"
+    "@astrojs/check": "^0.9.10",
+    "@types/leaflet": "^1.9.22",
+    "typescript": "^6.0.3"
   }
 }
