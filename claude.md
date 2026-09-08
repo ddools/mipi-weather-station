@@ -302,6 +302,14 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   corrected in `AirSensor` when the probe is active.
 - WU wants **imperial** (°F, inHg, mph, inches) and UTC `dateutc`; response body must
   contain "success".
+- **A record's `rain_mm` is never what a destination wants.** It is the rain in
+  that one 60s archive interval; every upload field (`rainin`, `dailyrainin`,
+  Windy `precip`, CWOP `r`/`p`/`P`) is an accumulation over a window, so it must
+  be summed out of the SQLite buffer via `upload/_rain.py`. WU and Windy sent the
+  raw interval value until 2026-09-08 and under-reported rain ~60x, silently —
+  no failed upload, no stuck cursor, nothing in the doctor. Anchor the window on
+  the **record's** timestamp, not `now` (backfill), and always send the fields,
+  zeros included. See [docs/uploads.md](docs/uploads.md).
 - Windy upload pressure is **Pa**, not hPa.
 - **`wow.met.ie` is not an upload endpoint.** It answers `GET /automaticreading`
   with HTTP 200 and the site's HTML shell — point a station at it and you upload

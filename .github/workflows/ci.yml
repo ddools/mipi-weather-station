@@ -44,7 +44,7 @@ jobs:
           WS_MOCK_SENSORS: "1"
 
   web:
-    name: web dashboard (astro build)
+    name: web dashboard (astro check + build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -60,6 +60,9 @@ jobs:
 
       - name: Install
         run: npm ci
+
+      - name: Typecheck
+        run: npm run check
 
       - name: Build
         run: npm run build

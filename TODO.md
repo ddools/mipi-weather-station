@@ -15,7 +15,22 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27. Remaining:
   current, no gaps since the last stable restart. Still outstanding: a deliberate
   network-partition (unplug) test, and a genuine 24h *uninterrupted* run — yesterday's
   clean-run clock restarted at 2026-08-27 21:46 BST after a deploy-session restart storm.
-- **Benchmarks** — live value updates within 60s of a new reading; mobile Lighthouse ≥ 90 (§2).
+- ~~**Benchmarks**~~ — **both passed**, measured 2026-09-08 (§2).
+  *Live-update latency:* a new reading is visible on `/api/current` **1.7–7.1 s**
+  after the Pi records it (six consecutive readings sampled against production);
+  the page polls every 45 s, so worst case is ~50 s, inside the 60 s target.
+  *Lighthouse:* the first run against production scored **mobile 84 / desktop 92**.
+  After the PR #23 fixes, the preview deploy scores **mobile 96** — LCP 3.9 s →
+  **2.6 s**, CLS 0.119 → **0**, unused JS 338 KB → 28 KB, a11y 97,
+  best-practices 100. The LCP win was indirect: 386 KB of ECharts no longer
+  competes with the hero's sky icon for bandwidth, so the icon lands a second
+  earlier even though it still waits on the `server:defer` island to resolve
+  Supabase and Open-Meteo. That structural wait is the remaining headroom if the
+  score ever needs to go higher (drop the defer, or inline the icon — note
+  Meteocons' SVGs share `id`s, so inlining several on one page risks `<defs>`
+  collisions). **Re-measure against production after merge**: the preview's SEO
+  reads 66 only because Vercel serves previews with `x-robots-tag: noindex`;
+  production has no such header and scored 100.
 - **Wind spike fix — deploy + data repair.** The station published a 70.6 m/s
   (254 km/h) gust at 2026-09-01T12:29:10Z. Cause: the sampler divided each pulse
   count by the nominal sample window rather than real elapsed time, and uploads
@@ -23,9 +38,13 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27. Remaining:
   (the record was preceded by a 185.4 s gap against a 66.2 s median — the only
   gap over 90 s in 1,299 rows). Collector fixed: real elapsed timing, uploads on
   a background thread, a 55 m/s plausibility ceiling, and reed-switch debounce on
-  both the anemometer and rain gauge (`pi/tests/test_sampler.py`). **Remaining:**
-  (1) deploy the collector to the Pi and restart the service; (2) run
-  `docs/supabase-wind-spike-fix.sql` against the live project to null the bad row.
+  both the anemometer and rain gauge (`pi/tests/test_sampler.py`).
+  **Data repair done** — verified 2026-09-08: row 3507 (2026-09-01T12:29:10Z) now
+  holds `wind_speed_ms: null, wind_gust_ms: null`, and no gust above 8.6 m/s
+  appears in the last 1,000 rows. **Remaining:** confirm the fixed collector is
+  actually deployed on the Pi. Circumstantial evidence says yes (a 65 s median
+  archive interval with no gap over 90 s in the last 1,000 records), but that is
+  not proof — check the running code and the service restart time on the Pi.
 - **Station elevation is 16 m** (confirmed 2026-09-08), corrected in
   `config.example.yaml`. **Remaining:** set `station.elevation_m: 16` in the Pi's
   own `pi/config.yaml` (gitignored, was 20) and restart the collector —
@@ -54,9 +73,15 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27. Remaining:
   6-digit PIN in `.env` as `WOW_AUTH_KEY`, set `uploaders.wow.{enabled,station_id}`
   + `station.timezone` on the Pi. **Time-boxed: WOW is decommissioning late 2026**,
   so do it soon or not at all. See [docs/wow-ie.md](docs/wow-ie.md) (§5).
-- **Supabase retention job** — SQL written (`docs/supabase-retention.sql`), not yet
-  run against the live project; repoint the 7d/30d queries at `readings_hourly` after (§5).
-- **README screenshots** of the live dashboard (§5).
+- **Supabase retention job** — SQL written (`docs/supabase-retention.sql`), still
+  not run: confirmed 2026-09-08 by REST (`/rest/v1/readings_hourly` → 404,
+  `PGRST205`). 13,140 rows since 2026-08-27, ~1,100/day, so the free tier is not
+  at risk yet — but this is what the 7d/30d chart queries are waiting on, and
+  `getHistory` currently pages up to 20k raw rows per request. Repoint those
+  queries at `readings_hourly` once it exists (§5).
+- ~~**README screenshots**~~ — done 2026-09-08. `docs/screenshots/` holds desktop
+  light, History-in-dark, and a phone shot, all captured from production; the
+  README leads with them and no longer claims the domain is undecided.
 - **TGS2600 air quality** — collector + dashboard support built (2026-08-27, §5);
   **enabled and flowing** as of 2026-08-28 (`sensors.air_quality.enabled: true` on
   the Pi, `air_quality` values landing in Supabase — schema column is live). Still
@@ -239,7 +264,10 @@ domain may come later).
       daylight-progress bar with a sun marker, day length + delta vs yesterday.
       Sits in the left column of the live panel above Rain/Air quality; verified
       light + dark via headless screenshot.
-- [ ] Benchmark: live value updates within 60s of a new reading; mobile Lighthouse ≥ 90
+- [x] Benchmark: **both passed**. Live updates 1.7–7.1 s to `/api/current` plus a
+      45 s poll, inside the 60 s target. Lighthouse **mobile 96** on the PR #23
+      preview (up from 84 on production: LCP 3.9 → 2.6 s, CLS 0.119 → 0).
+      Full detail in "Still open" at the top.
 
 ## 3. Weather Underground upload (plan.MD Details/D)
 
@@ -324,9 +352,13 @@ domain may come later).
       never exposed to the Windy bug, but it was the one live uploader that
       would retry a rejected record forever. Bound is 24h: it accepts backfill,
       so this is only a wedge backstop, not an API limit.
-- [ ] `wunderground` still has no staleness guard. Lower risk (WU accepts old
-      `dateutc` and we have never seen it reject one), but it is the last live
-      uploader that can wedge permanently — see the table in `docs/uploads.md`.
+- [x] `wunderground` staleness guard — **done 2026-09-08**. It was the last live
+      uploader that could wedge permanently. Drops records older than 24h, the
+      same bound as `wowbe` (WU accepts a backdated `dateutc`, so this is a wedge
+      backstop, not an API limit). `dateutc` now goes through `datetime` rather
+      than string surgery, which also fixes a latent non-UTC-offset bug. WU had
+      no tests at all; it now has 12 (`tests/test_wunderground.py`). Every live
+      uploader now has a bound — see the table in `docs/uploads.md`.
 
 ## 5. Polish (plan.MD Recommendations #5, Details/E)
 
@@ -420,7 +452,9 @@ domain may come later).
       ground-temp field. The onboard BMP085/HTU21D self-heat ~10 °C next to the
       Pi, so the probe on its lead is the real air thermometer. See
       [docs/sensors.md](docs/sensors.md) "DS18B20".
-- [ ] README screenshots of the live dashboard once it exists
+- [x] README screenshots — done 2026-09-08, captured from production with a
+      headless browser into `docs/screenshots/` (desktop light, History in dark,
+      phone). Regenerate them the same way after any visual change.
 - [~] TGS2600 air quality sensor (MCP342X @ `0x6A`, channel 0) — **code done**
       (2026-08-27). `i2cdetect` confirms the ADC at `0x6a` is present and
       unclaimed. `sensors/air_quality.py` ports the Foundation kit's relative
