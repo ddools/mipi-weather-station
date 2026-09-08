@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 import requests
 
 from ..core import units
+from ._rain import rain_hour_and_day
 from .base import Uploader
 
 log = logging.getLogger(__name__)
@@ -35,6 +36,8 @@ class WundergroundUploader(Uploader):
     def __init__(self, cfg) -> None:
         self._id = cfg.uploaders.wunderground.station_id
         self._key = cfg.env.wu_key
+        self._tz = cfg.station.get("timezone", "UTC")
+        self._sqlite_path = str(cfg.storage.sqlite_path)
 
     def send(self, record: dict) -> bool:
         dt = datetime.fromisoformat(record["recorded_at"].replace("Z", "+00:00"))
@@ -70,8 +73,14 @@ class WundergroundUploader(Uploader):
             params["windgustmph"] = round(units.ms_to_mph(record["wind_gust_ms"]), 1)
         if record.get("wind_dir_deg") is not None:
             params["winddir"] = round(record["wind_dir_deg"])
-        if record.get("rain_mm") is not None:
-            params["rainin"] = round(units.mm_to_in(record["rain_mm"]), 3)
+        # NOT record["rain_mm"], which is only this interval's rain: WU defines
+        # `rainin` as the accumulation over the past 60 minutes and `dailyrainin`
+        # as the total since local midnight. Both are summed from the buffer, and
+        # both are always sent -- a dry hour is a real 0.0, and omitting
+        # `dailyrainin` leaves WU with no daily accumulation to plot at all.
+        rain_1h_mm, rain_today_mm = rain_hour_and_day(self._sqlite_path, self._tz, dt)
+        params["rainin"] = round(units.mm_to_in(rain_1h_mm), 3)
+        params["dailyrainin"] = round(units.mm_to_in(rain_today_mm), 3)
         if record.get("dewpoint_c") is not None:
             params["dewptf"] = round(units.c_to_f(record["dewpoint_c"]), 1)
 

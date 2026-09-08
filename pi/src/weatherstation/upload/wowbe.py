@@ -32,12 +32,12 @@ API reference: https://wow.meteo.be/docs/api/
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import requests
 
 from ..core import units
-from ._rain import local_midnight_utc, sum_rain_since
+from ._rain import rain_hour_and_day
 from .base import Uploader
 
 log = logging.getLogger(__name__)
@@ -76,11 +76,7 @@ class WowBeUploader(Uploader):
             )
             return True
 
-        rain_1h_mm, rain_today_mm = sum_rain_since(
-            self._sqlite_path,
-            (now_utc - timedelta(hours=1)).isoformat(),
-            local_midnight_utc(self._tz, now_utc).isoformat(),
-        )
+        rain_1h_mm, rain_today_mm = rain_hour_and_day(self._sqlite_path, self._tz, dt)
 
         body = {
             "siteid": self._site_id,

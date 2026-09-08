@@ -92,3 +92,45 @@ if _age_s(record["recorded_at"]) > _MAX_AGE_S:
 Validate fields against what the API actually accepts, too — `winddir` must be
 `round()`ed for every WU-protocol destination. That is the bug that started all
 of this.
+
+## Rain is an accumulation, and never the record's own field
+
+A silent wrongness of a different shape: the upload never fails, the cursor
+never sticks, the doctor stays green — the numbers are just quietly too small.
+
+Every destination asks for rain as a **total over a window**:
+
+| Field | Destination | Window |
+|---|---|---|
+| `rainin` | WU, Windy (`precip`), WOW, WOW-BE | last 60 minutes |
+| `dailyrainin` | WU, WOW, WOW-BE | since local midnight |
+| `r` / `p` / `P` | CWOP | last hour / last 24 h / since local midnight |
+
+But an archive record's `rain_mm` is only the rain that fell during its own
+60-second interval. Sending it as `rainin` reports roughly **a sixtieth** of the
+real hourly total: a bucket tip shows up as 0.011 in for the one minute it
+happened and 0.000 for the other fifty-nine. The Weather Underground and Windy
+uploaders did exactly that until 2026-09-08, and WU was never sent `dailyrainin`
+at all, so it had no daily accumulation to plot.
+
+The totals come from `upload/_rain.py`, which sums `rain_mm` straight out of the
+SQLite buffer — the source of truth, so the figures survive an uploader restart
+with no in-memory accumulator to lose:
+
+```python
+rain_1h_mm, rain_today_mm = rain_hour_and_day(self._sqlite_path, self._tz, dt)
+```
+
+Two rules that are easy to get wrong:
+
+- **Anchor the window on the record, not on `now`.** `dt`, not
+  `datetime.now()`. For a live reading they are the same, but a backlog
+  replayed after an outage would otherwise stamp *this* hour's rain onto an
+  hours-old observation — which matters for the destinations that accept
+  backfill (`wunderground`, `wowbe`).
+- **Bound the window at both ends.** `sum_rain_since` takes `until_iso` as a
+  required keyword for that reason: anchored at an old record, an open-ended
+  `recorded_at >= ?` would sweep in every drop that fell *after* it.
+
+Always send the rain fields, including zeros. A dry hour is a real 0.0, and it
+is what tells the destination the gauge is alive rather than absent.

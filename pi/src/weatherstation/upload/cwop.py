@@ -158,8 +158,8 @@ class CWOPUploader(Uploader):
         dt = datetime.fromisoformat(record["recorded_at"].replace("Z", "+00:00"))
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
-        now_utc = datetime.now(timezone.utc)
-        if (now_utc - dt).total_seconds() > _MAX_AGE_S:
+        dt = dt.astimezone(timezone.utc)
+        if (datetime.now(timezone.utc) - dt).total_seconds() > _MAX_AGE_S:
             return True  # too stale for a realtime network -- drop it, mark sent
 
         if all(
@@ -168,20 +168,21 @@ class CWOPUploader(Uploader):
         ):
             return True  # nothing worth reporting
 
-        r1, r24, rmid = self._rain_windows(now_utc)
+        r1, r24, rmid = self._rain_windows(dt)
         packet = format_packet(self._callsign, self._lat, self._lon, record, r1, r24, rmid)
         ok = self._transmit(packet)
         if ok:
             self._last_sent_at = now
         return ok
 
-    def _rain_windows(self, now_utc: datetime) -> tuple[float, float, float]:
-        """(last hour, last 24 h, since local midnight) rain totals in mm."""
+    def _rain_windows(self, at: datetime) -> tuple[float, float, float]:
+        """(last hour, last 24 h, since local midnight) rain totals in mm, as of `at`."""
         r1, r24, rmid = sum_rain_since(
             self._sqlite_path,
-            (now_utc - timedelta(hours=1)).isoformat(),
-            (now_utc - timedelta(hours=24)).isoformat(),
-            local_midnight_utc(self._tz, now_utc).isoformat(),
+            (at - timedelta(hours=1)).isoformat(),
+            (at - timedelta(hours=24)).isoformat(),
+            local_midnight_utc(self._tz, at).isoformat(),
+            until_iso=at.isoformat(),
         )
         return r1, r24, rmid
 
