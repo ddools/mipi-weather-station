@@ -74,8 +74,9 @@ Every destination needs an escape hatch for a record it will never accept:
 |---|---|---|
 | `cwop` | 10 min | realtime-only network, backfill is meaningless |
 | `windy` | 1h55m | tracks Windy's documented 2h `time` limit |
+| `wow` | 1h | opaque 400s; the 5-min throttle means backfill is thin anyway |
 | `wowbe` | 24h | accepts backfill; purely a wedge backstop |
-| `wunderground` | — | none yet |
+| `wunderground` | 24h | accepts backfill; purely a wedge backstop |
 | `supabase` | — | none needed; it is the archive, backfill is the point |
 
 The rule: **if a destination can reject a record permanently, dropping it must

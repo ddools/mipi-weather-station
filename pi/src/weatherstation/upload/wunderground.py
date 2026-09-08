@@ -1,8 +1,20 @@
-"""Weather Underground PWS upload (imperial units, GET updateweatherstation.php)."""
+"""Weather Underground PWS upload (imperial units, GET updateweatherstation.php).
+
+WU accepts a backdated ``dateutc``, so a backlog replayed after an outage lands
+as real history rather than being refused -- and it has never rejected an
+over-age record of ours. `_MAX_AGE_S` is therefore not an API limit but the
+escape hatch every uploader needs: `upload/base.py:flush()` stops at the first
+record a destination refuses, so one permanently unacceptable record pins the
+cursor and blocks every fresher reading behind it, silently and indefinitely.
+That is how Windy took the station offline for two days (see upload/windy.py and
+docs/uploads.md). Dropping past the bound guarantees the cursor keeps moving;
+the SQLite buffer and Supabase remain the complete record either way.
+"""
 
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 
 import requests
 
@@ -12,6 +24,9 @@ from .base import Uploader
 log = logging.getLogger(__name__)
 
 _URL = "https://weatherstation.wunderground.com/weatherstation/updateweatherstation.php"
+# A day, matching `wowbe.py`: both accept backfill, so the bound is a wedge
+# backstop rather than a mirror of a documented server rule.
+_MAX_AGE_S = 86400
 
 
 class WundergroundUploader(Uploader):
@@ -22,11 +37,26 @@ class WundergroundUploader(Uploader):
         self._key = cfg.env.wu_key
 
     def send(self, record: dict) -> bool:
+        dt = datetime.fromisoformat(record["recorded_at"].replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.astimezone(timezone.utc)
+
+        if (datetime.now(timezone.utc) - dt).total_seconds() > _MAX_AGE_S:
+            # Retrying would block every fresher record behind it. Drop it and
+            # let the cursor advance.
+            log.warning(
+                "wunderground: dropping record older than %ds (%s)",
+                _MAX_AGE_S,
+                record["recorded_at"],
+            )
+            return True
+
         params = {
             "ID": self._id,
             "PASSWORD": self._key,
             "action": "updateraw",
-            "dateutc": record["recorded_at"].replace("T", " ").split("+")[0],
+            "dateutc": dt.strftime("%Y-%m-%d %H:%M:%S"),
         }
         if record.get("temp_c") is not None:
             params["tempf"] = round(units.c_to_f(record["temp_c"]), 1)
