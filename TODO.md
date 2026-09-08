@@ -15,20 +15,22 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27. Remaining:
   current, no gaps since the last stable restart. Still outstanding: a deliberate
   network-partition (unplug) test, and a genuine 24h *uninterrupted* run — yesterday's
   clean-run clock restarted at 2026-08-27 21:46 BST after a deploy-session restart storm.
-- **Benchmarks** — both measured 2026-09-08 (§2). *Live-update latency: **passed**.*
-  A new reading is visible on `/api/current` **1.7–7.1 s** after the Pi records it
-  (six consecutive readings sampled against production); the page polls every 45 s,
-  so worst case is ~50 s, inside the 60 s target. *Lighthouse: **not yet passed**.*
-  First run against production scored **mobile 84 / desktop 92** (a11y 97,
-  best-practices 100, SEO 100). Two of the three causes are fixed and awaiting
-  deploy — 386 KB of ECharts no longer loads on every visit, and CLS 0.119 → 0
-  (the `NowHero` skeleton reserved 224 px against a 408 px hero, shoving the whole
-  dashboard down). The remaining gap is **LCP 3.9 s**: the LCP element is the
-  hero's sky icon, which cannot begin downloading until the `server:defer` island
-  has resolved Supabase *and* Open-Meteo. Closing it means changing how the hero
-  renders (drop the defer, or inline the icon — note Meteocons' SVGs share `id`s,
-  so inlining several on one page risks `<defs>` collisions). Re-measure after
-  the pending deploy before deciding.
+- ~~**Benchmarks**~~ — **both passed**, measured 2026-09-08 (§2).
+  *Live-update latency:* a new reading is visible on `/api/current` **1.7–7.1 s**
+  after the Pi records it (six consecutive readings sampled against production);
+  the page polls every 45 s, so worst case is ~50 s, inside the 60 s target.
+  *Lighthouse:* the first run against production scored **mobile 84 / desktop 92**.
+  After the PR #23 fixes, the preview deploy scores **mobile 96** — LCP 3.9 s →
+  **2.6 s**, CLS 0.119 → **0**, unused JS 338 KB → 28 KB, a11y 97,
+  best-practices 100. The LCP win was indirect: 386 KB of ECharts no longer
+  competes with the hero's sky icon for bandwidth, so the icon lands a second
+  earlier even though it still waits on the `server:defer` island to resolve
+  Supabase and Open-Meteo. That structural wait is the remaining headroom if the
+  score ever needs to go higher (drop the defer, or inline the icon — note
+  Meteocons' SVGs share `id`s, so inlining several on one page risks `<defs>`
+  collisions). **Re-measure against production after merge**: the preview's SEO
+  reads 66 only because Vercel serves previews with `x-robots-tag: noindex`;
+  production has no such header and scored 100.
 - **Wind spike fix — deploy + data repair.** The station published a 70.6 m/s
   (254 km/h) gust at 2026-09-01T12:29:10Z. Cause: the sampler divided each pulse
   count by the nominal sample window rather than real elapsed time, and uploads
@@ -256,10 +258,10 @@ domain may come later).
       daylight-progress bar with a sun marker, day length + delta vs yesterday.
       Sits in the left column of the live panel above Rain/Air quality; verified
       light + dark via headless screenshot.
-- [~] Benchmark: **live updates passed** (1.7–7.1 s to `/api/current` + a 45 s poll,
-      inside 60 s); **Lighthouse mobile 84 / desktop 92**, short of the ≥ 90 target.
-      Fixes for the ECharts payload and the CLS have landed but are not deployed;
-      LCP 3.9 s is the open question. Full detail in "Still open" at the top.
+- [x] Benchmark: **both passed**. Live updates 1.7–7.1 s to `/api/current` plus a
+      45 s poll, inside the 60 s target. Lighthouse **mobile 96** on the PR #23
+      preview (up from 84 on production: LCP 3.9 → 2.6 s, CLS 0.119 → 0).
+      Full detail in "Still open" at the top.
 
 ## 3. Weather Underground upload (plan.MD Details/D)
 
