@@ -46,8 +46,8 @@ Key decisions already made — do not re-litigate without asking:
 - **Weather services**: WU first (free, imperial units, GET updateweatherstation.php),
   then Windy **v2 API only** (legacy dies end of 2026; pressure in **Pascals**), then
   CWOP (APRS weather packets over a raw socket to cwop.aprs.net:14580 — code done
-  2026-08-30, `upload/cwop.py`; id `GW7965` issued 2026-08-31, activation in
-  progress. See [docs/cwop.md](docs/cwop.md)).
+  2026-08-30, `upload/cwop.py`; id `GW7965`, live and activated 2026-09-08. See
+  [docs/cwop.md](docs/cwop.md)).
   **Met Office / Met Éireann WOW** (wow.met.ie) — uploader done 2026-09-06
   (`upload/wow.py`), query-string `GET wow.metoffice.gov.uk/automaticreading`.
   Deliberately short-lived: the Met Office began retiring WOW in Jan 2026 and
@@ -171,11 +171,10 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
 - **CWOP uploader written** (2026-08-30, `upload/cwop.py` + `tests/test_cwop.py`,
   11 tests) — APRS-IS socket client. **Id `GW7965`** issued 2026-08-31 (MADIS
   `G7965`; international sites get a `GW` prefix, not `CW`/`DW`/`EW` — the
-  uploader passes the id through verbatim). Not wired live yet:
-  `uploaders.cwop.{enabled,station_id}` + `station.timezone` on the Pi, then
-  verify on findu and **reply to cwop-support@noaa.gov** — the account is not
-  activated until that reply, and the station table only rebuilds on Wednesdays.
-  Passcode `-1` (in `.env` as `CWOP_PASSCODE`). Checklist + account details in
+  uploader passes the id through verbatim). **Live**: registered and activated
+  2026-09-08 after the packets showed at findu and we replied to
+  cwop-support@noaa.gov. Passcode `-1` (in `.env` as `CWOP_PASSCODE`). Account
+  details, the account-edit form and the open 5 m / 20 m elevation mismatch are in
   [docs/cwop.md](docs/cwop.md).
 - **WOW-BE uploader written** (2026-08-30, `upload/wowbe.py` + `tests/test_wowbe.py`,
   9 tests) — JSON REST `POST wow.meteo.be/api/v2/send/wow`, WU-protocol field set,
@@ -236,7 +235,7 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
    responses confirmed, real data visible in WU's history table.
 5. ~~**Windy v2**~~ — done 2026-08-27, see above.
 6. **Polish** — ~~GitHub Actions CI~~ (done 2026-08-27), ~~CWOP uploader~~ (code
-   done 2026-08-30, id `GW7965` issued 2026-08-31, activation in progress — see
+   done 2026-08-30, id `GW7965` live and activated 2026-09-08 — see
    docs/cwop.md), gauge dials,
    retention/downsampling job in Supabase (SQL written in
    `docs/supabase-retention.sql`, not yet applied), README screenshots.
@@ -322,8 +321,10 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
 - A CWOP id being issued is **not** registration: the account only becomes active
   after data is visible at findu *and* a reply goes back to cwop-support, and it
   only shows up in CWOP/MADIS after the weekly Wednesday station-table build
-  (cutoff Tue 02:00 ET). The site's plotted position comes from the lat/lon in our
-  own packets, not from anything typed into the signup form.
+  (cutoff Tue 02:00). Same delay for later edits, which go through
+  madis.ncep.noaa.gov/cwop_signup.shtml (*Existing Account Update*). The site's
+  plotted position comes from the lat/lon in our own packets, not from anything
+  typed into the signup form.
 - Supabase free projects pause after 7 days idle — a live station never idles, but a
   long holiday pause can suspend the project (restorable, ~30 s wake).
 - Supabase uploader treats HTTP 409 (duplicate on retry) as success — there's a
