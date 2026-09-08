@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { EChartsOption } from "echarts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,14 +33,32 @@ const C = {
   airQuality: "#78716c",
 };
 
+// Radix unmounts the inactive <TabsContent>, so every hop between ranges used to
+// re-download the whole window — and the 7d/30d bucketing reads thousands of raw
+// rows per request (see the readings_hourly note in TODO.md §2). Ranges are held
+// here for CACHE_TTL_MS instead: long enough that flipping between them is free,
+// short enough that a visitor who leaves the tab open and comes back gets fresh
+// readings. The map lives at module scope because the components do not.
+const CACHE_TTL_MS = 5 * 60_000;
+const historyCache = new Map<Range, { at: number; rows: Reading[] }>();
+
 function useHistory(range: Range) {
-  const [data, setData] = useState<Reading[] | null>(null);
+  const cached = historyCache.get(range);
+  const fresh = cached && Date.now() - cached.at < CACHE_TTL_MS ? cached.rows : null;
+  const [data, setData] = useState<Reading[] | null>(fresh);
+
   useEffect(() => {
+    const hit = historyCache.get(range);
+    if (hit && Date.now() - hit.at < CACHE_TTL_MS) {
+      setData(hit.rows);
+      return;
+    }
     let cancelled = false;
     setData(null);
     fetch(`/api/history?range=${range}`)
       .then((r) => r.json())
       .then((rows) => {
+        historyCache.set(range, { at: Date.now(), rows });
         if (!cancelled) setData(rows);
       })
       .catch(() => {
@@ -51,6 +69,39 @@ function useHistory(range: Range) {
     };
   }, [range]);
   return data;
+}
+
+// The dashboard's three top-level panels are all in the DOM at once, the
+// inactive ones carrying the `hidden` attribute (DashboardTabs.astro), so this
+// island hydrates on every page load even for a visitor who never opens
+// History. A `hidden` element has no layout box and therefore never intersects,
+// which makes IntersectionObserver a precise "this panel is actually on screen"
+// signal: no /api/history request until the History tab is opened and the
+// charts are near the viewport.
+function useOnScreen(ref: React.RefObject<HTMLElement | null>) {
+  const [onScreen, setOnScreen] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || onScreen) return;
+    // No IntersectionObserver (very old browser): render eagerly rather than
+    // leaving the tab permanently empty.
+    if (typeof IntersectionObserver === "undefined") {
+      setOnScreen(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setOnScreen(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [ref, onScreen]);
+  return onScreen;
 }
 
 // Every date/time on this page is Irish local time on a 24-hour clock. The
@@ -586,20 +637,30 @@ function RangeCharts({ range }: { range: Range }) {
 }
 
 export function HistoryCharts() {
+  const ref = useRef<HTMLDivElement>(null);
+  const onScreen = useOnScreen(ref);
+
   return (
-    <Tabs defaultValue="24h">
-      <TabsList>
-        {RANGES.map((r) => (
-          <TabsTrigger key={r.value} value={r.value}>
-            {r.label}
-          </TabsTrigger>
-        ))}
-      </TabsList>
-      {RANGES.map((r) => (
-        <TabsContent key={r.value} value={r.value} className="mt-4">
-          <RangeCharts range={r.value} />
-        </TabsContent>
-      ))}
-    </Tabs>
+    <div ref={ref}>
+      {/* Reserves the charts' height and, more to the point, gives the observer
+          a target with real area to intersect. */}
+      {!onScreen && <div className="h-64" aria-hidden="true" />}
+      {onScreen && (
+        <Tabs defaultValue="24h">
+          <TabsList>
+            {RANGES.map((r) => (
+              <TabsTrigger key={r.value} value={r.value}>
+                {r.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          {RANGES.map((r) => (
+            <TabsContent key={r.value} value={r.value} className="mt-4">
+              <RangeCharts range={r.value} />
+            </TabsContent>
+          ))}
+        </Tabs>
+      )}
+    </div>
   );
 }
