@@ -22,33 +22,47 @@ const { class: className } = Astro.props;
             href={station.url}
             target="_blank"
             rel="noopener noreferrer"
-            class="group flex h-full flex-col rounded-lg border border-border px-3 py-2.5 transition-colors hover:bg-muted"
+            class="group flex h-full items-start gap-3 rounded-lg border border-border px-3 py-2.5 transition-colors hover:bg-muted"
           >
-            <span class="flex items-center gap-1.5 text-sm font-medium text-foreground">
-              {station.network}
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-                class="h-3 w-3 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"
-              >
-                <path d="M15 3h6v6" />
-                <path d="M10 14 21 3" />
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-              </svg>
-            </span>
-            <span class="mt-0.5 text-xs text-muted-foreground">{station.note}</span>
-            {/* GUID site ids are far too long to read; only show short ones. */}
-            {station.id.length <= 16 && (
-              <span class="mt-1.5 font-mono text-[11px] text-muted-foreground tabular-nums">
-                {station.id}
+            {/* Brand logos carry their own backgrounds (WU black, Windy red,
+                NOAA/WOW white), so each tile is opaque and reads in both
+                themes. The ring keeps the white ones off the dark surface. */}
+            <img
+              src={station.logo}
+              alt={station.logoAlt}
+              width="32"
+              height="32"
+              loading="lazy"
+              decoding="async"
+              class="mt-0.5 h-8 w-8 shrink-0 rounded-md object-contain ring-1 ring-border"
+            />
+            <span class="min-w-0">
+              <span class="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                {station.network}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                  class="h-3 w-3 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"
+                >
+                  <path d="M15 3h6v6" />
+                  <path d="M10 14 21 3" />
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                </svg>
               </span>
-            )}
+              <span class="mt-0.5 block text-xs text-muted-foreground">{station.note}</span>
+              {/* GUID site ids are far too long to read; only show short ones. */}
+              {station.id.length <= 16 && (
+                <span class="mt-1.5 block font-mono text-[11px] text-muted-foreground tabular-nums">
+                  {station.id}
+                </span>
+              )}
+            </span>
           </a>
         </li>
       ))
