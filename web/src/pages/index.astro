@@ -18,7 +18,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 <Layout>
   <div class="mb-8">
     <NowHero server:defer>
-      <Skeleton slot="fallback" className="h-56 rounded-2xl sm:h-52" />
+      {/* Heights measured from the resolved hero at each breakpoint (408 / 260
+          / 240px). A short fallback is not a cosmetic flaw here: the hero sits
+          above the tabs, so every pixel it grows by shoves the whole dashboard
+          down once the island lands. That was the site's entire CLS. */}
+      <Skeleton slot="fallback" className="h-102 rounded-2xl sm:h-65 xl:h-60" />
     </NowHero>
   </div>
 

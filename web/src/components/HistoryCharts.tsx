@@ -1,8 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import type { EChartsOption } from "echarts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { EChart } from "@/components/EChart";
+// ECharts is ~380 KB — bigger than the rest of the dashboard put together, and
+// only ever needed once the History tab is open. `EChart` is the sole module
+// that pulls the runtime in, so lazily importing it here is what keeps that
+// weight out of the initial page load; everything else in this file is chart
+// *options*, which are plain objects and type-only imports.
+const EChart = lazy(() => import("@/components/EChart").then((m) => ({ default: m.EChart })));
 import { useIsDark } from "@/lib/use-is-dark";
 import type { Reading } from "@/lib/supabase";
 import { MS_TO_KMH } from "@/lib/format";
@@ -557,7 +562,11 @@ function ChartCard({
         </div>
       </CardHeader>
       <CardContent>
-        <EChart option={option} height={height} />
+        {/* The fallback holds the chart's height so the grid does not jump
+            while the ECharts chunk arrives. */}
+        <Suspense fallback={<div style={{ height: height ?? 280 }} />}>
+          <EChart option={option} height={height} />
+        </Suspense>
       </CardContent>
     </Card>
   );
