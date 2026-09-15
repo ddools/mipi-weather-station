@@ -1,0 +1,48 @@
+name: Station watchdog
+
+# Alerts (via a GitHub issue) when the weather station stops sending data.
+# Runs on GitHub's infrastructure, independent of the Pi, so it still fires when
+# the Pi or its uplink is the thing that's down.
+#
+# Requires two repo secrets (Settings -> Secrets and variables -> Actions):
+#   PUBLIC_SUPABASE_URL       e.g. https://xxxx.supabase.co
+#   PUBLIC_SUPABASE_ANON_KEY  the publishable key (already public — it ships in
+#                             the site JS; a secret just keeps it out of the log)
+#
+# Note: GitHub disables scheduled workflows after 60 days with no repo commits,
+# and can delay scheduled runs under load — real detection latency is ~15-45 min.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      stale_minutes:
+        description: "Override the staleness threshold (minutes). Set to 0 to force the offline path for a test."
+        required: false
+        default: "20"
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: station-watchdog
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/github-script@v7
+        env:
+          SUPABASE_URL: ${{ secrets.PUBLIC_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.PUBLIC_SUPABASE_ANON_KEY }}
+          STALE_MINUTES: ${{ inputs.stale_minutes || '20' }}
+        with:
+          script: |
+            const watchdog = require('${{ github.workspace }}/.github/scripts/station-watchdog.cjs');
+            await watchdog({ github, context, core });

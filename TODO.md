@@ -90,6 +90,18 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27. Remaining:
 
 ## Done
 
+- [x] **Offline alerting** (2026-09-15) — `.github/workflows/station-watchdog.yml`
+      runs on GitHub every ~15 min (independent of the Pi), queries Supabase for
+      the newest `recorded_at`, and opens/closes a single `station-down` GitHub
+      issue when data goes stale (>20 min) / resumes. Logic in
+      `.github/scripts/station-watchdog.cjs`. Replaces `dashboard-health.yml`
+      (#5, 2026-08-30), which did the same Supabase freshness check but just
+      failed the Action run — this version raises an actual issue instead of
+      relying on GitHub's default failed-scheduled-run email. Also added
+      `web/src/pages/api/health.ts` — returns HTTP 503 when data is stale, for
+      pointing an external uptime monitor at (UptimeRobot, a phone app). Needs
+      repo secrets `PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_ANON_KEY` (already
+      set for the retired workflow, so no new secrets needed).
 - [x] Repo scaffold, package structure (`pi/`, `web/`, `docs/`)
 - [x] Sensor bring-up & verification on real hardware — BMP085, HTU21D, MCP342X
       wind vane, anemometer, rain gauge all confirmed working (2026-08-27)
