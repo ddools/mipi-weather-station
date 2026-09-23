@@ -284,3 +284,57 @@ def test_io_slower_than_the_whole_interval_resyncs(monkeypatch, caplog):
     intervals = [b - a for a, b in zip(stamps, stamps[1:])]
     # bounded by the I/O it cannot outrun, and never running away
     assert all(70.0 <= i <= 150.0 for i in intervals), intervals
+
+
+class _RecordingHeartbeat:
+    def __init__(self):
+        self.beats = 0
+        self.started = False
+
+    def start(self):
+        self.started = True
+
+    def beat(self):
+        self.beats += 1
+
+
+def test_heartbeat_beats_once_per_archived_record(monkeypatch):
+    """The beat says "still collecting", so it follows the stored record -- not a
+    successful upload, which store-and-forward is allowed to defer."""
+    hb = _RecordingHeartbeat()
+    clock = _Clock()
+    anemo = _ScriptedAnemometer(clock, [0] * 25)
+    buffer = _StubBuffer()
+    monkeypatch.setattr(sampler_mod.time, "monotonic", clock.monotonic)
+    monkeypatch.setattr(sampler_mod.time, "sleep", lambda s: clock.advance(s))
+    cfg = _FakeConfig(
+        sampling={"wind_sample_s": 5, "archive_interval_s": 60},
+        calibration={
+            "anemometer_radius_cm": RADIUS_CM,
+            "anemometer_adjustment": ADJUSTMENT,
+            "rain_bucket_mm": 0.2794,
+        },
+        station={"elevation_m": 20},
+    )
+    s = Sampler(
+        cfg, _StubAir(), anemo, _StubRain(), _StubVane(), buffer, uploaders=[], heartbeat=hb
+    )
+
+    # Stop at the start of the second cycle's store, so exactly one record has
+    # been fully archived -- the beat must have followed it.
+    def _stop(record):
+        buffer.records.append(record)
+        if len(buffer.records) == 2:
+            raise KeyboardInterrupt
+
+    buffer.append = _stop
+    with pytest.raises(KeyboardInterrupt):
+        s.run_forever()
+
+    assert hb.started is True
+    assert hb.beats == 1, "one beat per stored record, raised after the append"
+
+
+def test_sampler_runs_fine_with_no_heartbeat_configured(monkeypatch):
+    rec = _run_one_archive(monkeypatch, [_pulses_for(5.0, 5.0)] * 12)
+    assert rec.wind_speed_ms == pytest.approx(5.0, abs=0.1)

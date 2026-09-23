@@ -157,6 +157,19 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   WMO-code→Meteocons map, 30-min memo cache; a 4th Open-Meteo dependency
   alongside marine/air-quality) + sun + moon + pollen.
   Plan: `docs/dashboard-tabs.md`.
+- **Alerting** — two independent alarms, see [docs/alerting.md](docs/alerting.md).
+  A **heartbeat** dead man's switch (`core/heartbeat.py`, `HEARTBEAT_URL` in
+  `.env`, empty = disabled): the Pi pings an external watcher on every stored
+  record and that service emails when pings stop (~2 min). Provider-agnostic —
+  healthchecks.io, Cronitor, Better Stack all take a ping URL; period/grace live
+  on the service, so retuning needs no deploy. Beats on the **stored record**,
+  not a successful upload, and `beat()` only sets an Event (network I/O on the
+  sampling thread is what caused the 70.6 m/s gust). Plus the older
+  **station watchdog** (`.github/workflows/station-watchdog.yml`) which polls
+  Supabase from GitHub Actions and opens/closes a `station-down` issue —
+  ~15-45 min latency, and the only one that catches "sampling fine, cloud
+  unreachable". **A 2-min threshold pages you for every restart/reboot**; raise
+  grace to 3-5 min if that grates.
 - **Installable PWA** (2026-09-08) — `web/public/manifest.webmanifest` +
   `web/public/sw.js` + `web/src/components/ServiceWorker.astro` (mounted from
   `Layout.astro`) + `web/src/pages/offline.astro`. Icons in `web/public/icons/`

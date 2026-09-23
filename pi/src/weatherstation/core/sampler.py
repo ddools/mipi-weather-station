@@ -37,12 +37,14 @@ class Sampler:
         buffer: LocalBuffer,
         uploaders,
         air_quality=None,
+        heartbeat=None,
     ):
         self.cfg = cfg
         self.air, self.anemometer, self.rain, self.vane = air, anemometer, rain, vane
         self.air_quality = air_quality
         self.buffer = buffer
         self.uploaders = uploaders
+        self.heartbeat = heartbeat
         self._flush_wake = threading.Event()
 
     def run_forever(self) -> None:
@@ -61,6 +63,8 @@ class Sampler:
         sample_dt = archive_dt / samples_per_archive
         log.info("sampling: wind every %ss, archive every %ss", sample_dt, archive_dt)
         self._start_uploader_thread()
+        if self.heartbeat is not None:
+            self.heartbeat.start()
         # Pulses accrue continuously in the sensor's interrupt handler, so a sample
         # covers the real time since the previous read -- never the nominal sample_dt.
         # Deliberately carried across archive cycles: the first sample of a cycle
@@ -107,6 +111,12 @@ class Sampler:
             self.buffer.append(record)
             log.info("archived: %s", record.as_dict())
             self._flush_wake.set()
+            # Beat on a stored record, not a successful upload: the buffer is the
+            # source of truth, so this says "the station is still collecting".
+            # A destination being unreachable is store-and-forward's problem and
+            # must not raise an alarm that the station is down.
+            if self.heartbeat is not None:
+                self.heartbeat.beat()
 
             # Advance the anchor by exactly one interval rather than restarting
             # from now: that is what stops the per-cycle I/O cost accumulating
