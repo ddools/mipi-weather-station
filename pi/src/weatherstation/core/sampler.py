@@ -20,6 +20,11 @@ log = logging.getLogger(__name__)
 # pollutes neither the interval mean nor the gust.
 MAX_PLAUSIBLE_WIND_MS = 55.0
 
+# Shortest sample window worth trusting, seconds. Sampling runs to absolute
+# deadlines, so a slow sensor read can push the next deadline into the past; the
+# sample it would produce covers almost no time and means nothing.
+MIN_SAMPLE_S = 0.5
+
 
 class Sampler:
     def __init__(
@@ -46,20 +51,38 @@ class Sampler:
         archive_dt = self.cfg.sampling.archive_interval_s
         samples_per_archive = max(1, archive_dt // wind_dt)
 
-        log.info("sampling: wind every %ss, archive every %ss", wind_dt, archive_dt)
+        # Sleeps are to an absolute deadline, not `sleep(wind_dt)`: reading the
+        # sensors is not free (the MCP342X vane conversion alone is ~270 ms, and
+        # the DS18B20 ~750 ms once per cycle), so sleeping a fixed wind_dt *adds*
+        # that cost to every interval instead of absorbing it. On the real Pi that
+        # ran the archive at 64.96 s against a configured 60 s -- 8.3% slow, ~110
+        # records a day quietly missing. Deadlines make the work come out of the
+        # interval, so the cadence holds as long as a cycle's I/O fits inside it.
+        sample_dt = archive_dt / samples_per_archive
+        log.info("sampling: wind every %ss, archive every %ss", sample_dt, archive_dt)
         self._start_uploader_thread()
         # Pulses accrue continuously in the sensor's interrupt handler, so a sample
-        # covers the real time since the previous read -- never the nominal wind_dt.
+        # covers the real time since the previous read -- never the nominal sample_dt.
         # Deliberately carried across archive cycles: the first sample of a cycle
         # also covers whatever the previous one spent building and storing its
-        # record, and dividing that by wind_dt is what produced 250 km/h gusts.
-        last_read = time.monotonic()
+        # record, and dividing that by sample_dt is what produced 250 km/h gusts.
+        cycle_start = time.monotonic()
+        last_read = cycle_start
         while True:
             wind_samples: list[float] = []
             dirs: list[float] = []
             rain_tips = 0
-            for _ in range(samples_per_archive):
-                time.sleep(wind_dt)
+            for i in range(samples_per_archive):
+                self._sleep_until(cycle_start + (i + 1) * sample_dt)
+                if time.monotonic() - last_read < MIN_SAMPLE_S:
+                    # This deadline blew past while the previous sample's I/O ran,
+                    # so its window is ~0s. Skipping leaves the pulse counter
+                    # unreset, so those pulses simply land in the next sample over
+                    # its true elapsed time -- nothing is lost. Reading anyway
+                    # would divide them by ~0, and `Anemometer.speed_ms` reports a
+                    # non-positive window as 0.0 m/s, quietly dragging the
+                    # interval mean toward zero.
+                    continue
                 pulses = self.anemometer.read_and_reset()
                 now = time.monotonic()
                 elapsed, last_read = now - last_read, now
@@ -84,6 +107,32 @@ class Sampler:
             self.buffer.append(record)
             log.info("archived: %s", record.as_dict())
             self._flush_wake.set()
+
+            # Advance the anchor by exactly one interval rather than restarting
+            # from now: that is what stops the per-cycle I/O cost accumulating
+            # into drift. A small overshoot (the last sample's read finishing
+            # after the boundary) is absorbed by the next cycle's first sleep.
+            cycle_start += archive_dt
+            behind = time.monotonic() - cycle_start
+            if behind >= archive_dt:
+                # A whole interval's worth of deadlines is already in the past --
+                # sensor I/O is outrunning the configured cadence. Resync so the
+                # debt cannot grow without bound; the loop still cannot spin,
+                # because an expired deadline skips its sample rather than taking
+                # a zero-length one.
+                log.warning(
+                    "sampling is %.1fs behind the %ss archive interval; resyncing",
+                    behind,
+                    archive_dt,
+                )
+                cycle_start = time.monotonic()
+
+    @staticmethod
+    def _sleep_until(deadline: float) -> None:
+        """Sleep until `deadline` (a `time.monotonic()` value). No-op if already past."""
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(remaining)
 
     def _start_uploader_thread(self) -> None:
         """Run uploads off the sampling thread.

@@ -10,6 +10,8 @@ elapsed time, and that anything still absurd is dropped rather than published.
 
 from __future__ import annotations
 
+import logging
+
 import pytest
 
 from weatherstation.core import sampler as sampler_mod
@@ -195,3 +197,90 @@ def test_the_actual_spike_reproduces_under_the_old_arithmetic():
     corrected = Anemometer.speed_ms(pulses, real_elapsed, RADIUS_CM, ADJUSTMENT)
     assert corrected < 3.0
     assert corrected * 3.6 < 11  # ~10 km/h, matching its neighbours
+
+
+def _archive_times(monkeypatch, cycles, io_per_read=0.0, wind_dt=5, archive_dt=60):
+    """Clock time at each archive boundary, driving `cycles` full cycles.
+
+    `io_per_read` stands in for the real cost of reading the sensors (the MCP342X
+    vane conversion is ~270 ms), burnt inside every sample.
+    """
+    clock = _Clock()
+    per_cycle = archive_dt // wind_dt
+    stalls = dict.fromkeys(range(cycles * per_cycle + 1), io_per_read)
+    anemo = _ScriptedAnemometer(clock, [0] * (cycles * per_cycle + 1), stalls)
+    buffer = _StubBuffer()
+
+    monkeypatch.setattr(sampler_mod.time, "monotonic", clock.monotonic)
+    monkeypatch.setattr(sampler_mod.time, "sleep", lambda s: clock.advance(s))
+
+    cfg = _FakeConfig(
+        sampling={"wind_sample_s": wind_dt, "archive_interval_s": archive_dt},
+        calibration={
+            "anemometer_radius_cm": RADIUS_CM,
+            "anemometer_adjustment": ADJUSTMENT,
+            "rain_bucket_mm": 0.2794,
+        },
+        station={"elevation_m": 20},
+    )
+    s = Sampler(cfg, _StubAir(), anemo, _StubRain(), _StubVane(), buffer, uploaders=[])
+
+    stamps = []
+
+    def _stamp(record):
+        stamps.append(clock.monotonic())
+        if len(stamps) == cycles:
+            raise KeyboardInterrupt
+
+    buffer.append = _stamp
+    with pytest.raises(KeyboardInterrupt):
+        s.run_forever()
+    return stamps
+
+
+def test_archive_cadence_holds_when_sensor_reads_are_slow(monkeypatch):
+    """The real Pi ran 64.96s archives against a configured 60s — 8.3% slow, ~110
+    records a day lost — because `sleep(wind_dt)` added the sensor I/O to every
+    interval instead of absorbing it. Deadlines keep the cadence exact."""
+    stamps = _archive_times(monkeypatch, cycles=5, io_per_read=0.4)
+    intervals = [b - a for a, b in zip(stamps, stamps[1:])]
+    assert intervals == pytest.approx([60.0] * 4)
+    # and no cumulative drift across the run
+    assert stamps[-1] - stamps[0] == pytest.approx(240.0)
+
+
+def test_cadence_is_exact_with_instant_sensors_too(monkeypatch):
+    stamps = _archive_times(monkeypatch, cycles=4, io_per_read=0.0)
+    assert [b - a for a, b in zip(stamps, stamps[1:])] == pytest.approx([60.0] * 3)
+
+
+def test_slow_reads_cost_samples_not_cadence(monkeypatch):
+    """Sensor I/O slow enough to blow individual sample deadlines must still
+    archive on time -- the loop gives up samples, not the archive interval."""
+    stamps = _archive_times(monkeypatch, cycles=3, io_per_read=8.0)
+    assert [b - a for a, b in zip(stamps, stamps[1:])] == pytest.approx([60.0] * 2)
+
+
+def test_blown_deadline_skips_the_sample_rather_than_reading_a_zero_window(monkeypatch):
+    """A deadline already in the past leaves ~0s since the last read. Reading
+    anyway divides the pulses by ~0, and `speed_ms` reports a non-positive window
+    as 0.0 m/s -- a phantom calm that drags the interval mean down. The 25s stall
+    below is the case that used to produce it."""
+    pulses = [_pulses_for(5.0, 30.0)] + [_pulses_for(5.0, 5.0)] * 11
+    rec = _run_one_archive(monkeypatch, pulses, stalls={0: 25.0})
+
+    # a steady 5 m/s wind, so nothing in the interval may read as calm
+    assert rec.wind_speed_ms == pytest.approx(5.0, abs=0.1)
+    assert rec.wind_gust_ms == pytest.approx(5.0, abs=0.1)
+
+
+def test_io_slower_than_the_whole_interval_resyncs(monkeypatch, caplog):
+    """A single read outlasting the archive interval puts every deadline in the
+    past. The anchor must resync so the debt cannot grow without bound."""
+    with caplog.at_level(logging.WARNING, logger="weatherstation.core.sampler"):
+        stamps = _archive_times(monkeypatch, cycles=6, io_per_read=70.0)
+
+    assert "resyncing" in caplog.text
+    intervals = [b - a for a, b in zip(stamps, stamps[1:])]
+    # bounded by the I/O it cannot outrun, and never running away
+    assert all(70.0 <= i <= 150.0 for i in intervals), intervals
