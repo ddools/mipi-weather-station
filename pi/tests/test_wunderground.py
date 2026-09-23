@@ -93,10 +93,15 @@ def test_dateutc_is_utc_seconds(tmp_path, monkeypatch):
     """WU wants UTC to the second; a non-UTC offset must be converted, not
     truncated off the end of the string."""
     sent = _capture(monkeypatch)
-    WundergroundUploader(_cfg(tmp_path)).send(
-        _record(recorded_at="2026-09-08T20:08:30.225308+01:00")
-    )
-    assert sent["params"]["dateutc"] == "2026-09-08 19:08:30"
+    # Relative to now (not a fixed date) so this keeps passing as time moves on --
+    # the uploader drops anything older than _MAX_AGE_S as unsendable (see
+    # wunderground.py), which a hardcoded date eventually ages past. Non-UTC
+    # offset and non-zero microseconds still exercise both the offset
+    # conversion and the truncation to whole seconds.
+    local = datetime.now(timezone(timedelta(hours=1))).replace(microsecond=225308)
+    WundergroundUploader(_cfg(tmp_path)).send(_record(recorded_at=local.isoformat()))
+    expected = local.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    assert sent["params"]["dateutc"] == expected
 
 
 def test_missing_fields_are_omitted(tmp_path, monkeypatch):
