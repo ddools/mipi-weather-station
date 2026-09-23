@@ -19,12 +19,18 @@ import windIcon from "@meteocons/svg/flat/wind.svg?url";
 import compassIcon from "@meteocons/svg/flat/compass.svg?url";
 import airQualityIcon from "@meteocons/svg/flat/smoke-particles.svg?url";
 
-type Range = "24h" | "7d" | "30d";
+type Range = "24h" | "7d" | "30d" | "all";
 const RANGES: { value: Range; label: string }[] = [
   { value: "24h", label: "24 hours" },
   { value: "7d", label: "7 days" },
   { value: "30d", label: "30 days" },
+  { value: "all", label: "All time" },
 ];
+
+// "All time" is one point per day. Past this span a day-by-day axis and a bar per
+// day of rain get too dense to read, so ticks move to months and rain is totalled
+// per month instead.
+const MONTHLY_AFTER_DAYS = 120;
 
 // Series colours — picked for meaning and to stay legible in both themes.
 const C = {
@@ -117,23 +123,27 @@ const TZ = "Europe/Dublin";
 const LOCALE = "en-IE";
 
 // Axis tick formatting differs by range: a time-of-day for 24h, weekday + hour
-// for 7d, a calendar date for 30d. One formatter for all three left the 24h
-// axis cluttered with a repeated "Aug 27".
-function axisFormatter(range: Range) {
+// for 7d, a calendar date for 30d (and a short "All time"), month + year once
+// "All time" spans many months. One formatter for all of them left the 24h axis
+// cluttered with a repeated "Aug 27".
+function axisFormatter(range: Range, monthly = false) {
   const opts: Intl.DateTimeFormatOptions =
     range === "24h"
       ? { hour: "2-digit", minute: "2-digit", hour12: false }
       : range === "7d"
         ? { weekday: "short", day: "numeric" }
-        : { day: "numeric", month: "short" };
+        : monthly
+          ? { month: "short", year: "numeric" }
+          : { day: "numeric", month: "short" };
   const f = new Intl.DateTimeFormat(LOCALE, { ...opts, timeZone: TZ });
   return (value: string) => f.format(new Date(value));
 }
 
 // The tooltip is the only place a reader gets an exact value, so it spells the
 // moment out in full — weekday, date and time — rather than repeating the
-// abbreviated axis tick.
-function tooltipTimeFormatter(range: Range) {
+// abbreviated axis tick. Daily points get the date alone (with the year for
+// "All time"), monthly rain bars just the month.
+function tooltipTimeFormatter(range: Range, monthly = false) {
   const f = new Intl.DateTimeFormat(LOCALE, {
     weekday: "short",
     day: "numeric",
@@ -147,9 +157,12 @@ function tooltipTimeFormatter(range: Range) {
     weekday: "short",
     day: "numeric",
     month: "short",
+    ...(range === "all" ? { year: "numeric" as const } : {}),
     timeZone: TZ,
   });
-  return (value: string) => (range === "30d" ? dayOnly : f).format(new Date(value));
+  const month = new Intl.DateTimeFormat(LOCALE, { month: "long", year: "numeric", timeZone: TZ });
+  const fmt = monthly ? month : range === "30d" || range === "all" ? dayOnly : f;
+  return (value: string) => fmt.format(new Date(value));
 }
 
 function baseTextStyle(isDark: boolean) {
@@ -163,15 +176,38 @@ interface AxisCtx {
   isDark: boolean;
   range: Range;
   times: string[];
+  /** "All time" long enough to label by month and total rain per month. */
+  monthly: boolean;
 }
 
 // A category axis labels every Nth sample, which lands ticks on whatever minute
 // the sampler happened to fire — "15:04, 15:49, 16:34…". Readers scan a time
 // axis for round numbers, so pick out the first sample inside each round
 // interval instead and label only those.
-const TICK_STEP_HOURS: Record<Range, number> = { "24h": 3, "7d": 24, "30d": 72 };
+const TICK_STEP_HOURS: Record<Exclude<Range, "all">, number> = { "24h": 3, "7d": 24, "30d": 72 };
 
-function roundTickIndices(times: string[], range: Range): Set<number> {
+// "All time" points are daily and sit on local midnight, which is 23:00 UTC in
+// summer, so the hour arithmetic below never lands on them. Tick every 7th day
+// instead, or the first day of each month once the span is long.
+function lifetimeTickIndices(times: string[], monthly: boolean): Set<number> {
+  if (!monthly) return new Set(times.map((_, i) => i).filter((i) => i % 7 === 0));
+  const monthOf = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit" });
+  const seen = new Set<string>();
+  const out = new Set<number>();
+  times.forEach((t, i) => {
+    const key = monthOf.format(new Date(t));
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.add(i);
+  });
+  return out;
+}
+
+function roundTickIndices(times: string[], range: Range, monthly: boolean): Set<number> {
+  if (range === "all") {
+    const out = lifetimeTickIndices(times, monthly);
+    return out.size >= 2 ? out : new Set<number>();
+  }
   const step = TICK_STEP_HOURS[range];
   const hourOf = new Intl.DateTimeFormat("en-CA", {
     timeZone: TZ,
@@ -197,9 +233,9 @@ function roundTickIndices(times: string[], range: Range): Set<number> {
   return out.size >= 2 ? out : new Set<number>();
 }
 
-function categoryXAxis({ isDark, range, times }: AxisCtx) {
+function categoryXAxis({ isDark, range, times, monthly }: AxisCtx) {
   const { muted, split } = baseTextStyle(isDark);
-  const ticks = roundTickIndices(times, range);
+  const ticks = roundTickIndices(times, range, monthly);
   return {
     type: "category" as const,
     data: times,
@@ -208,7 +244,7 @@ function categoryXAxis({ isDark, range, times }: AxisCtx) {
       color: muted,
       hideOverlap: true,
       ...(ticks.size ? { interval: (i: number) => ticks.has(i) } : {}),
-      formatter: axisFormatter(range),
+      formatter: axisFormatter(range, monthly),
     },
     axisLine: { lineStyle: { color: split } },
     axisTick: { show: false },
@@ -218,8 +254,8 @@ function categoryXAxis({ isDark, range, times }: AxisCtx) {
 // A shared tooltip for every time series: the moment in full, then one row per
 // series with its colour swatch, name and value *with its unit*. The default
 // tooltip printed the raw ISO timestamp as a heading and bare numbers below it.
-function axisTooltip(range: Range, unit: string, isDark: boolean, digits = 1) {
-  const time = tooltipTimeFormatter(range);
+function axisTooltip(range: Range, unit: string, isDark: boolean, digits = 1, monthly = false) {
+  const time = tooltipTimeFormatter(range, monthly);
   return {
     trigger: "axis" as const,
     axisPointer: {
@@ -391,8 +427,9 @@ function airQualityOption(data: Reading[], ctx: AxisCtx): EChartsOption {
   ]);
 }
 
-/** Rain totalled per hour (24h) or per day (7d/30d), keyed to real instants. */
-function rainBuckets(data: Reading[], range: Range) {
+/** Rain totalled per hour (24h), per day (7d/30d/short "All time") or per month
+ *  (long "All time"), keyed to real instants. */
+function rainBuckets(data: Reading[], range: Range, monthly: boolean) {
   // Group on the Irish local hour/day so the bars line up with the clock the
   // reader is looking at, but keep a real timestamp per bucket so the axis and
   // tooltip formatters can convert it themselves.
@@ -400,7 +437,7 @@ function rainBuckets(data: Reading[], range: Range) {
     timeZone: TZ,
     year: "numeric",
     month: "2-digit",
-    day: "2-digit",
+    ...(monthly ? {} : { day: "2-digit" as const }),
     ...(range === "24h" ? { hour: "2-digit" as const, hour12: false } : {}),
   });
   const buckets = new Map<string, { at: string; mm: number }>();
@@ -423,14 +460,14 @@ function rainBuckets(data: Reading[], range: Range) {
 // Totalled per hour (or per day over a week or a month) and drawn as bars, the
 // same data reads as "when did it rain, and how hard".
 function rainOption(data: Reading[], ctx: AxisCtx): EChartsOption {
-  const { times, values } = rainBuckets(data, ctx.range);
+  const { times, values } = rainBuckets(data, ctx.range, ctx.monthly);
   const { color, muted, split } = baseTextStyle(ctx.isDark);
-  const per = ctx.range === "24h" ? "hour" : "day";
+  const per = ctx.range === "24h" ? "hour" : ctx.monthly ? "month" : "day";
   return {
     textStyle: { color },
     grid: { left: 8, right: 16, top: 16, bottom: 4, containLabel: true },
     tooltip: {
-      ...axisTooltip(ctx.range, ` mm / ${per}`, ctx.isDark, 1),
+      ...axisTooltip(ctx.range, ` mm / ${per}`, ctx.isDark, 1, ctx.monthly),
       axisPointer: { type: "shadow" as const },
     },
     xAxis: {
@@ -438,9 +475,9 @@ function rainOption(data: Reading[], ctx: AxisCtx): EChartsOption {
       boundaryGap: true,
       axisLabel: {
         ...categoryXAxis({ ...ctx, times }).axisLabel,
-        // One bar = one hour (24h) or one whole day (7d/30d); label it as such
-        // rather than inheriting the line charts' formatter for the range.
-        formatter: axisFormatter(ctx.range === "24h" ? "24h" : "30d"),
+        // One bar = one hour (24h), one whole day or one month; label it as
+        // such rather than inheriting the line charts' formatter for the range.
+        formatter: axisFormatter(ctx.range === "24h" ? "24h" : "30d", ctx.monthly),
       },
     },
     yAxis: {
@@ -583,10 +620,15 @@ function RangeCharts({ range }: { range: Range }) {
     return <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">No data yet for this range.</div>;
   }
 
-  const ctx: AxisCtx = { isDark, range, times: data.map((d) => d.recorded_at) };
+  const times = data.map((d) => d.recorded_at);
+  const spanDays =
+    (new Date(times[times.length - 1]).getTime() - new Date(times[0]).getTime()) / 86_400_000;
+  const monthly = range === "all" && spanDays > MONTHLY_AFTER_DAYS;
+  const ctx: AxisCtx = { isDark, range, times, monthly };
   const hasAirQuality = data.some((d) => d.air_quality != null);
-  const sampling = range === "24h" ? "every reading" : "hourly averages";
-  const rainPer = range === "24h" ? "hourly totals" : "daily totals";
+  const sampling =
+    range === "24h" ? "every reading" : range === "all" ? "daily averages" : "hourly averages";
+  const rainPer = range === "24h" ? "hourly totals" : monthly ? "monthly totals" : "daily totals";
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
