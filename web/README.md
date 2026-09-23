@@ -25,7 +25,7 @@ not integration notes for elsewhere. UI components use **shadcn/ui**.
    - `src/pages/api/current.ts` and `src/pages/api/history.ts` with
      `export const prerender = false` — thin Supabase queries returning JSON.
    - Charts: **ECharts** client island — temp/pressure/humidity lines, rain bars,
-     wind rose (polar bar), gauge dials. Range tabs (shadcn `Tabs`): 24h / 7d / 30d.
+     wind rose (polar bar), gauge dials. Range tabs (shadcn `Tabs`): 24h / 7d / 30d / All time.
    - Rain radar: `RainRadar.tsx` **Leaflet** client island (`client:visible`),
      rendered in the third row of `CurrentConditions` next to the rain card.
      Frames + tiles from the free, keyless [RainViewer](https://www.rainviewer.com/api/weather-maps-api.html)
@@ -45,8 +45,11 @@ GET {SUPABASE_URL}/rest/v1/readings
     &order=recorded_at.asc
 apikey: {ANON_KEY}
 ```
-For 7d/30d ranges, downsample server-side in the API route (group by hour) to keep
-payloads small.
+7d/30d read hourly averages from `readings_hourly` and "All time" reads daily
+averages from the `readings_daily` view (both from `docs/supabase-retention.sql`),
+each topped up from raw rows for the hours the rollup hasn't reached. Until that
+SQL is run they fall back to bucketing raw rows in `lib/supabase.ts`, capped at
+the newest 20k (~14 days).
 
 ## Dashboard tabs (added 2026-09-01)
 

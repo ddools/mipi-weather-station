@@ -227,7 +227,7 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
    in `.env`, real data flowing, RLS verified, systemd service enabled and running.
    Remaining: the 24h network-unplug soak test (needs elapsed time, not blocked).
 3. ~~**Astro site in `web/`**~~ — done 2026-08-27: server-island live panel,
-   `/api/history` (24h raw, 7d/30d hourly-bucketed), ECharts charts + wind rose,
+   `/api/history` (24h raw, 7d/30d hourly from `readings_hourly`, "all" = station lifetime, daily from the `readings_daily` view), ECharts charts + wind rose,
    shadcn/ui, Meteocons icons, Tides section, dark mode. Not yet deployed —
    still needs a domain (undecided) and a Vercel project wired to `web/`.
    Details in `web/README.md` and TODO.md.
