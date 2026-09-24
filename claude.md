@@ -339,6 +339,14 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   unique index on `recorded_at` to make retries idempotent.
 - `pyproject.toml` readme must stay `pi/README.md` (setuptools can't reference
   `../README.md`).
+- **Light/dark is shared with www.dermotdooley.com and train.dermotdooley.com** through a
+  `theme` cookie on `dermotdooley.com` (values `dermot-dark` / `dermot-light` — the main
+  site's daisyUI theme names; don't rename them here). `Layout.astro` maps it onto the
+  `dark` class shadcn uses; `localStorage` is the fallback (old visits hold `dark`/`light`).
+  Default is dark, not the system preference, to match the other sites. The cookie only gets
+  `domain=dermotdooley.com` on that domain, so localhost/previews keep their own. The site
+  header copies the main site's navbar (Nord base-200 `--navbar` token in `global.css`);
+  it's `sticky top-0 h-16`, so the dashboard tab bar sticks at `top-16` under it.
 - **The service worker only registers from a production build.**
   `ServiceWorker.astro` branches on `import.meta.env.PROD`; under `astro dev` it
   renders the opposite script, which unregisters any worker left behind by a
