@@ -160,6 +160,15 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   WMO-code→Meteocons map, 30-min memo cache; a 4th Open-Meteo dependency
   alongside marine/air-quality) + sun + moon + pollen.
   Plan: `docs/dashboard-tabs.md`.
+- **Design-review pass** (2026-09-25): Tides/Sun/Moon/Pollen made server
+  islands (they were baked into the static shell at build time — the tide card
+  showed a countdown hours stale); one countdown rule (`format.ts:untilLabel`,
+  re-ticked in the browser via `data-until` + `lib/live-times.ts`); hero status
+  chip "last reading 40s ago", amber/red when stale; card headers on Lucide at
+  one size; Meteocons only for weather, Nord-recoloured and still except the
+  hero's (see Gotchas); tablet/desktop card grid reworked; air-quality card shows
+  the raw index + what the sensor measures; `og.png` share image. Details in
+  `web/README.md`.
 - **Bathing water card** (2026-09-25) — `components/BathingSection.astro`
   (`server:defer`) + `lib/bathing.ts`, from the EPA Bathing Water Open Data API
   (keyless, CC BY 4.0). Skerries, South Beach (`IEEABWC020_0000_0500`): latest
@@ -171,13 +180,13 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
 - **Installable PWA** (2026-09-08) — `web/public/manifest.webmanifest` +
   `web/public/sw.js` + `web/src/components/ServiceWorker.astro` (mounted from
   `Layout.astro`) + `web/src/pages/offline.astro`. Icons in `web/public/icons/`
-  are generated from `favicon.svg` by `npm run icons` (needs `rsvg-convert`).
+  are generated from `favicon.svg` by `pnpm icons` (needs `rsvg-convert`).
   Caching is network-first for navigations and for `/api/*` + `/_server-islands/*`
   (so an offline launch shows the last readings seen), cache-first for the
   content-hashed `/_astro/*`, and cross-origin requests are left alone. Full
   table in `web/README.md`.
 - **CI live** (2026-08-27) — `.github/workflows/ci.yml`: `pi` job (ruff check +
-  ruff format check + pytest on Py 3.9 & 3.13) and `web` job (`npm ci` + `astro
+  ruff format check + pytest on Py 3.9 & 3.13) and `web` job (`pnpm install --frozen-lockfile` + `astro
   build`). Runs on push-to-`main` and every PR.
 - **CWOP uploader written** (2026-08-30, `upload/cwop.py` + `tests/test_cwop.py`,
   11 tests) — APRS-IS socket client. **Id `GW7965`** issued 2026-08-31 (MADIS
@@ -224,6 +233,10 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   pip install -e ".[dev]" && cp config.example.yaml config.yaml &&
   WS_MOCK_SENSORS=1 weatherstation`
 - Tests: `cd pi && pytest`
+- `web/` uses **pnpm** (switched from npm 2026-09-25), pinned via `packageManager` in
+  `web/package.json`; CI runs `pnpm install --frozen-lockfile`. pnpm 11 skips dependency
+  build scripts unless listed under `allowBuilds` in `web/pnpm-workspace.yaml` (esbuild
+  is) — a new dep that needs one fails install with `ERR_PNPM_IGNORED_BUILDS`.
 - New uploaders: subclass `upload/base.py:Uploader`, implement `send(record)->bool`
   (must be retry-safe), register in `upload/__init__.py:build_uploaders`.
 
@@ -365,6 +378,17 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   `domain=dermotdooley.com` on that domain, so localhost/previews keep their own. The site
   header copies the main site's navbar (Nord base-200 `--navbar` token in `global.css`);
   it's `sticky top-0 h-16`, so the dashboard tab bar sticks at `top-16` under it.
+- **Anything on the dashboard that depends on "now" must be a server island**
+  (`server:defer`) or computed in the browser. `index.astro` is prerendered, so
+  a plain component's frontmatter runs once, at build time — Tides, Sun, Moon and
+  Pollen all silently showed build-time data until 2026-09-25.
+- **Meteocons animate forever and in their own palette.** The site serves
+  Nord-recoloured copies from `web/public/weather-icons/` (`pnpm
+  weather-icons`). The still versions *freeze* each animation at 1.5 s rather
+  than delete it — raindrops rest at opacity 0 and only exist mid-animation, so
+  stripping `<animate>` leaves a bare cloud. The compass is the exception
+  (animation stripped, needle rotated by us). Add any new `lib/forecast.ts` icon
+  name to the script's list and re-run.
 - **The service worker only registers from a production build.**
   `ServiceWorker.astro` branches on `import.meta.env.PROD`; under `astro dev` it
   renders the opposite script, which unregisters any worker left behind by a

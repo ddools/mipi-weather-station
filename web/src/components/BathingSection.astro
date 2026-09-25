@@ -1,7 +1,8 @@
 ---
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { WavesLadder } from "lucide-react";
 import { getBathingReport, RATING_LABEL, type Rating } from "@/lib/bathing";
-import waterIcon from "@meteocons/svg/flat/water.svg?url";
+import { CARD_ICON } from "@/lib/utils";
 
 interface Props {
   class?: string;
@@ -52,13 +53,14 @@ const restriction = report?.alert
     : null;
 
 const sample = report?.lastSample ?? null;
+// Out of season the last sample is weeks old and says nothing about the water
+// today, so it's shown greyed out rather than as a live "Excellent".
+const sampleStyle = sample && report?.inSeason ? style(sample.rating) : UNRATED;
 ---
 
 <Card className={className}>
   <CardHeader className="flex items-center gap-2">
-    {/* The waves only fill the middle of meteocons' 128px box; scale them up to
-        sit level with the tides icon. */}
-    <img src={waterIcon} alt="" class="h-10 w-10 scale-150" />
+    <WavesLadder className={CARD_ICON} aria-hidden="true" />
     <div>
       <CardTitle>Bathing water</CardTitle>
       {report && <p class="text-xs text-muted-foreground">{report.beachName}</p>}
@@ -117,10 +119,10 @@ const sample = report?.lastSample ?? null;
             Latest sample
           </p>
           {sample ? (
-            <div class:list={[restriction && "opacity-70"]}>
+            <div class:list={[(restriction || !report.inSeason) && "opacity-70"]}>
               <div class="mt-1 flex items-center gap-2">
-                <span class={`inline-block h-2.5 w-2.5 rounded-full ${style(sample.rating).dot}`} />
-                <span class={`text-lg font-semibold ${style(sample.rating).text}`}>
+                <span class={`inline-block h-2.5 w-2.5 rounded-full ${sampleStyle.dot}`} />
+                <span class={`text-lg font-semibold ${sampleStyle.text}`}>
                   {label(sample.rating)}
                 </span>
               </div>

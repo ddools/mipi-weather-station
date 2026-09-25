@@ -11,6 +11,8 @@ const description =
   "Live weather from a Raspberry Pi weather station in Skerries, Co. Dublin — " +
   "temperature, wind, pressure, humidity and rainfall, updated every minute.";
 const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://weather.dermotdooley.com");
+// Link previews need an absolute URL. Regenerate with `pnpm icons`.
+const ogImage = new URL("/og.png", canonical).href;
 ---
 
 <!doctype html>
@@ -34,9 +36,14 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://weather.der
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical.href} />
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Skerries Weather Station — live from a Raspberry Pi in Skerries, Co. Dublin" />
+    <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
     <script is:inline>
       // Same as www.dermotdooley.com: dark unless you've picked light, on any of the
       // dermotdooley.com sites — the choice is shared through a `theme` cookie on the parent
@@ -117,6 +124,10 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://weather.der
       </p>
 
     </footer>
+    <script>
+      import { startLiveTimes } from "@/lib/live-times";
+      startLiveTimes();
+    </script>
     <script is:inline>
       (() => {
         const button = document.getElementById("theme-toggle");

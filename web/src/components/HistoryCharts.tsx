@@ -11,13 +11,17 @@ const EChart = lazy(() => import("@/components/EChart").then((m) => ({ default: 
 import { useIsDark } from "@/lib/use-is-dark";
 import type { Reading } from "@/lib/supabase";
 import { MS_TO_KMH } from "@/lib/format";
-import thermometerIcon from "@meteocons/svg/flat/thermometer.svg?url";
-import humidityIcon from "@meteocons/svg/flat/humidity.svg?url";
-import pressureHighIcon from "@meteocons/svg/flat/pressure-high.svg?url";
-import rainIcon from "@meteocons/svg/flat/rain.svg?url";
-import windIcon from "@meteocons/svg/flat/wind.svg?url";
-import compassIcon from "@meteocons/svg/flat/compass.svg?url";
-import airQualityIcon from "@meteocons/svg/flat/smoke-particles.svg?url";
+import { CARD_ICON } from "@/lib/utils";
+import {
+  CloudRain,
+  Compass,
+  Droplets,
+  Gauge,
+  Leaf,
+  Thermometer,
+  Wind,
+  type LucideIcon,
+} from "lucide-react";
 
 type Range = "24h" | "7d" | "30d" | "all";
 const RANGES: { value: Range; label: string }[] = [
@@ -574,14 +578,14 @@ function windRoseOption(data: Reading[], isDark: boolean): EChartsOption {
 }
 
 function ChartCard({
-  icon,
+  icon: Icon,
   title,
   hint,
   option,
   height,
   wide,
 }: {
-  icon: string;
+  icon: LucideIcon;
   title: string;
   /** One line under the title saying what the reader is looking at. */
   hint?: string;
@@ -592,7 +596,7 @@ function ChartCard({
   return (
     <Card className={wide ? "lg:col-span-2" : undefined}>
       <CardHeader className="flex items-center gap-2">
-        <img src={icon} alt="" className="h-9 w-9" />
+        <Icon className={CARD_ICON} aria-hidden="true" />
         <div>
           <CardTitle>{title}</CardTitle>
           {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
@@ -634,34 +638,34 @@ function RangeCharts({ range }: { range: Range }) {
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
       <ChartCard
         wide
-        icon={thermometerIcon}
+        icon={Thermometer}
         title="Temperature & dew point"
         hint={`°C · ${sampling} · the closer the two lines, the damper the air`}
         option={tempOption(data, ctx)}
       />
       <ChartCard
-        icon={pressureHighIcon}
+        icon={Gauge}
         title="Pressure"
         hint="hPa at sea level · falling ahead of unsettled weather"
         option={pressureOption(data, ctx)}
         height={240}
       />
       <ChartCard
-        icon={humidityIcon}
+        icon={Droplets}
         title="Humidity"
         hint="% relative humidity"
         option={humidityOption(data, ctx)}
         height={240}
       />
       <ChartCard
-        icon={windIcon}
+        icon={Wind}
         title="Wind & gusts"
         hint="km/h · gust is the peak within each reading"
         option={windOption(data, ctx)}
         height={240}
       />
       <ChartCard
-        icon={rainIcon}
+        icon={CloudRain}
         title="Rainfall"
         hint={`mm · ${rainPer}`}
         option={rainOption(data, ctx)}
@@ -669,7 +673,7 @@ function RangeCharts({ range }: { range: Range }) {
       />
       {hasAirQuality && (
         <ChartCard
-          icon={airQualityIcon}
+          icon={Leaf}
           title="Air quality"
           hint="relative index, uncalibrated · lower is cleaner"
           option={airQualityOption(data, ctx)}
@@ -677,7 +681,7 @@ function RangeCharts({ range }: { range: Range }) {
         />
       )}
       <ChartCard
-        icon={compassIcon}
+        icon={Compass}
         title="Wind rose"
         hint="share of readings blowing from each direction"
         option={windRoseOption(data, isDark)}

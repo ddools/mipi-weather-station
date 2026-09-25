@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// Regenerates the PWA icons in public/icons/ from public/favicon.svg.
+// Regenerates the PWA icons in public/icons/ and the link-preview image
+// public/og.png from public/favicon.svg.
 //
-//   npm run icons        (needs rsvg-convert: brew install librsvg)
+//   pnpm icons        (needs rsvg-convert: brew install librsvg)
 //
 // One windmill mark on a dark-slate ground, so a single icon reads on both a
 // light and a dark home screen. Two shapes are produced:
@@ -11,8 +12,11 @@
 //             shape the launcher uses, and the safe zone is only the central
 //             80% circle, so the mark needs the extra margin
 //
+// og.png is the 1200x630 card chat apps and social sites show for a shared
+// link (og:image / twitter:image in Layout.astro).
+//
 // The generated PNGs are committed; this only needs re-running when the
-// favicon changes.
+// favicon or the site's name/description changes.
 
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -62,3 +66,38 @@ for (const icon of ICONS) {
   ]);
   console.log(`${icon.name}  ${icon.size}x${icon.size}`);
 }
+
+// --- Link preview ------------------------------------------------------------
+
+const OG = { width: 1200, height: 630 };
+const MUTED = "#b4b4b4"; // --muted-foreground, dark theme (oklch 0.75)
+const ACCENT = "#88c0d0"; // Nord frost
+
+function renderOg() {
+  const { width, height } = OG;
+  const mark = 150;
+  const font = "Helvetica Neue, Helvetica, Arial, sans-serif";
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" ` +
+    `viewBox="0 0 ${width} ${height}">` +
+    `<rect width="${width}" height="${height}" fill="${BACKGROUND}"/>` +
+    `<rect y="${height - 12}" width="${width}" height="12" fill="${ACCENT}"/>` +
+    `<g transform="translate(90 110) scale(${(mark / 14).toFixed(6)})">` +
+    `<path fill="${FOREGROUND}" d="${path}"/></g>` +
+    `<text x="90" y="370" font-family="${font}" font-size="76" font-weight="700" ` +
+    `fill="${FOREGROUND}">Skerries Weather Station</text>` +
+    `<text x="90" y="440" font-family="${font}" font-size="36" fill="${MUTED}">` +
+    `Live from a Raspberry Pi in Skerries, Co. Dublin</text>` +
+    `<text x="90" y="530" font-family="${font}" font-size="30" fill="${ACCENT}">` +
+    `Temperature · Wind · Rain · Tides · Forecast</text>` +
+    `</svg>`
+  );
+}
+
+const ogSource = join(tmpdir(), "ws-og.svg");
+writeFileSync(ogSource, renderOg());
+execFileSync("rsvg-convert", [
+  "-w", String(OG.width), "-h", String(OG.height),
+  "-o", join(ROOT, "public", "og.png"), ogSource,
+]);
+console.log(`og.png  ${OG.width}x${OG.height}`);

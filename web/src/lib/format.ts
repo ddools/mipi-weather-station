@@ -31,13 +31,45 @@ export function rainIntensity(mmPerHour: number | null): string {
   return "heavy rain";
 }
 
-export function timeAgo(iso: string): string {
-  const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  if (seconds < 90) return "just now";
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  return `${hours}h ago`;
+// --- Countdowns ------------------------------------------------------------
+//
+// One rule for every "in …" on the site: hours and minutes under a day, then
+// "tomorrow" or "in N days" by the Dublin calendar. Server-rendered text is
+// only right at render time, so anything marked `data-until` is re-rendered in
+// the browser every few seconds by lib/live-times.ts.
+
+const DAY_MS = 86_400_000;
+
+/** Calendar date in Dublin as a day number, for counting midnights crossed. */
+function dublinDayNumber(ms: number): number {
+  const ymd = new Date(ms).toLocaleDateString("en-CA", { timeZone: "Europe/Dublin" });
+  return Date.parse(`${ymd}T00:00:00Z`) / DAY_MS;
+}
+
+export function untilLabel(target: string | number | Date, now: number = Date.now()): string {
+  const t = new Date(target).getTime();
+  const mins = Math.ceil((t - now) / 60_000);
+  if (Number.isNaN(mins)) return "";
+  if (mins <= 0) return "now";
+  if (mins < 24 * 60) {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return h ? `in ${h}h ${m}m` : `in ${m}m`;
+  }
+  const days = dublinDayNumber(t) - dublinDayNumber(now);
+  return days <= 1 ? "tomorrow" : `in ${days} days`;
+}
+
+/** Age of a reading: "40s ago", "6m ago", "2h 5m ago", "3 days ago". */
+export function ageLabel(iso: string | number | Date, now: number = Date.now()): string {
+  const s = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 1000));
+  if (s < 60) return `${s}s ago`;
+  const mins = Math.floor(s / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const h = Math.floor(mins / 60);
+  if (h < 24) return mins % 60 ? `${h}h ${mins % 60}m ago` : `${h}h ago`;
+  const days = Math.floor(h / 24);
+  return days === 1 ? "a day ago" : `${days} days ago`;
 }
 
 // --- Wind ------------------------------------------------------------------

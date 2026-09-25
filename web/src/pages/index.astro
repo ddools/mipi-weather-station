@@ -19,37 +19,37 @@ import { Skeleton } from "@/components/ui/skeleton";
 <Layout>
   <div class="mb-8">
     <NowHero server:defer>
-      {/* Heights measured from the resolved hero at each breakpoint (432 / 260
-          / 240px). A short fallback is not a cosmetic flaw here: the hero sits
+      {/* Heights measured from the resolved hero at each breakpoint (436 / 428
+          / 264 / 244px). A short fallback is not a cosmetic flaw here: the hero sits
           above the tabs, so every pixel it grows by shoves the whole dashboard
           down once the island lands. That was the site's entire CLS. */}
-      <Skeleton slot="fallback" className="h-108 rounded-2xl sm:h-65 xl:h-60" />
+      <Skeleton slot="fallback" className="h-109 rounded-2xl sm:h-107 lg:h-66 xl:h-61" />
     </NowHero>
   </div>
 
   <DashboardTabs>
     <Fragment slot="now">
       <CurrentConditions server:defer>
-        <div slot="fallback" class="space-y-4">
-          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Skeleton className="h-60" />
-            <Skeleton className="h-60" />
-            <Skeleton className="h-60" />
-            <Skeleton className="h-60" />
-          </div>
-          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <Skeleton className="h-44" />
-            <Skeleton className="h-44" />
-            <Skeleton className="h-44" />
-          </div>
+        <div slot="fallback" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
+          <Skeleton className="h-96 sm:col-span-2 lg:col-span-4" />
+          <Skeleton className="h-96 sm:col-span-2 lg:col-span-8" />
+          <Skeleton className="h-52 lg:col-span-3" />
+          <Skeleton className="h-52 lg:col-span-3" />
+          <Skeleton className="h-52 lg:col-span-3" />
+          <Skeleton className="h-52 lg:col-span-3" />
         </div>
       </CurrentConditions>
 
       <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
         {/* Tides + bathing are the "going in the sea" pair; stacked, they
             roughly match the radar's height beside them on lg. */}
+        {/* Tides, sun, moon and pollen are all server islands — rendered per
+            request. As part of the static shell they were frozen at build time,
+            and the countdowns went stale with them. */}
         <div class="flex flex-col gap-4">
-          <TidesSection />
+          <TidesSection server:defer>
+            <Skeleton slot="fallback" className="h-80" />
+          </TidesSection>
           <BathingSection server:defer>
             <Skeleton slot="fallback" className="h-64" />
           </BathingSection>
@@ -72,7 +72,7 @@ import { Skeleton } from "@/components/ui/skeleton";
       </section>
 
       <section>
-        <h2 class="mb-4 text-base font-semibold text-muted-foreground">History</h2>
+        <h3 class="mb-4 text-base font-semibold text-muted-foreground">Charts</h3>
         {/* client:only — the charts fetch their own data and render a spinner
             first, so SSR adds nothing and only invites Radix/ECharts hydration
             mismatches (worse now that the panel starts `hidden`). */}
@@ -88,9 +88,15 @@ import { Skeleton } from "@/components/ui/skeleton";
       </section>
 
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <SunSection />
-        <MoonSection />
-        <PollenSection />
+        <SunSection server:defer>
+          <Skeleton slot="fallback" className="h-56" />
+        </SunSection>
+        <MoonSection server:defer>
+          <Skeleton slot="fallback" className="h-56" />
+        </MoonSection>
+        <PollenSection server:defer>
+          <Skeleton slot="fallback" className="h-56" />
+        </PollenSection>
       </div>
     </Fragment>
   </DashboardTabs>

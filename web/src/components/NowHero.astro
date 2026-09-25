@@ -5,7 +5,7 @@
 import SkyIcon from "@/components/SkyIcon.astro";
 import { getLatestReading, getTodaySummary } from "@/lib/supabase";
 import { getCurrentSky } from "@/lib/forecast";
-import { degToCompass, fmt, msToKmh } from "@/lib/format";
+import { ageLabel, degToCompass, fmt, msToKmh } from "@/lib/format";
 import { feelsLike } from "@/lib/derived";
 import { getTideStatus, nextTurn, TIDE_STAGE_LABEL, type TideStatus } from "@/lib/tides";
 
@@ -20,12 +20,14 @@ const [latest, summary, sky, tide] = await Promise.all([
 const ageSec = latest?.recorded_at
   ? (Date.now() - new Date(latest.recorded_at).getTime()) / 1000
   : Infinity;
+// Keep in step with STATUS in the script below. Past "live" the whole status
+// chip is tinted, so a stalled feed is obvious and not just a dot changing colour.
 const status =
   ageSec <= 180
-    ? { key: "live", label: "Live", color: "#10b981" }
+    ? { key: "live", label: "Live", color: "#10b981", chip: "" }
     : ageSec <= 900
-      ? { key: "delayed", label: "Delayed", color: "#f59e0b" }
-      : { key: "offline", label: "Offline", color: "#ef4444" };
+      ? { key: "delayed", label: "Delayed", color: "#f59e0b", chip: "bg-amber-400/25 ring-amber-500/50" }
+      : { key: "offline", label: "Station offline", color: "#ef4444", chip: "bg-red-500/20 ring-red-500/50" };
 
 // Offline → the newest row's instantaneous values no longer describe "now".
 const reading = status.key === "offline" ? null : latest;
@@ -43,6 +45,9 @@ const lastUpdatedAbs = latest?.recorded_at
       timeZone: "Europe/Dublin",
     })
   : null;
+const lastReadingText = latest?.recorded_at
+  ? `last reading ${ageLabel(latest.recorded_at)}`
+  : "awaiting first reading";
 
 // Tide marker: "Tide coming in · High 14:32". Slack water already names the
 // tide ("High tide"), so only the in/out stages get the "Tide" prefix.
@@ -112,26 +117,33 @@ const stats = [
   ]}
 >
   <div class="mb-5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-    <span class="flex items-center gap-2 font-medium">
-      <span class="relative flex h-2.5 w-2.5">
-        <span
-          id="hero-ping"
-          class:list={[
-            "absolute inline-flex h-full w-full rounded-full opacity-75",
-            { "animate-ping": status.key === "live" },
-          ]}
-          style={`background-color:${status.color}`}
-        ></span>
-        <span
-          id="hero-dot"
-          class="relative inline-flex h-2.5 w-2.5 rounded-full"
-          style={`background-color:${status.color}`}
-        ></span>
+    <span
+      id="hero-status"
+      class:list={[
+        "-mx-2 flex items-center gap-2 rounded-full px-2 py-0.5",
+        status.chip && `ring-1 ${status.chip}`,
+      ]}
+      title={lastUpdatedAbs ? `Last reading ${lastUpdatedAbs}` : undefined}
+    >
+      <span class="flex items-center gap-2 font-medium">
+        <span class="relative flex h-2.5 w-2.5">
+          <span
+            id="hero-ping"
+            class:list={[
+              "absolute inline-flex h-full w-full rounded-full opacity-75 motion-reduce:hidden",
+              { "animate-ping": status.key === "live" },
+            ]}
+            style={`background-color:${status.color}`}
+          ></span>
+          <span
+            id="hero-dot"
+            class="relative inline-flex h-2.5 w-2.5 rounded-full"
+            style={`background-color:${status.color}`}
+          ></span>
+        </span>
+        <span id="hero-label">{status.label}</span>
       </span>
-      <span id="hero-label">{status.label}</span>
-    </span>
-    <span id="hero-updated" class="opacity-80">
-      {lastUpdatedAbs ? `Last updated ${lastUpdatedAbs}` : "Awaiting first reading"}
+      <span id="hero-updated" class="opacity-80 tabular-nums">· {lastReadingText}</span>
     </span>
     <span
       id="hero-tide"
@@ -161,11 +173,14 @@ const stats = [
     </span>
   </div>
 
-  <div class="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between sm:gap-10">
+  {/* Stacked (temperature over a 2×2 of stats) until desktop: side by side at
+      tablet width, the stats wrapped "1018 hPa" and "RAIN TODAY" onto two lines. */}
+  <div class="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
     <div class="flex items-center gap-4 sm:gap-5">
       <SkyIcon
         name={sky?.icon ?? "overcast-day"}
         alt={sky?.label ?? ""}
+        animated
         class="h-24 w-24 shrink-0 drop-shadow-sm sm:h-28 sm:w-28"
       />
       <div>
@@ -191,14 +206,14 @@ const stats = [
       </div>
     </div>
 
-    <dl class="grid grid-cols-2 gap-y-5 sm:grid-cols-4 sm:gap-y-0">
+    <dl class="grid grid-cols-2 gap-y-5 lg:grid-cols-4 lg:gap-y-0">
       {
         stats.map((s, i) => (
           <div
             class:list={[
               "px-4 first:pl-0 sm:px-5",
               i > 0 && "border-l border-current/15",
-              i === 2 && "border-l-0 sm:border-l",
+              i === 2 && "border-l-0 pl-0 sm:pl-0 lg:border-l lg:pl-5",
             ]}
           >
             <dt class="text-xs font-medium uppercase tracking-wide opacity-70">{s.label}</dt>
@@ -264,36 +279,49 @@ const stats = [
       return !iso || (Date.now() - new Date(iso).getTime()) / 1000 > 900;
     };
 
+    // Mirrors `status` in the frontmatter. Chip classes are listed in full so
+    // Tailwind keeps them in the build.
     const STATUS = [
-      { label: "Live", color: "#10b981", maxAge: 180, ping: true },
-      { label: "Delayed", color: "#f59e0b", maxAge: 900, ping: false },
-      { label: "Offline", color: "#ef4444", maxAge: Infinity, ping: false },
+      { label: "Live", color: "#10b981", maxAge: 180, ping: true, chip: [] as string[] },
+      { label: "Delayed", color: "#f59e0b", maxAge: 900, ping: false,
+        chip: ["ring-1", "bg-amber-400/25", "ring-amber-500/50"] },
+      { label: "Station offline", color: "#ef4444", maxAge: Infinity, ping: false,
+        chip: ["ring-1", "bg-red-500/20", "ring-red-500/50"] },
     ];
+    const ALL_CHIP = [...new Set(STATUS.flatMap((s) => s.chip))];
     function fmtAbsolute(iso: string) {
       return new Date(iso).toLocaleString("en-IE", {
         day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
         timeZone: "Europe/Dublin",
       });
     }
+    // Mirrors lib/format.ts:ageLabel.
+    function ageLabel(sec: number) {
+      const s = Math.max(0, Math.floor(sec));
+      if (s < 60) return `${s}s ago`;
+      const mins = Math.floor(s / 60);
+      if (mins < 60) return `${mins}m ago`;
+      const h = Math.floor(mins / 60);
+      if (h < 24) return mins % 60 ? `${h}h ${mins % 60}m ago` : `${h}h ago`;
+      const days = Math.floor(h / 24);
+      return days === 1 ? "a day ago" : `${days} days ago`;
+    }
     function updateStatus(iso: string | undefined) {
+      const chip = document.getElementById("hero-status");
       const label = document.getElementById("hero-label");
       const dot = document.getElementById("hero-dot");
       const ping = document.getElementById("hero-ping");
       const updated = document.getElementById("hero-updated");
-      if (!label || !dot || !ping || !updated) return;
-      if (!iso) {
-        label.textContent = "Offline";
-        dot.style.backgroundColor = ping.style.backgroundColor = "#ef4444";
-        ping.classList.remove("animate-ping");
-        updated.textContent = "Awaiting first reading";
-        return;
-      }
-      const age = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+      if (!chip || !label || !dot || !ping || !updated) return;
+      const age = iso ? (Date.now() - new Date(iso).getTime()) / 1000 : Infinity;
       const s = STATUS.find((x) => age <= x.maxAge)!;
       label.textContent = s.label;
       dot.style.backgroundColor = ping.style.backgroundColor = s.color;
       ping.classList.toggle("animate-ping", s.ping);
-      updated.textContent = `Last updated ${fmtAbsolute(iso)}`;
+      chip.classList.remove(...ALL_CHIP);
+      chip.classList.add(...s.chip);
+      updated.textContent = iso ? `· last reading ${ageLabel(age)}` : "· awaiting first reading";
+      if (iso) chip.title = `Last reading ${fmtAbsolute(iso)}`;
     }
 
     const refreshCurrent = async () => {
@@ -371,7 +399,7 @@ const stats = [
 
     updateStatus(root.dataset.recordedAt || undefined);
     refreshCurrent();
-    setInterval(() => updateStatus(root.dataset.recordedAt || undefined), 15_000);
+    setInterval(() => updateStatus(root.dataset.recordedAt || undefined), 5_000);
     setInterval(refreshCurrent, 45_000);
     setInterval(refreshSummary, 5 * 60_000);
     setInterval(refreshTide, 10 * 60_000);

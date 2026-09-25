@@ -5,15 +5,10 @@ import { WindTrend } from "@/components/WindTrend";
 import { getLatestReading, getTodaySummary } from "@/lib/supabase";
 import { degToCompass, fmt, beaufort, msToKmh, pressureTrend, rainIntensity, trend as changeTrend } from "@/lib/format";
 import { feelsLike, dewPointComfort } from "@/lib/derived";
-import { airQualityBand, type AirBand } from "@/lib/air";
-import thermometerIcon from "@meteocons/svg/flat/thermometer.svg?url";
-import humidityIcon from "@meteocons/svg/flat/humidity.svg?url";
-import pressureHighIcon from "@meteocons/svg/flat/pressure-high.svg?url";
-import pressureLowIcon from "@meteocons/svg/flat/pressure-low.svg?url";
-import pressureNoneIcon from "@meteocons/svg/flat/barometer.svg?url";
-import windIcon from "@meteocons/svg/flat/wind.svg?url";
-import rainIcon from "@meteocons/svg/flat/rain.svg?url";
-import airQualityIcon from "@meteocons/svg/flat/smoke-particles.svg?url";
+import { airQualityBand, AIR_USUAL_RANGE, type AirBand } from "@/lib/air";
+import { nordify, stripAnimation } from "@/lib/meteocons.js";
+import { cn, CARD_ICON } from "@/lib/utils";
+import { CloudRain, Droplets, Gauge, Leaf, Thermometer, Wind } from "lucide-react";
 import compassSvgRaw from "@meteocons/svg/flat/compass.svg?raw";
 
 const [latestReading, summary] = await Promise.all([getLatestReading(), getTodaySummary()]);
@@ -43,14 +38,6 @@ const status = liveStatus(latestReading?.recorded_at);
 const RAIN_SPARK_MIN_MM = 2;
 const reading = status.key === "offline" ? null : latestReading;
 
-const pressureHpa = reading?.pressure_msl_hpa ?? null;
-const pressureIcon =
-  pressureHpa === null
-    ? pressureNoneIcon
-    : pressureHpa >= 1013
-      ? pressureHighIcon
-      : pressureLowIcon;
-
 const trend = reading ? pressureTrend(summary.pressureNow, summary.pressure3hAgo) : null;
 
 // Temperature: hourly-rate trend arrow + change since the same time yesterday.
@@ -75,7 +62,7 @@ const air = airQualityBand(reading?.air_quality);
 const AIR_STYLE: Record<AirBand, { dot: string; text: string }> = {
   good: { dot: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400" },
   moderate: { dot: "bg-amber-500", text: "text-amber-600 dark:text-amber-400" },
-  poor: { dot: "bg-red-500", text: "text-red-600 dark:text-red-400" },
+  poor: { dot: "bg-orange-500", text: "text-orange-600 dark:text-orange-400" },
   unknown: { dot: "bg-muted-foreground/40", text: "text-muted-foreground" },
 };
 
@@ -84,22 +71,21 @@ const windKmh = msToKmh(reading?.wind_speed_ms ?? null);
 const gustKmh = msToKmh(reading?.wind_gust_ms ?? null);
 const gustMaxKmh = msToKmh(summary.gustMax);
 
-// The compass icon's needle is a separate <g id="Pointer"> group with its own
-// idle wobble animation (SMIL animateTransform, rotate -6..6deg). We point it
-// at the real wind direction by injecting a static base rotation and marking
-// the wobble `additive="sum"` so the two combine instead of the wobble
-// overwriting our rotation every frame. Falls back to the icon's default
-// (unrotated, still wobbling) if either anchor string isn't found — e.g. a
-// future meteocons release changes the internal markup.
+// The compass icon's needle is a separate <g id="Pointer"> group; we point it
+// at the real wind direction with a static rotation. Its idle wobble is
+// stripped along with every other card-icon animation, and it's recoloured to
+// Nord. Falls back to the unrotated icon if the anchor string isn't found —
+// e.g. a future meteocons release changes the internal markup.
 function renderCompass(deg: number | null): string {
-  const sized = compassSvgRaw.replace("<svg ", '<svg width="100%" height="100%" ');
+  const sized = stripAnimation(nordify(compassSvgRaw)).replace(
+    "<svg ",
+    '<svg width="100%" height="100%" '
+  );
   if (deg === null) return sized;
-  return sized
-    .replace('<g id="Pointer">', `<g id="Pointer" transform="rotate(${Math.round(deg)} 64 64)">`)
-    .replace(
-      'type="rotate" values="-6 64 64;6 64 64;-6 64 64"',
-      'type="rotate" values="-6 64 64;6 64 64;-6 64 64" additive="sum"'
-    );
+  return sized.replace(
+    '<g id="Pointer">',
+    `<g id="Pointer" transform="rotate(${Math.round(deg)} 64 64)">`
+  );
 }
 
 const compassSvg = renderCompass(reading?.wind_dir_deg ?? null);
@@ -107,6 +93,13 @@ const compassSvg = renderCompass(reading?.wind_dir_deg ?? null);
 // "Right now" rain intensity — only meaningful while the station is live, so it
 // follows `reading` (nulled when offline) rather than the day-total figures.
 const rainRateNow = reading ? summary.rainRateNow : null;
+// The compact cards: Rain, Pressure, Humidity and (when the sensor reports)
+// Air quality — one desktop row of four, or of three without it.
+const hasAir = reading?.air_quality != null;
+const compactSpan = hasAir ? "lg:col-span-3" : "lg:col-span-4";
+
+// On a dry day the running-total chart is a flat line at zero — drop it.
+const rainedToday = (summary.rainToday ?? 0) > 0;
 const rainSparkDomain: [number, number] = [
   0,
   Math.max(summary.rainToday ?? 0, RAIN_SPARK_MIN_MM),
@@ -140,10 +133,14 @@ const windSparkRange = sparkRange(
   data-wind-dir-deg={reading?.wind_dir_deg ?? ""}
 >
 
-  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-    <Card>
+  {/* Phone: one column, in source order. Tablet and up: the two tall cards
+      (Temperature, Wind) first — full width on tablet, side by side on desktop —
+      then the compact cards, two or four across, so no card stretches far past
+      its own content. `sm:order-1` moves Rain down among the compact cards. */}
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
+    <Card className="sm:col-span-2 lg:col-span-4">
       <CardHeader className="flex items-center gap-2">
-        <img src={thermometerIcon} alt="" class="h-10 w-10" />
+        <Thermometer className={CARD_ICON} aria-hidden="true" />
         <CardTitle>Temperature</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col">
@@ -211,9 +208,9 @@ const windSparkRange = sparkRange(
       </CardContent>
     </Card>
 
-    <Card>
+    <Card className={cn(compactSpan, "sm:order-1")}>
       <CardHeader className="flex items-center gap-2">
-        <img src={rainIcon} alt="" class="h-10 w-10" />
+        <CloudRain className={CARD_ICON} aria-hidden="true" />
         <CardTitle>Rain today</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col">
@@ -244,24 +241,28 @@ const windSparkRange = sparkRange(
           </div>
         </dl>
 
-        <div class="mt-auto pt-4">
-          <Sparkline
-            values={summary.spark.rain}
-            domain={rainSparkDomain}
-            color="#38bdf8"
-            class="w-full text-muted-foreground/60"
-          />
-          <p class="mt-1 flex justify-between text-xs text-muted-foreground tabular-nums">
-            <span>Running total today</span>
-            <span data-field="rain_today_spark">{fmt(summary.rainToday, 1, " mm")}</span>
-          </p>
-        </div>
+        {
+          rainedToday && (
+            <div class="mt-auto pt-4">
+              <Sparkline
+                values={summary.spark.rain}
+                domain={rainSparkDomain}
+                color="#38bdf8"
+                class="w-full text-muted-foreground/60"
+              />
+              <p class="mt-1 flex justify-between text-xs text-muted-foreground tabular-nums">
+                <span>Running total today</span>
+                <span data-field="rain_today_spark">{fmt(summary.rainToday, 1, " mm")}</span>
+              </p>
+            </div>
+          )
+        }
       </CardContent>
     </Card>
 
-    <Card className="lg:col-span-2">
+    <Card className="sm:col-span-2 lg:col-span-8">
       <CardHeader className="flex items-center gap-2">
-        <img src={windIcon} alt="" class="h-10 w-10" />
+        <Wind className={CARD_ICON} aria-hidden="true" />
         <CardTitle>Wind</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-wrap items-center gap-x-8 gap-y-4">
@@ -320,12 +321,9 @@ const windSparkRange = sparkRange(
         </div>
       </CardContent>
     </Card>
-  </div>
-
-  <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-    <Card>
+    <Card className={cn(compactSpan, "sm:order-1")}>
       <CardHeader className="flex items-center gap-2">
-        <img src={pressureIcon} alt="" class="h-10 w-10" />
+        <Gauge className={CARD_ICON} aria-hidden="true" />
         <CardTitle>Pressure</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col">
@@ -353,9 +351,9 @@ const windSparkRange = sparkRange(
       </CardContent>
     </Card>
 
-    <Card>
+    <Card className={cn(compactSpan, "sm:order-1", !hasAir && "sm:col-span-2")}>
       <CardHeader className="flex items-center gap-2">
-        <img src={humidityIcon} alt="" class="h-10 w-10" />
+        <Droplets className={CARD_ICON} aria-hidden="true" />
         <CardTitle>Humidity</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col">
@@ -387,26 +385,30 @@ const windSparkRange = sparkRange(
     </Card>
 
     {
-      reading?.air_quality != null && (
-        <Card>
+      hasAir && reading && (
+        <Card className={cn(compactSpan, "sm:order-1")}>
           <CardHeader className="flex items-center gap-2">
-            <img src={airQualityIcon} alt="" class="h-10 w-10" />
+            <Leaf className={CARD_ICON} aria-hidden="true" />
             <CardTitle>Air quality</CardTitle>
           </CardHeader>
           <CardContent>
-            <div class="flex items-center gap-2.5">
+            <div class="flex items-baseline gap-2">
               <span
                 data-field="air_dot"
-                class={`inline-block h-3 w-3 shrink-0 rounded-full ${AIR_STYLE[air.band].dot}`}
+                class={`inline-block h-2.5 w-2.5 shrink-0 self-center rounded-full ${AIR_STYLE[air.band].dot}`}
               />
-              <span
-                data-field="air_quality"
-                class={`text-2xl font-semibold ${AIR_STYLE[air.band].text}`}
-              >
+              <span data-field="air_quality" class={`text-lg font-semibold ${AIR_STYLE[air.band].text}`}>
                 {air.label}
               </span>
+              <span class="text-sm text-muted-foreground tabular-nums">
+                index <span data-field="air_index">{fmt(reading.air_quality, 1)}</span>
+              </span>
             </div>
-            <p class="mt-2 text-sm text-muted-foreground" data-field="air_note">{air.note}</p>
+            <p class="mt-1 text-sm text-muted-foreground" data-field="air_note">{air.note}</p>
+            <p class="mt-3 text-xs text-muted-foreground">
+              A gas sensor at the station: it picks up smoke, cooking and solvent fumes, not
+              particles (PM2.5). No absolute scale — it usually reads {AIR_USUAL_RANGE}.
+            </p>
           </CardContent>
         </Card>
       )
@@ -484,23 +486,24 @@ const windSparkRange = sparkRange(
   // Mirrors lib/air.ts. Class lists must match the AIR_STYLE map in the frontmatter
   // so Tailwind keeps them in the build.
   const AIR_BANDS = [
-    { max: 63, label: "Good", note: "nothing unusual in the air",
+    { max: 63, label: "Normal", note: "about usual for this spot",
       dot: "bg-emerald-500", text: ["text-emerald-600", "dark:text-emerald-400"] },
-    { max: 64.5, label: "Moderate", note: "slightly raised — cooking or solvents nearby",
+    { max: 64.5, label: "Slightly raised", note: "a little above usual — cooking or a car idling nearby",
       dot: "bg-amber-500", text: ["text-amber-600", "dark:text-amber-400"] },
-    { max: Infinity, label: "Poor", note: "raised — a strong nearby source",
-      dot: "bg-red-500", text: ["text-red-600", "dark:text-red-400"] },
+    { max: Infinity, label: "Raised", note: "well above usual — smoke or fumes close to the station",
+      dot: "bg-orange-500", text: ["text-orange-600", "dark:text-orange-400"] },
   ];
   const AIR_UNKNOWN = { label: "—", note: "sensor warming up", dot: "bg-muted-foreground/40", text: ["text-muted-foreground"] };
-  const ALL_AIR_DOTS = ["bg-emerald-500", "bg-amber-500", "bg-red-500", "bg-muted-foreground/40"];
+  const ALL_AIR_DOTS = ["bg-emerald-500", "bg-amber-500", "bg-orange-500", "bg-muted-foreground/40"];
   const ALL_AIR_TEXT = [
     "text-emerald-600", "dark:text-emerald-400", "text-amber-600", "dark:text-amber-400",
-    "text-red-600", "dark:text-red-400", "text-muted-foreground",
+    "text-orange-600", "dark:text-orange-400", "text-muted-foreground",
   ];
   function setAirQuality(v: number | null) {
     const b = v === null ? AIR_UNKNOWN : (AIR_BANDS.find((x) => v <= x.max) ?? AIR_BANDS[2]);
     set("air_quality", b.label);
     set("air_note", b.note);
+    set("air_index", fmt(v, 1, ""));
     const dot = root()?.querySelector('[data-field="air_dot"]');
     const label = root()?.querySelector('[data-field="air_quality"]');
     ALL_AIR_DOTS.forEach((c) => dot?.classList.remove(c));

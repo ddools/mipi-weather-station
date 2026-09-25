@@ -3,7 +3,8 @@ import type * as L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useIsDark } from "@/lib/use-is-dark";
-import radarIcon from "@meteocons/svg/flat/raindrops.svg?url";
+import { CARD_ICON } from "@/lib/utils";
+import { Radar } from "lucide-react";
 
 // Skerries Harbour / Holmpatrick — same point the header and tides use.
 const STATION = { lat: 53.585, lon: -6.106 };
@@ -224,7 +225,7 @@ export function RainRadar() {
   return (
     <Card>
       <CardHeader className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <img src={radarIcon} alt="" className="h-9 w-9" />
+        <Radar className={CARD_ICON} aria-hidden="true" />
         <CardTitle>Rain radar</CardTitle>
         <a
           className="ml-auto shrink-0 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
