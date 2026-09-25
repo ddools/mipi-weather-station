@@ -145,63 +145,12 @@ const sample = report?.lastSample ?? null;
             </p>
           )}
 
-          {report.annual.length > 0 && (
-            <>
-              <p class="mt-4 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                Annual rating
-              </p>
-              <ol class="mt-1.5 flex flex-wrap gap-1.5 text-xs">
-                {report.annual.map((y) => (
-                  <li class="flex items-center gap-1.5 rounded-md bg-muted/60 px-2 py-1">
-                    <span class="text-muted-foreground tabular-nums">{y.year}</span>
-                    <span class={`inline-block h-2 w-2 rounded-full ${style(y.rating).dot}`} />
-                    <span class="font-medium">{label(y.rating)}</span>
-                  </li>
-                ))}
-              </ol>
-            </>
-          )}
-
           {report.inSeason && report.shortTermPollutionRisk && !restriction && (
             <p class="mt-3 text-xs text-muted-foreground">
               The EPA flags this beach as prone to short-term pollution, typically after heavy
               rain.
             </p>
           )}
-
-          <p class="mt-3 text-xs text-muted-foreground">
-            Source:{" "}
-            <a
-              href="https://data.epa.ie/api-list/bathing-water-open-data/"
-              target="_blank"
-              rel="noopener"
-              class="underline underline-offset-2 hover:text-foreground"
-            >
-              EPA
-            </a>{" "}
-            (CC BY 4.0) ·{" "}
-            <a
-              href="https://www.beaches.ie/"
-              target="_blank"
-              rel="noopener"
-              class="underline underline-offset-2 hover:text-foreground"
-            >
-              beaches.ie
-            </a>
-            {report.profileUrl && (
-              <>
-                {" · "}
-                <a
-                  href={report.profileUrl}
-                  target="_blank"
-                  rel="noopener"
-                  class="underline underline-offset-2 hover:text-foreground"
-                >
-                  Beach profile
-                </a>
-              </>
-            )}
-          </p>
         </>
       )
     }

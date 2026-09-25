@@ -319,5 +319,11 @@ Made while building (2026-09-25); revisit if they read wrong in use.
   repeats the EPA's own `short_term_pollution_risk` flag as one muted line. It
   quotes the EPA and doesn't use our rain data, so it isn't §5.
 - **Rain note (§5)**: still open. It needs a threshold we don't have yet.
+- **Trimmed (2026-09-25, Dermot's call)**: the annual-rating strip (§4b item 4)
+  and the source footer (§4b item 5) were removed, and `annual`/`profileUrl` were
+  dropped from `BathingReport`. The card is now: header, restriction banner,
+  latest sample, pollution-risk line. **CC BY 4.0 attribution for the EPA isn't
+  shown anywhere now.** Add it back somewhere (e.g. a site-wide data-credits
+  footer) before relying on the licence.
 - **Colours**: sky/emerald/amber/red as in §4b. Not checked against beaches.ie
   (its homepage exposes no rating colours to scrape).

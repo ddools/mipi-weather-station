@@ -163,8 +163,10 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
 - **Bathing water card** (2026-09-25) — `components/BathingSection.astro`
   (`server:defer`) + `lib/bathing.ts`, from the EPA Bathing Water Open Data API
   (keyless, CC BY 4.0). Skerries, South Beach (`IEEABWC020_0000_0500`): latest
-  sample, four-year annual ratings, red banner for an active restriction,
-  "Season ended" outside 1 Jun – 15 Sep. First non-Open-Meteo data dependency
+  sample, red banner for an active restriction,
+  "Season ended" outside 1 Jun – 15 Sep. The annual ratings and the "Source:
+  EPA" line were removed from the card at Dermot's request, so there's **no EPA
+  credit on the site right now** even though CC BY 4.0 requires one. First non-Open-Meteo data dependency
   in `web/`. Plan + API notes: [docs/bathing-water.md](docs/bathing-water.md).
 - **Installable PWA** (2026-09-08) — `web/public/manifest.webmanifest` +
   `web/public/sw.js` + `web/src/components/ServiceWorker.astro` (mounted from
