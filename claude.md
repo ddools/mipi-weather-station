@@ -151,7 +151,8 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   High 11:26", from `lib/tides.ts` `stage`/`nextTurn`, shared with `TidesSection`;
   refreshed from `/api/tides` every 10 min). The old status bar was dropped from `CurrentConditions`.
   `Now in detail` tab = the detail cards + `WindTrend` island (last-5-min
-  wind/gust trend, polls `/api/recent`) + **Tides** + rain radar.
+  wind/gust trend, polls `/api/recent`) + **Tides** (with **Bathing water**
+  stacked under it) + rain radar.
   `History` = charts + records + station health; `HistoryCharts` is now
   `client:only="react"` (SSR only invited Radix hydration mismatches) and
   `EChart.tsx` defers `echarts.init` until its container has a size.
@@ -159,6 +160,12 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   WMO-code→Meteocons map, 30-min memo cache; a 4th Open-Meteo dependency
   alongside marine/air-quality) + sun + moon + pollen.
   Plan: `docs/dashboard-tabs.md`.
+- **Bathing water card** (2026-09-25) — `components/BathingSection.astro`
+  (`server:defer`) + `lib/bathing.ts`, from the EPA Bathing Water Open Data API
+  (keyless, CC BY 4.0). Skerries, South Beach (`IEEABWC020_0000_0500`): latest
+  sample, four-year annual ratings, red banner for an active restriction,
+  "Season ended" outside 1 Jun – 15 Sep. First non-Open-Meteo data dependency
+  in `web/`. Plan + API notes: [docs/bathing-water.md](docs/bathing-water.md).
 - **Installable PWA** (2026-09-08) — `web/public/manifest.webmanifest` +
   `web/public/sw.js` + `web/src/components/ServiceWorker.astro` (mounted from
   `Layout.astro`) + `web/src/pages/offline.astro`. Icons in `web/public/icons/`
@@ -313,6 +320,13 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   the **record's** timestamp, not `now` (backfill), and always send the fields,
   zeros included. See [docs/uploads.md](docs/uploads.md).
 - Windy upload pressure is **Pa**, not hPa.
+- **The EPA bathing-water API can't filter by beach.** `/measurements` and
+  `/alerts` ignore `?beach_id=` and return the whole country (26k sample rows,
+  oldest first), so `lib/bathing.ts` reads `count` and fetches the last two
+  1000-row pages, then filters and sorts by `result_date` itself. `/alerts` lists
+  only *active* incidents — ended ones vanish, so there's no closure history.
+  Results are strings (`"<10"`); sample ratings say `Excellent`, annual ones
+  `Excellent Quality`.
 - **`wow.met.ie` is not an upload endpoint.** It answers `GET /automaticreading`
   with HTTP 200 and the site's HTML shell — point a station at it and you upload
   nothing, silently. Observations go to `wow.metoffice.gov.uk/automaticreading`;

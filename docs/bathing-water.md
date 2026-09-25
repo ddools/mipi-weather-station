@@ -4,8 +4,11 @@ Plan for adding an EPA bathing-water card to the dashboard: the latest sample
 result, the annual rating, and any active bathing restriction at the designated
 bathing water nearest the station.
 
-Status: **plan, not started.** Written 2026-09-25. Every API fact below was
-checked against the live API that day.
+Status: **implemented on branch `bathing-water`** 2026-09-25: `lib/bathing.ts`,
+`BathingSection.astro`, wired into *Now in detail*. Checked against the live API
+and in the browser (all six states in §4b forced via fixtures, light + dark,
+390 px and desktop). Not yet deployed. §5 (rain note) not done. Every API fact
+below was checked against the live API on 2026-09-25.
 
 ---
 
@@ -197,9 +200,9 @@ render at build time, which is fine for them, but an active restriction must sho
 up without a redeploy. The service worker already caches `/_server-islands/*`
 network-first, so the offline copy comes for free.
 
-Uses the shadcn `Card` (same header pattern as `PollenSection`). Meteocons has no
-beach/swim icon; `thermometer-water.svg` or `raindrop.svg` are the closest.
-Decide when building.
+Uses the shadcn `Card` (same header pattern as `PollenSection`). Icon: Meteocons
+`water.svg` (waves), scaled 150% because the glyph only fills the middle of its
+128 px box. Meteocons has no beach/swim icon.
 
 Layout (top to bottom):
 
@@ -257,9 +260,10 @@ rain radar. Tides + bathing are the "going in the sea" pair:
 </div>
 ```
 
-Radar and Tides stay side by side on `lg`; bathing drops to its own row. If that
-row looks lonely, move it into the tides column instead. Judge it in the
-browser.
+**As built:** the first try (above) left bathing alone on a third row with a
+big gap under the short Tides card, so bathing is **stacked under Tides** in the
+left column instead. Tides + bathing together roughly match the radar's height
+on `lg`; on phones the order is Tides → Bathing → Radar.
 
 ---
 
@@ -303,11 +307,17 @@ No Pi changes, no Supabase changes, no new npm dependencies.
 
 ---
 
-## 7. Open questions
+## 7. Decisions
 
-- **One beach or two?** Skerries South Beach only (the plan), or add Loughshinny
-  as a compact second row?
-- **Icon**: `thermometer-water` vs `raindrop` vs a Lucide `waves` icon.
-- **Rain note (§5)**: do it at all, and at what threshold?
-- **Off-season visibility**: keep the card visible all year (the plan), or
-  collapse it to a one-liner between mid-September and June?
+Made while building (2026-09-25); revisit if they read wrong in use.
+
+- **One beach**: Skerries South Beach only. Loughshinny would be a second
+  `BEACH_ID` and a compact row, if wanted.
+- **Icon**: Meteocons `water.svg`.
+- **Off-season**: the card stays visible all year with a "Season ended" badge.
+- **Pollution-risk line**: in season, with no restriction active, the card
+  repeats the EPA's own `short_term_pollution_risk` flag as one muted line. It
+  quotes the EPA and doesn't use our rain data, so it isn't §5.
+- **Rain note (§5)**: still open. It needs a threshold we don't have yet.
+- **Colours**: sky/emerald/amber/red as in §4b. Not checked against beaches.ie
+  (its homepage exposes no rating colours to scrape).
