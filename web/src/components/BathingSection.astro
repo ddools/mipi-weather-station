@@ -1,0 +1,209 @@
+---
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getBathingReport, RATING_LABEL, type Rating } from "@/lib/bathing";
+import waterIcon from "@meteocons/svg/flat/water.svg?url";
+
+interface Props {
+  class?: string;
+}
+const { class: className } = Astro.props;
+
+const report = await getBathingReport();
+
+const RATING_STYLE: Record<Rating, { dot: string; text: string }> = {
+  excellent: { dot: "bg-sky-500", text: "text-sky-600 dark:text-sky-400" },
+  good: { dot: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400" },
+  sufficient: { dot: "bg-amber-500", text: "text-amber-600 dark:text-amber-400" },
+  poor: { dot: "bg-red-500", text: "text-red-600 dark:text-red-400" },
+};
+const UNRATED = { dot: "bg-muted-foreground/40", text: "text-muted-foreground" };
+
+function style(r: Rating | null) {
+  return r ? RATING_STYLE[r] : UNRATED;
+}
+function label(r: Rating | null): string {
+  return r ? RATING_LABEL[r] : "Not rated";
+}
+
+// EPA dates are plain local dates ("2026-09-07"); pin to noon UTC and format in
+// UTC so the day can't slip either way.
+function shortDate(iso: string): string {
+  return new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-IE", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+}
+
+const restriction = report?.alert
+  ? {
+      title: report.alert.type,
+      detail: report.alert.description,
+      since: report.alert.startDate,
+      noticeUrl: report.alert.noticeUrl,
+    }
+  : report?.allSeasonRestriction
+    ? {
+        title: "Bathing restricted all season",
+        detail: report.allSeasonRestriction,
+        since: null,
+        noticeUrl: null,
+      }
+    : null;
+
+const sample = report?.lastSample ?? null;
+---
+
+<Card className={className}>
+  <CardHeader className="flex items-center gap-2">
+    {/* The waves only fill the middle of meteocons' 128px box; scale them up to
+        sit level with the tides icon. */}
+    <img src={waterIcon} alt="" class="h-10 w-10 scale-150" />
+    <div>
+      <CardTitle>Bathing water</CardTitle>
+      {report && <p class="text-xs text-muted-foreground">{report.beachName}</p>}
+    </div>
+  </CardHeader>
+  <CardContent>
+    {
+      !report ? (
+        <p class="text-sm text-muted-foreground">Bathing water data unavailable.</p>
+      ) : (
+        <>
+          {restriction && (
+            <div
+              role="alert"
+              class="mb-4 flex gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+                class="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-400"
+              >
+                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" />
+                <path d="M12 9v4" />
+                <path d="M12 17h.01" />
+              </svg>
+              <div class="space-y-1">
+                <p class="font-semibold text-red-700 dark:text-red-300">{restriction.title}</p>
+                {restriction.detail && <p>{restriction.detail}</p>}
+                {(restriction.since || restriction.noticeUrl) && (
+                  <p class="text-xs text-muted-foreground">
+                    {restriction.since && <>Since {shortDate(restriction.since)}</>}
+                    {restriction.since && restriction.noticeUrl && " · "}
+                    {restriction.noticeUrl && (
+                      <a
+                        href={restriction.noticeUrl}
+                        target="_blank"
+                        rel="noopener"
+                        class="underline underline-offset-2 hover:text-foreground"
+                      >
+                        Official notice
+                      </a>
+                    )}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          <p class="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+            Latest sample
+          </p>
+          {sample ? (
+            <div class:list={[restriction && "opacity-70"]}>
+              <div class="mt-1 flex items-center gap-2">
+                <span class={`inline-block h-2.5 w-2.5 rounded-full ${style(sample.rating).dot}`} />
+                <span class={`text-lg font-semibold ${style(sample.rating).text}`}>
+                  {label(sample.rating)}
+                </span>
+              </div>
+              <p class="mt-1 text-sm text-muted-foreground">
+                {!report.inSeason && (
+                  <span class="mr-1 rounded bg-muted px-1.5 py-0.5 text-xs font-medium">
+                    Season ended
+                  </span>
+                )}
+                Sampled {shortDate(sample.date)}
+                {report.inSeason && report.nextSampleDate && (
+                  <> · next {shortDate(report.nextSampleDate)}</>
+                )}
+              </p>
+              <p class="mt-1 text-xs text-muted-foreground tabular-nums">
+                E. coli {sample.eColi} · enterococci {sample.enterococci} per 100 ml
+              </p>
+            </div>
+          ) : (
+            <p class="mt-1 text-sm text-muted-foreground">
+              {report.inSeason ? "No samples yet this season." : "No recent samples."}
+            </p>
+          )}
+
+          {report.annual.length > 0 && (
+            <>
+              <p class="mt-4 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                Annual rating
+              </p>
+              <ol class="mt-1.5 flex flex-wrap gap-1.5 text-xs">
+                {report.annual.map((y) => (
+                  <li class="flex items-center gap-1.5 rounded-md bg-muted/60 px-2 py-1">
+                    <span class="text-muted-foreground tabular-nums">{y.year}</span>
+                    <span class={`inline-block h-2 w-2 rounded-full ${style(y.rating).dot}`} />
+                    <span class="font-medium">{label(y.rating)}</span>
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
+
+          {report.inSeason && report.shortTermPollutionRisk && !restriction && (
+            <p class="mt-3 text-xs text-muted-foreground">
+              The EPA flags this beach as prone to short-term pollution, typically after heavy
+              rain.
+            </p>
+          )}
+
+          <p class="mt-3 text-xs text-muted-foreground">
+            Source:{" "}
+            <a
+              href="https://data.epa.ie/api-list/bathing-water-open-data/"
+              target="_blank"
+              rel="noopener"
+              class="underline underline-offset-2 hover:text-foreground"
+            >
+              EPA
+            </a>{" "}
+            (CC BY 4.0) ·{" "}
+            <a
+              href="https://www.beaches.ie/"
+              target="_blank"
+              rel="noopener"
+              class="underline underline-offset-2 hover:text-foreground"
+            >
+              beaches.ie
+            </a>
+            {report.profileUrl && (
+              <>
+                {" · "}
+                <a
+                  href={report.profileUrl}
+                  target="_blank"
+                  rel="noopener"
+                  class="underline underline-offset-2 hover:text-foreground"
+                >
+                  Beach profile
+                </a>
+              </>
+            )}
+          </p>
+        </>
+      )
+    }
+  </CardContent>
+</Card>

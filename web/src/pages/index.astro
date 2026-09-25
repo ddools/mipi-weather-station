@@ -12,6 +12,7 @@ import SunSection from "@/components/SunSection.astro";
 import MoonSection from "@/components/MoonSection.astro";
 import PollenSection from "@/components/PollenSection.astro";
 import TidesSection from "@/components/TidesSection.astro";
+import BathingSection from "@/components/BathingSection.astro";
 import { Skeleton } from "@/components/ui/skeleton";
 ---
 
@@ -45,7 +46,14 @@ import { Skeleton } from "@/components/ui/skeleton";
       </CurrentConditions>
 
       <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
-        <TidesSection />
+        {/* Tides + bathing are the "going in the sea" pair; stacked, they
+            roughly match the radar's height beside them on lg. */}
+        <div class="flex flex-col gap-4">
+          <TidesSection />
+          <BathingSection server:defer>
+            <Skeleton slot="fallback" className="h-64" />
+          </BathingSection>
+        </div>
         <RainRadar client:visible />
       </div>
     </Fragment>

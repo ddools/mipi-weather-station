@@ -73,7 +73,8 @@ The tab bar carries a per-tab inline icon (activity / line-chart / calendar) and
 `text-base` labels.
 
 - **Now in detail** — the detail cards (temp, humidity, pressure, wind, rain
-  today, air quality), then `TidesSection` + rain radar. The Wind card carries a
+  today, air quality), then `TidesSection` with `BathingSection` (EPA bathing
+  water, `server:defer`) stacked under it, beside the rain radar. The Wind card carries a
   `WindTrend` island: it polls `/api/recent?minutes=15` every 30 s and shows a
   last-5-minutes read (picking up / easing / steady, plus veering/backing
   direction) as a dual wind+gust sparkline.
@@ -82,7 +83,7 @@ The tab bar carries a per-tab inline icon (activity / line-chart / calendar) and
   a size), `RecordsSection`, `StationHealth`.
 - **Ahead** — `ForecastSection` (5-day) + Sun / Moon / Pollen.
 
-## External data sources (all Open-Meteo, free, no key)
+## External data sources (free, no key)
 
 | Lib | API | Used by |
 |-----|-----|---------|
@@ -90,6 +91,9 @@ The tab bar carries a per-tab inline icon (activity / line-chart / calendar) and
 | `lib/pollen.ts` | air-quality-api (CAMS pollen) | Pollen |
 | `lib/forecast.ts` | forecast (`/v1/forecast` daily) | 5-day forecast — 30-min in-memory cache |
 | `lib/forecast.ts:getCurrentSky` | forecast (`/v1/forecast` `current`) | Now-tab hero sky icon + condition — 15-min in-memory cache |
+| `lib/bathing.ts` | **EPA** Bathing Water API (`data.epa.ie/bw/api/v1`, CC BY 4.0, attribution shown on the card) | Bathing water — beach record + latest sample cached 6 h, active alerts 30 min. See [docs/bathing-water.md](../docs/bathing-water.md) |
+
+Everything above is Open-Meteo except the EPA row.
 
 ## PWA (added 2026-09-08)
 
