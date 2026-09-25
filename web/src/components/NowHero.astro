@@ -7,11 +7,14 @@ import { getLatestReading, getTodaySummary } from "@/lib/supabase";
 import { getCurrentSky } from "@/lib/forecast";
 import { degToCompass, fmt, msToKmh } from "@/lib/format";
 import { feelsLike } from "@/lib/derived";
+import { getTideStatus, nextTurn, TIDE_STAGE_LABEL, type TideStatus } from "@/lib/tides";
 
-const [latest, summary, sky] = await Promise.all([
+const [latest, summary, sky, tide] = await Promise.all([
   getLatestReading(),
   getTodaySummary(),
   getCurrentSky(),
+  // The tide marker is a nice-to-have — never let the marine API sink the hero.
+  getTideStatus().catch(() => null),
 ]);
 
 const ageSec = latest?.recorded_at
@@ -40,6 +43,34 @@ const lastUpdatedAbs = latest?.recorded_at
       timeZone: "Europe/Dublin",
     })
   : null;
+
+// Tide marker: "Tide coming in · High 14:32". Slack water already names the
+// tide ("High tide"), so only the in/out stages get the "Tide" prefix.
+function tideText(t: TideStatus | null) {
+  if (!t) return null;
+  const label = TIDE_STAGE_LABEL[t.stage];
+  const turn = nextTurn(t);
+  return {
+    stage: t.stage === "rising" || t.stage === "falling" ? `Tide ${label.toLowerCase()}` : label,
+    next: turn
+      ? `${turn.type === "high" ? "High" : "Low"} ${new Date(turn.time).toLocaleTimeString("en-IE", {
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: "Europe/Dublin",
+        })}`
+      : "",
+    up: t.stage === "high" || t.trend === "rising",
+  };
+}
+const tideNow = tideText(tide);
+
+// Lucide waves-arrow-up/-down, inline so they take currentColor (Meteocons' tide
+// icons hard-code a dark arrow that vanishes on the night gradient).
+const WAVES =
+  '<path d="M2 15c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/>' +
+  '<path d="M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/>';
+const TIDE_UP = '<path d="M12 2v8"/><path d="m8 6 4-4 4 4"/>';
+const TIDE_DOWN = '<path d="M12 10V2"/><path d="m16 6-4 4-4-4"/>';
 
 const stats = [
   {
@@ -101,6 +132,32 @@ const stats = [
     </span>
     <span id="hero-updated" class="opacity-80">
       {lastUpdatedAbs ? `Last updated ${lastUpdatedAbs}` : "Awaiting first reading"}
+    </span>
+    <span
+      id="hero-tide"
+      class:list={["flex items-center gap-1.5 sm:ml-auto", { hidden: !tideNow }]}
+    >
+      <svg
+        class:list={[
+          "h-4 w-4 shrink-0",
+          isNight ? "text-sky-300" : "text-sky-700 dark:text-sky-300",
+        ]}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <g set:html={WAVES} />
+        <g data-tide-arrow="up" class:list={{ hidden: tideNow?.up === false }} set:html={TIDE_UP} />
+        <g data-tide-arrow="down" class:list={{ hidden: tideNow?.up !== false }} set:html={TIDE_DOWN} />
+      </svg>
+      <span class="font-medium" data-field="tide_stage">{tideNow?.stage}</span>
+      <span class="opacity-80 tabular-nums" data-field="tide_next">
+        {tideNow?.next && `· ${tideNow.next}`}
+      </span>
     </span>
   </div>
 
@@ -278,10 +335,45 @@ const stats = [
       }
     };
 
+    // Mirrors lib/tides.ts (TIDE_STAGE_LABEL / nextTurn) and tideText() above.
+    const TIDE_STAGE: Record<string, string> = {
+      high: "High tide",
+      low: "Low tide",
+      rising: "Tide coming in",
+      falling: "Tide going out",
+    };
+    const refreshTide = async () => {
+      const box = document.getElementById("hero-tide");
+      try {
+        const res = await fetch("/api/tides");
+        if (!res.ok || !box) return;
+        const t = await res.json();
+        if (!t || !TIDE_STAGE[t.stage]) return;
+        const turn = t.trend === "rising" ? t.nextHigh : t.nextLow;
+        set("tide_stage", TIDE_STAGE[t.stage]);
+        set(
+          "tide_next",
+          turn
+            ? `· ${turn.type === "high" ? "High" : "Low"} ${new Date(turn.time).toLocaleTimeString(
+                "en-IE",
+                { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Dublin" },
+              )}`
+            : "",
+        );
+        const up = t.stage === "high" || t.trend === "rising";
+        box.querySelector('[data-tide-arrow="up"]')?.classList.toggle("hidden", !up);
+        box.querySelector('[data-tide-arrow="down"]')?.classList.toggle("hidden", up);
+        box.classList.remove("hidden");
+      } catch {
+        /* next interval retries */
+      }
+    };
+
     updateStatus(root.dataset.recordedAt || undefined);
     refreshCurrent();
     setInterval(() => updateStatus(root.dataset.recordedAt || undefined), 15_000);
     setInterval(refreshCurrent, 45_000);
     setInterval(refreshSummary, 5 * 60_000);
+    setInterval(refreshTide, 10 * 60_000);
   }
 </script>

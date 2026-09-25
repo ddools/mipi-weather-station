@@ -147,7 +147,9 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   A **glance hero** (`components/NowHero.astro` — big temp + sky icon/condition
   from Open-Meteo `current` via `lib/forecast.ts:getCurrentSky` + `SkyIcon.astro`;
   day/night gradient; own compact poll loop) renders **above** the tabs, so it's
-  visible on every tab. The old status bar was dropped from `CurrentConditions`.
+  visible on every tab. Its top row carries a **tide marker** ("Tide coming in ·
+  High 11:26", from `lib/tides.ts` `stage`/`nextTurn`, shared with `TidesSection`;
+  refreshed from `/api/tides` every 10 min). The old status bar was dropped from `CurrentConditions`.
   `Now in detail` tab = the detail cards + `WindTrend` island (last-5-min
   wind/gust trend, polls `/api/recent`) + **Tides** + rain radar.
   `History` = charts + records + station health; `HistoryCharts` is now

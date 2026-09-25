@@ -29,9 +29,21 @@ export interface TidePoint {
   heightM: number;
 }
 
+/** Where the cycle is right now — "high"/"low" for the ~45 min of slack water
+ *  either side of the turn, "rising"/"falling" the rest of the time. */
+export type TideStage = "high" | "low" | "rising" | "falling";
+
+export const TIDE_STAGE_LABEL: Record<TideStage, string> = {
+  high: "High tide",
+  low: "Low tide",
+  rising: "Coming in",
+  falling: "Going out",
+};
+
 export interface TideStatus {
   currentHeightM: number;
   trend: "rising" | "falling";
+  stage: TideStage;
   nextHigh: TideEvent | null;
   nextLow: TideEvent | null;
   /** Most recent high/low before now — lets the card say "High tide" for the
@@ -48,6 +60,8 @@ export interface TideStatus {
 // ahead. `now` lands ~20% from the left at these values.
 const CURVE_BEFORE_MS = 4 * 3600_000;
 const CURVE_AFTER_MS = 16 * 3600_000;
+
+const SLACK_WINDOW_MS = 45 * 60_000;
 
 interface MarineResponse {
   hourly: {
@@ -94,6 +108,12 @@ export async function getTideStatus(): Promise<TideStatus | null> {
   const lastExtreme =
     [...events].reverse().find((e) => new Date(e.time).getTime() <= now) ?? null;
 
+  const nearTurn = (type: TideEvent["type"]) =>
+    [type === "high" ? nextHigh : nextLow, lastExtreme].some(
+      (e) => e?.type === type && Math.abs(new Date(e.time).getTime() - now) <= SLACK_WINDOW_MS,
+    );
+  const stage: TideStage = nearTurn("high") ? "high" : nearTurn("low") ? "low" : trend;
+
   // Windowed hourly curve, same timing/datum corrections as the extrema so the
   // "now" dot and the high/low markers sit consistently on the drawn line.
   const curve: TidePoint[] = [];
@@ -109,7 +129,12 @@ export async function getTideStatus(): Promise<TideStatus | null> {
     ? { min: Math.min(...inWindow), max: Math.max(...inWindow) }
     : { min: currentHeightM - 1, max: currentHeightM + 1 };
 
-  return { currentHeightM, trend, nextHigh, nextLow, lastExtreme, curve, rangeM };
+  return { currentHeightM, trend, stage, nextHigh, nextLow, lastExtreme, curve, rangeM };
+}
+
+/** The turn the tide is heading for: the next high while rising, else the next low. */
+export function nextTurn(status: TideStatus): TideEvent | null {
+  return status.trend === "rising" ? status.nextHigh : status.nextLow;
 }
 
 /**

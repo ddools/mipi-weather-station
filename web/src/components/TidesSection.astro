@@ -1,6 +1,6 @@
 ---
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getTideStatus } from "@/lib/tides";
+import { getTideStatus, nextTurn, TIDE_STAGE_LABEL } from "@/lib/tides";
 import tideHighIcon from "@meteocons/svg/flat/water-tide-high.svg?url";
 import tideLowIcon from "@meteocons/svg/flat/water-tide-low.svg?url";
 
@@ -32,34 +32,10 @@ function untilLabel(iso: string | undefined): string {
 }
 
 // --- Glance state: where are we in the cycle right now? ---------------------
-// "High/Low tide" for the ~45 min around slack water (either side of the turn);
-// "Coming in / Going out" the rest of the time.
-const SLACK_WINDOW_MIN = 45;
-const minsTo = (iso: string | undefined) =>
-  iso ? Math.abs(new Date(iso).getTime() - Date.now()) / 60_000 : Infinity;
-
-let stateLabel = "";
-let target: { time: string; heightM: number } | null = null;
-let targetWord = "";
-if (status) {
-  const nearHigh =
-    minsTo(status.nextHigh?.time) <= SLACK_WINDOW_MIN ||
-    (status.lastExtreme?.type === "high" && minsTo(status.lastExtreme.time) <= SLACK_WINDOW_MIN);
-  const nearLow =
-    minsTo(status.nextLow?.time) <= SLACK_WINDOW_MIN ||
-    (status.lastExtreme?.type === "low" && minsTo(status.lastExtreme.time) <= SLACK_WINDOW_MIN);
-
-  if (nearHigh) stateLabel = "High tide";
-  else if (nearLow) stateLabel = "Low tide";
-  else stateLabel = status.trend === "rising" ? "Coming in" : "Going out";
-
-  target = status.trend === "rising" ? status.nextHigh : status.nextLow;
-  targetWord = status.trend === "rising" ? "high" : "low";
-}
+const stateLabel = status ? TIDE_STAGE_LABEL[status.stage] : "";
+const target = status ? nextTurn(status) : null;
 const icon =
-  status && (stateLabel === "High tide" || status.trend === "rising")
-    ? tideHighIcon
-    : tideLowIcon;
+  status && (status.stage === "high" || status.trend === "rising") ? tideHighIcon : tideLowIcon;
 
 // --- Tide curve geometry (zero-JS inline SVG, stretched to card width) ------
 const VB_W = 300;
@@ -144,7 +120,7 @@ const nowPct = nowDot ? (nowDot.x / VB_W) * 100 : 0;
           </div>
           <p class="mt-0.5 text-sm text-muted-foreground tabular-nums">
             {target
-              ? `${targetWord === "high" ? "High" : "Low"} tide ${formatTime(target.time)} · in ${untilLabel(target.time)}`
+              ? `${target.type === "high" ? "High" : "Low"} tide ${formatTime(target.time)} · in ${untilLabel(target.time)}`
               : status.trend === "rising"
                 ? "Rising"
                 : "Falling"}
