@@ -18,15 +18,12 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27; CWOP since
 - **Heartbeat alerting** — code live on the Pi (2026-09-26), but off until
   `HEARTBEAT_URL` is set in the Pi's `.env`. Create a check at healthchecks.io
   (period 1 min, grace 1–5 min) — [docs/alerting.md](docs/alerting.md).
-- **Soak test** — data-integrity check **passed** 2026-08-28 (§1). Still
-  outstanding: a deliberate network-partition (unplug) test.
 - **Supabase purge job** — the hourly rollup is verified running (2026-09-26:
   the newest `readings_hourly` bucket was the last complete hour, 60 samples
   each). The daily purge only deletes raw rows older than 90 days, and the
   oldest is 2026-08-27, so it has nothing to do until ~2026-11-25. After that,
   check the oldest raw row in `readings` is never more than ~90 days old (or run
   `select jobname, schedule from cron.job;` in the SQL editor any time).
-- **Gauge dials** for current temp/wind — in the original plan, never built.
 
 ## Done
 
@@ -55,6 +52,25 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27; CWOP since
 - [x] **README screenshots** — 2026-09-08, `docs/screenshots/` (desktop light,
       History in dark, phone), captured from production; re-shot 2026-09-26
       after the design pass.
+- [x] **Network-outage soak test — passed 2026-09-26.** Cut the Pi's outbound
+      HTTP/HTTPS/APRS for 10 minutes with an nftables drop rule (SSH untouched;
+      auto-lifted by a `systemd-run` timer), 20:12–20:22 UTC. Results:
+      - the Pi kept archiving every 60 s throughout (ids 37452–37467 contiguous)
+        while every upload cursor froze — no sampling stall from hung uploads;
+      - the site showed "Delayed · last reading 6m ago";
+      - within ~60 s of the rule lifting every destination was back to 0 behind;
+      - Supabase holds all 16 rows of the window, gaps 59.9999–60.0001 s, no wind
+        spike (max gust 3.07 m/s).
+      To repeat it (needs sudo on the Pi):
+      ```
+      sudo nft add table inet soak
+      sudo nft add chain inet soak out '{ type filter hook output priority 0; }'
+      sudo nft add rule inet soak out tcp dport '{ 80, 443, 14580 }' drop
+      sudo systemd-run --on-active=10m --unit=soak-unblock nft delete table inet soak
+      ```
+- [x] **Gauge dials — dropped** (2026-09-26). In the original plan, never built;
+      the cards already show the values and the design pass pushed toward less
+      on the page.
 - [x] **Rolling air-quality baseline** (2026-09-26) — the TGS2600 index drifted
       from ~62 to a ~69 median in its first month, so fixed bands kept going
       stale. The card's bands are now margins above the station's own 7-day
@@ -125,8 +141,8 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27; CWOP since
       backlog. Notably the pipeline lost **no** data across yesterday evening's
       30+ restarts (a `config.yaml`-missing crash loop, one `readonly database`
       crash, the air-quality deploy) — every id is present locally and upstream.
-- [ ] Store-and-forward soak test — the *remaining* pieces: a deliberate
-      network-unplug test (never done), and a genuine 24h uninterrupted run.
+- [x] Store-and-forward soak test — network-outage test **passed 2026-09-26**
+      (see Done).
       The service has only been continuously up since 2026-08-27 21:46 BST (the
       earlier "since 11:01 BST" note was wrong — it was restarted repeatedly
       during the evening deploy session). No gaps >150s since that restart;
@@ -166,8 +182,8 @@ domain may come later).
       at 20k rows — the `readings_hourly` rollup is still the real fix.
 - [x] ECharts: temp/humidity/pressure line chart, rain bar chart, wind rose (polar
       bar, averaged by 16-point compass bucket) — all in `HistoryCharts.tsx`
-      (client island). **Gauge dials for current temp/wind are not built** —
-      only the three charts above exist so far.
+      (client island). Gauge dials for current temp/wind were planned but
+      dropped (2026-09-26).
 - [x] Derived + external dashboard panels (2026-08-31, PR #11): **Feels like**
       (wind chill / humidex, `lib/derived.ts`), **trend arrows** on temp/humidity
       + "vs 24h ago" (`lib/format.ts` `trend()`), **Records** card — all-time +

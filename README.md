@@ -118,7 +118,6 @@ WS_MOCK_SENSORS=1 weatherstation
 - [x] Weather Underground upload
 - [x] Windy Stations API v2 upload
 - [x] Wind rose, dark mode, installable PWA
-- [ ] Gauge dials
 - [x] CWOP (APRS) upload — live; id `GW7965` (MADIS `G7965`), registered
       2026-08-31 and activated 2026-09-08 ([docs/cwop.md](docs/cwop.md))
 - [x] WOW-BE (wow.meteo.be) upload — live since 2026-09-07 ([docs/wowbe.md](docs/wowbe.md))
@@ -126,7 +125,7 @@ WS_MOCK_SENSORS=1 weatherstation
       decommissioning late 2026 ([docs/wow-ie.md](docs/wow-ie.md))
 - [x] TGS2600 air quality — on the dashboard since 2026-08-28
 - [x] Offline alerting — heartbeat + GitHub watchdog ([docs/alerting.md](docs/alerting.md))
-- [ ] Store-and-forward soak test (a deliberate network-unplug run)
+- [x] Store-and-forward soak test — 10-minute network outage, full backfill, no gaps (2026-09-26)
 
 ## Licence
 

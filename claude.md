@@ -40,7 +40,7 @@ Key decisions already made — do not re-litigate without asking:
   with service-role key. Schema in `docs/supabase-schema.sql`.
 - **Astro**: static shell + server island (`server:defer`) live panel + SSR API routes
   (`/api/current`, `/api/history`, `prerender = false`) + **ECharts** client island for
-  charts (lines, rain bars, wind rose, gauges). `@astrojs/vercel` adapter.
+  charts (lines, rain bars, wind rose). `@astrojs/vercel` adapter.
 - **UI**: **shadcn/ui** (changed 2026-08-27) — React components (Tailwind + Radix)
   vendored into `web/src/components/ui/` via the shadcn CLI, mounted as Astro React
   islands (`@astrojs/react`). Not shadcn's native pairing (that's Next.js), but
@@ -114,8 +114,9 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   data confirmed flowing end-to-end (sensors → SQLite → Supabase). RLS verified
   via direct REST calls (publishable key can SELECT, can't INSERT). Collector
   runs as a systemd service on the Pi (`ddools` user), enabled on boot.
-  Data-integrity check passed 2026-08-28; the deliberate network-unplug test is
-  still to do.
+  Data-integrity check passed 2026-08-28; **network-outage soak test passed
+  2026-09-26** — 10 min with uploads blocked, sampling unaffected, full backfill
+  within ~60 s of reconnecting, no gaps (details + repro in TODO.md).
 - **Weather Underground live** (2026-08-27): station "DDools Pi Station"
   (Holmpatrick), ID `IHOLMP2`. Real data confirmed landing via WU's history
   table. Hit and resolved a gotcha: a freshly-created device returned a bare
@@ -281,7 +282,7 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
    gpiozero's `lgpio` backend on trixie).
 2. ~~**Supabase live**~~ — done 2026-08-27: project created, schema applied, keys
    in `.env`, real data flowing, RLS verified, systemd service enabled and running.
-   Remaining: the 24h network-unplug soak test (needs elapsed time, not blocked).
+   Network-outage soak test passed 2026-09-26.
 3. ~~**Astro site in `web/`**~~ — done and live 2026-08-27: server-island live panel,
    `/api/history` (24h raw, 7d/30d hourly from `readings_hourly`, "all" = station lifetime, daily from the `readings_daily` view), ECharts charts + wind rose,
    shadcn/ui, Meteocons icons, Tides section, dark mode. Deployed on Vercel at
@@ -292,9 +293,9 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
 6. **Polish** — ~~GitHub Actions CI~~ (done 2026-08-27), ~~CWOP uploader~~ (live
    2026-09-08), ~~WOW-BE~~ (live 2026-09-07), ~~retention/rollup SQL~~ (live),
    ~~README screenshots~~ (re-shot 2026-09-26), ~~offline alerting~~ (#29),
-   gauge dials (not built).
+   ~~soak test~~ (passed 2026-09-26); gauge dials dropped.
 7. **Open, as of 2026-09-26** (details in TODO.md "Still open"): fix CWOP's 5 m
-   elevation record; set `HEARTBEAT_URL` on the Pi; the network-unplug soak test;
+   elevation record (and the surname it truncated); set `HEARTBEAT_URL` on the Pi;
    check the purge job after ~2026-11-25.
 
 ## Gotchas
