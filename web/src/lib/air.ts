@@ -1,14 +1,24 @@
-// The TGS2600 relative index barely moves — this station sits ~56–65 on the
-// Foundation scale, ~62 most of the time (higher = more reducing gas: cooking,
-// solvents, smoke). A raw number that close together tells a viewer nothing, so
-// the card shows a band instead. Thresholds are empirical percentiles of this
-// sensor's own history, not an absolute scale — re-tune GOOD_MAX / MODERATE_MAX
-// if its baseline drifts (cook something and check it reaches "Poor").
+// The TGS2600 relative index barely moves — over the week to 2026-09-26 this
+// station's median was 69.4 on the Foundation scale, p90 70.9, p98 71.5 (higher =
+// more reducing gas: cooking, solvents, smoke). It first sat ~56–65 and drifted
+// up after fitting, as new gas sensors do. It is not a particulate (PM2.5) or AQI reading, and it has
+// no absolute scale, so the card shows how far the index is above this sensor's
+// own normal, with the raw number beside it. Thresholds are percentiles of the
+// last week (GOOD_MAX = p90, MODERATE_MAX = p98) — re-tune all three constants
+// if the baseline drifts again (cook something and check it reaches "Raised"):
+//
+//   select percentile_cont(0.5)  within group (order by air_quality) as typical,
+//          percentile_cont(0.9)  within group (order by air_quality) as p90,
+//          percentile_cont(0.98) within group (order by air_quality) as p98
+//   from readings
+//   where air_quality is not null and recorded_at > now() - interval '7 days';
 
 export type AirBand = "good" | "moderate" | "poor" | "unknown";
 
-export const AIR_GOOD_MAX = 63;
-export const AIR_MODERATE_MAX = 64.5;
+export const AIR_GOOD_MAX = 70.9;
+export const AIR_MODERATE_MAX = 71.5;
+/** Where the index normally sits, for the caption under the reading. */
+export const AIR_USUAL_RANGE = "around 69–71";
 
 export interface AirQuality {
   band: AirBand;
@@ -16,10 +26,17 @@ export interface AirQuality {
   note: string;
 }
 
+const LABELS: Record<AirBand, string> = {
+  good: "Normal",
+  moderate: "Slightly raised",
+  poor: "Raised",
+  unknown: "—",
+};
+
 const NOTES: Record<AirBand, string> = {
-  good: "nothing unusual in the air",
-  moderate: "slightly raised — cooking or solvents nearby",
-  poor: "raised — a strong nearby source",
+  good: "about usual for this spot",
+  moderate: "a little above usual — cooking or a car idling nearby",
+  poor: "well above usual — smoke or fumes close to the station",
   unknown: "sensor warming up",
 };
 
@@ -32,6 +49,5 @@ export function airQualityBand(index: number | null | undefined): AirQuality {
         : index <= AIR_MODERATE_MAX
           ? "moderate"
           : "poor";
-  const label = band === "unknown" ? "—" : band[0].toUpperCase() + band.slice(1);
-  return { band, label, note: NOTES[band] };
+  return { band, label: LABELS[band], note: NOTES[band] };
 }

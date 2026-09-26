@@ -7,8 +7,9 @@
 --
 -- At a 60 s archive interval one raw row is ~120 B on disk with the index, so
 -- 90 days ≈ 130k rows ≈ ~30 MB. The hourly rollup after years is still < 5 MB.
--- The website's 7d/30d queries can move to `readings_hourly` later (see the note
--- at the bottom); nothing reads this table yet, so creating it changes nothing.
+-- The website's 7d/30d history reads `readings_hourly` and its "All time" range
+-- reads the `readings_daily` view over it (section 5) — the rollup is what lets
+-- the charts reach back past the 90-day raw window to the station's first day.
 
 -- ---------------------------------------------------------------------------
 -- 1. Hourly rollup table
@@ -134,10 +135,46 @@ select cron.schedule(
 --   select * from cron.job;
 
 -- ---------------------------------------------------------------------------
--- Follow-up (not done here): point the site's 7d/30d history at readings_hourly
+-- 5. Daily view for the site's "All time" history range
 -- ---------------------------------------------------------------------------
--- web/src/lib/supabase.ts still pulls raw rows for every range and buckets in
--- JS. Once this rollup has data, change getHistory() so 7d/30d query
--- readings_hourly directly (already hourly, already small) and only 24h hits
--- the raw table. That removes the "pulling 43k raw rows for a 30d query" risk
--- noted in TODO.md §2.
+-- One row per Irish-local calendar day, built from readings_hourly so it covers
+-- the station's whole life even after the raw rows are purged. Today is left
+-- out (it is still filling); the site adds it from the hourly/raw tail.
+-- Columns are named like `readings` so the site can treat rows as Readings.
+-- security_invoker makes the view obey readings_hourly's RLS (public read)
+-- instead of running as its owner.
+create or replace view readings_daily
+with (security_invoker = on) as
+select
+    (date_trunc('day', bucket at time zone 'Europe/Dublin')
+        at time zone 'Europe/Dublin')                                 as recorded_at,
+    sum(sample_count)::integer                                        as sample_count,
+    avg(temp_c)::real                                                 as temp_c,
+    avg(humidity)::real                                               as humidity,
+    avg(pressure_hpa)::real                                           as pressure_hpa,
+    avg(pressure_msl_hpa)::real                                       as pressure_msl_hpa,
+    avg(wind_speed_ms)::real                                          as wind_speed_ms,
+    max(wind_gust_ms)                                                 as wind_gust_ms,
+    mod(
+        degrees(
+            atan2(
+                avg(sin(radians(wind_dir_deg))),
+                avg(cos(radians(wind_dir_deg)))
+            )
+        )::numeric + 360,
+        360
+    )::real                                                           as wind_dir_deg,
+    sum(rain_mm)::real                                                as rain_mm,
+    avg(dewpoint_c)::real                                             as dewpoint_c,
+    avg(air_quality)::real                                            as air_quality
+from readings_hourly
+where bucket < (date_trunc('day', now() at time zone 'Europe/Dublin')
+                    at time zone 'Europe/Dublin')
+group by 1;
+
+grant select on readings_daily to anon, authenticated;
+
+-- The site reads 7d/30d from readings_hourly and "All time" from
+-- readings_daily (web/src/lib/supabase.ts), topping each up from raw rows for
+-- the hours the rollup hasn't reached yet. Until this file has been run both
+-- ranges fall back to bucketing raw rows, which is capped at 20k (~14 days).

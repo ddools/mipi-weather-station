@@ -56,48 +56,126 @@ export async function getRecentReadings(minutes = 15): Promise<Reading[]> {
   return res.json();
 }
 
-export type HistoryRange = "24h" | "7d" | "30d";
+export type HistoryRange = "24h" | "7d" | "30d" | "all";
 
-const RANGE_HOURS: Record<HistoryRange, number> = {
+const RANGE_HOURS: Record<Exclude<HistoryRange, "all">, number> = {
   "24h": 24,
   "7d": 24 * 7,
   "30d": 24 * 30,
 };
 
-// PostgREST caps a single response at 1000 rows regardless of `limit`, so a
-// `gte`-filtered range has to be paged or it silently truncates to the oldest
-// 1000 (≈ 17 h at our cadence). Page size matches that cap; the ceiling stops a
-// 30-day pull from fanning out unboundedly before the hourly rollup exists.
-const PAGE = 1000;
-const MAX_ROWS = 20000;
+// Before the station's first reading, so "all" means the Pi's whole life.
+const LIFETIME_START = "2000-01-01T00:00:00Z";
 
-async function fetchRange(sinceISO: string): Promise<Reading[]> {
-  const rows: Reading[] = [];
-  for (let offset = 0; offset < MAX_ROWS; offset += PAGE) {
+// Rollup columns named like `readings` (PostgREST `alias:column`), so their rows
+// are Readings as far as the charts are concerned. See docs/supabase-retention.sql.
+const ROLLUP_FIELDS =
+  "temp_c,humidity,pressure_hpa,pressure_msl_hpa,wind_speed_ms,wind_gust_ms,wind_dir_deg,rain_mm,dewpoint_c,air_quality";
+const HOURLY_COLUMNS = `recorded_at:bucket,${ROLLUP_FIELDS}`;
+const DAILY_COLUMNS = `recorded_at,${ROLLUP_FIELDS}`;
+
+// PostgREST caps a single response at 1000 rows regardless of `limit`, so a
+// `gte`-filtered range has to be paged or it silently truncates. Page size
+// matches that cap. Raw rows also have a ceiling (~14 days at our cadence):
+// anything longer should come from the rollup tables, and if those are missing
+// the raw fallback keeps the newest rows rather than the oldest.
+const PAGE = 1000;
+const MAX_RAW_ROWS = 20000;
+
+/**
+ * Every row of `table` with `timeCol` >= `sinceISO`, oldest→newest (or
+ * newest→oldest for `desc`), paged by keyset on `timeCol` rather than offset so
+ * rows inserted mid-read can't shift a page boundary and duplicate a row.
+ */
+async function fetchPaged<T extends { recorded_at: string }>(
+  table: string,
+  columns: string,
+  timeCol: string,
+  sinceISO: string,
+  { desc = false, maxRows = Infinity } = {}
+): Promise<T[]> {
+  const rows: T[] = [];
+  const dir = desc ? "desc" : "asc";
+  let cursor = "";
+  while (rows.length < maxRows) {
     const res = await restFetch(
-      `readings?select=${READING_COLUMNS}&recorded_at=gte.${sinceISO}` +
-        `&order=recorded_at.asc&limit=${PAGE}&offset=${offset}`
+      `${table}?select=${columns}&${timeCol}=gte.${encodeURIComponent(sinceISO)}${cursor}` +
+        `&order=${timeCol}.${dir}&limit=${PAGE}`
     );
-    if (!res.ok) throw new Error(`Supabase error ${res.status}`);
-    const page: Reading[] = await res.json();
+    if (!res.ok) throw new Error(`Supabase error ${res.status} reading ${table}`);
+    const page: T[] = await res.json();
     rows.push(...page);
     if (page.length < PAGE) return rows;
+    const last = page[page.length - 1].recorded_at;
+    cursor = `&${timeCol}=${desc ? "lt" : "gt"}.${encodeURIComponent(last)}`;
   }
-  console.warn(`getHistory: hit the ${MAX_ROWS}-row ceiling; older data omitted`);
+  console.warn(`fetchPaged: hit the ${maxRows}-row ceiling on ${table}; older data omitted`);
   return rows;
 }
 
+async function fetchRange(sinceISO: string): Promise<Reading[]> {
+  const rows = await fetchPaged<Reading>("readings", READING_COLUMNS, "recorded_at", sinceISO, {
+    desc: true,
+    maxRows: MAX_RAW_ROWS,
+  });
+  return rows.reverse();
+}
+
+/** A rollup table/view, or [] if it doesn't exist yet (retention SQL not run). */
+async function fetchRollup(table: string, columns: string, timeCol: string, sinceISO: string) {
+  try {
+    return await fetchPaged<Reading>(table, columns, timeCol, sinceISO);
+  } catch (err) {
+    console.warn(`getHistory: ${table} unavailable, falling back to raw rows`, err);
+    return [];
+  }
+}
+
+/**
+ * Hourly averages from `sinceISO` to now: readings_hourly for the hours the
+ * rollup has done, then raw rows bucketed here for the rest. The rollup runs at
+ * five past each hour, so it always trails now by an hour or two — and until
+ * the retention SQL is applied it doesn't exist, and this is all raw.
+ */
+async function getHourlyHistory(sinceISO: string): Promise<Reading[]> {
+  const hourly = await fetchRollup("readings_hourly", HOURLY_COLUMNS, "bucket", sinceISO);
+  const last = hourly[hourly.length - 1];
+  const tailSince = last
+    ? new Date(new Date(last.recorded_at).getTime() + 3600_000).toISOString()
+    : sinceISO;
+  const tail = bucketHourly(await fetchRange(tailSince));
+  return renumber([...hourly, ...tail]);
+}
+
+/**
+ * Daily averages over the station's whole life: the readings_daily view for
+ * every finished Irish day, then today (and anything the view is missing)
+ * built from the hourly history.
+ */
+async function getDailyHistory(): Promise<Reading[]> {
+  const daily = await fetchRollup("readings_daily", DAILY_COLUMNS, "recorded_at", LIFETIME_START);
+  const last = daily[daily.length - 1];
+  const lastDay = last ? dublinDate.format(new Date(last.recorded_at)) : "";
+  // Start the tail a little before the next local midnight (DST moves it by an
+  // hour) and drop whatever still falls on a day the view already has.
+  const tailSince = last
+    ? new Date(new Date(last.recorded_at).getTime() + 22 * 3600_000).toISOString()
+    : LIFETIME_START;
+  const tail = (await getHourlyHistory(tailSince)).filter(
+    (r) => dublinDate.format(new Date(r.recorded_at)) > lastDay
+  );
+  return renumber([...daily, ...bucketDaily(tail)]);
+}
+
 export async function getHistory(range: HistoryRange): Promise<Reading[]> {
+  if (range === "all") return getDailyHistory();
   const hours = RANGE_HOURS[range] ?? 24;
   const since = new Date(Date.now() - hours * 3600_000).toISOString();
-  const rows = await fetchRange(since);
 
-  // 24h is small enough to return raw. Longer ranges get bucketed into hourly
-  // averages here so the client payload stays small. This still pulls every raw
-  // row first — fine at today's volume, but revisit with a server-side aggregate
-  // (Postgres view/RPC) once the table has real history.
-  if (range === "24h") return rows;
-  return bucketHourly(rows);
+  // 24h is small enough to return raw. Longer ranges are hourly averages so the
+  // client payload stays small.
+  if (range === "24h") return fetchRange(since);
+  return getHourlyHistory(since);
 }
 
 export interface TodaySummary {
@@ -265,13 +343,39 @@ function downsample(values: (number | null)[], target: number): (number | null)[
   return out;
 }
 
+function renumber(rows: Reading[]): Reading[] {
+  return rows.map((r, i) => ({ ...r, id: i }));
+}
+
+/** Raw rows → one averaged row per UTC hour. */
 function bucketHourly(rows: Reading[]): Reading[] {
+  return bucketRows(
+    rows,
+    (r) => r.recorded_at.slice(0, 13), // "YYYY-MM-DDTHH"
+    (key) => `${key}:00:00.000Z`
+  );
+}
+
+/** Hourly rows → one averaged row per Irish calendar day, stamped with its first hour. */
+function bucketDaily(rows: Reading[]): Reading[] {
+  return bucketRows(
+    rows,
+    (r) => dublinDate.format(new Date(r.recorded_at)),
+    (_key, first) => first.recorded_at
+  );
+}
+
+function bucketRows(
+  rows: Reading[],
+  keyOf: (r: Reading) => string,
+  stampOf: (key: string, first: Reading) => string
+): Reading[] {
   const buckets = new Map<string, Reading[]>();
   for (const row of rows) {
-    const hourKey = row.recorded_at.slice(0, 13); // "YYYY-MM-DDTHH"
-    const bucket = buckets.get(hourKey);
+    const key = keyOf(row);
+    const bucket = buckets.get(key);
     if (bucket) bucket.push(row);
-    else buckets.set(hourKey, [row]);
+    else buckets.set(key, [row]);
   }
 
   const numericFields = [
@@ -287,8 +391,8 @@ function bucketHourly(rows: Reading[]): Reading[] {
     "air_quality",
   ] as const;
 
-  return [...buckets.entries()].map(([hourKey, bucketRows], i) => {
-    const avg: Partial<Reading> = { id: i, recorded_at: `${hourKey}:00:00.000Z` };
+  return [...buckets.entries()].map(([key, bucketRows], i) => {
+    const avg: Partial<Reading> = { id: i, recorded_at: stampOf(key, bucketRows[0]) };
     for (const field of numericFields) {
       const values = bucketRows
         .map((r) => r[field])
@@ -297,6 +401,9 @@ function bucketHourly(rows: Reading[]): Reading[] {
         // rain accumulates — sum the bucket, don't average it; null if the hour
         // has no rain readings at all (a data gap, not a dry hour)
         avg[field] = values.length ? values.reduce((a, b) => a + b, 0) : null;
+      } else if (field === "wind_gust_ms") {
+        // the peak gust in the bucket, as readings_hourly/readings_daily do
+        avg[field] = values.length ? Math.max(...values) : null;
       } else if (field === "wind_dir_deg") {
         // Bearings wrap at 360°, so the arithmetic mean is wrong wherever an
         // hour straddles north: 350° and 10° average to 180° — the exact

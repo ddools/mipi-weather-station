@@ -76,9 +76,10 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27. Remaining:
 - **Supabase retention job** — SQL written (`docs/supabase-retention.sql`), still
   not run: confirmed 2026-09-08 by REST (`/rest/v1/readings_hourly` → 404,
   `PGRST205`). 13,140 rows since 2026-08-27, ~1,100/day, so the free tier is not
-  at risk yet — but this is what the 7d/30d chart queries are waiting on, and
-  `getHistory` currently pages up to 20k raw rows per request. Repoint those
-  queries at `readings_hourly` once it exists (§5).
+  at risk yet — but the 7d/30d and **All time** history charts now read
+  `readings_hourly` / `readings_daily` (2026-09-23) and, until the SQL is run,
+  fall back to the newest 20k raw rows (~14 days) — so 30d and All time are
+  both short of their range until then. Run the whole file, including §5.
 - ~~**README screenshots**~~ — done 2026-09-08. `docs/screenshots/` holds desktop
   light, History-in-dark, and a phone shot, all captured from production; the
   README leads with them and no longer claims the domain is undecided.
@@ -438,7 +439,7 @@ domain may come later).
     set and a drifting formatter, which would make CI non-reproducible. One-time
     `ruff format` reformat of 21 files came with this (mechanical: blank line
     after module docstrings, re-wrapping lines that now fit in 100).
-  - **web**: `npm ci` + `astro build` on Node 22, with dummy `PUBLIC_SUPABASE_*`
+  - **web**: `pnpm install --frozen-lockfile` + `astro build` on Node 22, with dummy `PUBLIC_SUPABASE_*`
     env (build never hits Supabase; the live data paths are all request-time).
   - Not yet: `astro check` (TS typecheck) — needs `@astrojs/check` + `typescript`
     added as web devDeps first.

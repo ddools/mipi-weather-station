@@ -147,9 +147,12 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   A **glance hero** (`components/NowHero.astro` — big temp + sky icon/condition
   from Open-Meteo `current` via `lib/forecast.ts:getCurrentSky` + `SkyIcon.astro`;
   day/night gradient; own compact poll loop) renders **above** the tabs, so it's
-  visible on every tab. The old status bar was dropped from `CurrentConditions`.
+  visible on every tab. Its top row carries a **tide marker** ("Tide coming in ·
+  High 11:26", from `lib/tides.ts` `stage`/`nextTurn`, shared with `TidesSection`;
+  refreshed from `/api/tides` every 10 min). The old status bar was dropped from `CurrentConditions`.
   `Now in detail` tab = the detail cards + `WindTrend` island (last-5-min
-  wind/gust trend, polls `/api/recent`) + **Tides** + rain radar.
+  wind/gust trend, polls `/api/recent`) + **Tides** (with **Bathing water**
+  stacked under it) + rain radar.
   `History` = charts + records + station health; `HistoryCharts` is now
   `client:only="react"` (SSR only invited Radix hydration mismatches) and
   `EChart.tsx` defers `echarts.init` until its container has a size.
@@ -157,6 +160,23 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   WMO-code→Meteocons map, 30-min memo cache; a 4th Open-Meteo dependency
   alongside marine/air-quality) + sun + moon + pollen.
   Plan: `docs/dashboard-tabs.md`.
+- **Design-review pass** (2026-09-25): Tides/Sun/Moon/Pollen made server
+  islands (they were baked into the static shell at build time — the tide card
+  showed a countdown hours stale); one countdown rule (`format.ts:untilLabel`,
+  re-ticked in the browser via `data-until` + `lib/live-times.ts`); hero status
+  chip "last reading 40s ago", amber/red when stale; card headers on Lucide at
+  one size; Meteocons only for weather, Nord-recoloured and still except the
+  hero's (see Gotchas); tablet/desktop card grid reworked; air-quality card shows
+  the raw index + what the sensor measures; `og.png` share image. Details in
+  `web/README.md`.
+- **Bathing water card** (2026-09-25) — `components/BathingSection.astro`
+  (`server:defer`) + `lib/bathing.ts`, from the EPA Bathing Water Open Data API
+  (keyless, CC BY 4.0). Skerries, South Beach (`IEEABWC020_0000_0500`): latest
+  sample, red banner for an active restriction,
+  "Season ended" outside 1 Jun – 15 Sep. The annual ratings and the "Source:
+  EPA" line were removed from the card at Dermot's request, so there's **no EPA
+  credit on the site right now** even though CC BY 4.0 requires one. First non-Open-Meteo data dependency
+  in `web/`. Plan + API notes: [docs/bathing-water.md](docs/bathing-water.md).
 - **Alerting** — two independent alarms, see [docs/alerting.md](docs/alerting.md).
   A **heartbeat** dead man's switch (`core/heartbeat.py`, `HEARTBEAT_URL` in
   `.env`, empty = disabled): the Pi pings an external watcher on every stored
@@ -173,13 +193,13 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
 - **Installable PWA** (2026-09-08) — `web/public/manifest.webmanifest` +
   `web/public/sw.js` + `web/src/components/ServiceWorker.astro` (mounted from
   `Layout.astro`) + `web/src/pages/offline.astro`. Icons in `web/public/icons/`
-  are generated from `favicon.svg` by `npm run icons` (needs `rsvg-convert`).
+  are generated from `favicon.svg` by `pnpm icons` (needs `rsvg-convert`).
   Caching is network-first for navigations and for `/api/*` + `/_server-islands/*`
   (so an offline launch shows the last readings seen), cache-first for the
   content-hashed `/_astro/*`, and cross-origin requests are left alone. Full
   table in `web/README.md`.
 - **CI live** (2026-08-27) — `.github/workflows/ci.yml`: `pi` job (ruff check +
-  ruff format check + pytest on Py 3.9 & 3.13) and `web` job (`npm ci` + `astro
+  ruff format check + pytest on Py 3.9 & 3.13) and `web` job (`pnpm install --frozen-lockfile` + `astro
   build`). Runs on push-to-`main` and every PR.
 - **CWOP uploader written** (2026-08-30, `upload/cwop.py` + `tests/test_cwop.py`,
   11 tests) — APRS-IS socket client. **Id `GW7965`** issued 2026-08-31 (MADIS
@@ -226,6 +246,10 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   pip install -e ".[dev]" && cp config.example.yaml config.yaml &&
   WS_MOCK_SENSORS=1 weatherstation`
 - Tests: `cd pi && pytest`
+- `web/` uses **pnpm** (switched from npm 2026-09-25), pinned via `packageManager` in
+  `web/package.json`; CI runs `pnpm install --frozen-lockfile`. pnpm 11 skips dependency
+  build scripts unless listed under `allowBuilds` in `web/pnpm-workspace.yaml` (esbuild
+  is) — a new dep that needs one fails install with `ERR_PNPM_IGNORED_BUILDS`.
 - New uploaders: subclass `upload/base.py:Uploader`, implement `send(record)->bool`
   (must be retry-safe), register in `upload/__init__.py:build_uploaders`.
 
@@ -240,7 +264,7 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
    in `.env`, real data flowing, RLS verified, systemd service enabled and running.
    Remaining: the 24h network-unplug soak test (needs elapsed time, not blocked).
 3. ~~**Astro site in `web/`**~~ — done 2026-08-27: server-island live panel,
-   `/api/history` (24h raw, 7d/30d hourly-bucketed), ECharts charts + wind rose,
+   `/api/history` (24h raw, 7d/30d hourly from `readings_hourly`, "all" = station lifetime, daily from the `readings_daily` view), ECharts charts + wind rose,
    shadcn/ui, Meteocons icons, Tides section, dark mode. Not yet deployed —
    still needs a domain (undecided) and a Vercel project wired to `web/`.
    Details in `web/README.md` and TODO.md.
@@ -324,6 +348,13 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   the **record's** timestamp, not `now` (backfill), and always send the fields,
   zeros included. See [docs/uploads.md](docs/uploads.md).
 - Windy upload pressure is **Pa**, not hPa.
+- **The EPA bathing-water API can't filter by beach.** `/measurements` and
+  `/alerts` ignore `?beach_id=` and return the whole country (26k sample rows,
+  oldest first), so `lib/bathing.ts` reads `count` and fetches the last two
+  1000-row pages, then filters and sorts by `result_date` itself. `/alerts` lists
+  only *active* incidents — ended ones vanish, so there's no closure history.
+  Results are strings (`"<10"`); sample ratings say `Excellent`, annual ones
+  `Excellent Quality`.
 - **`wow.met.ie` is not an upload endpoint.** It answers `GET /automaticreading`
   with HTTP 200 and the site's HTML shell — point a station at it and you upload
   nothing, silently. Observations go to `wow.metoffice.gov.uk/automaticreading`;
@@ -352,6 +383,25 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   unique index on `recorded_at` to make retries idempotent.
 - `pyproject.toml` readme must stay `pi/README.md` (setuptools can't reference
   `../README.md`).
+- **Light/dark is shared with www.dermotdooley.com and train.dermotdooley.com** through a
+  `theme` cookie on `dermotdooley.com` (values `dermot-dark` / `dermot-light` — the main
+  site's daisyUI theme names; don't rename them here). `Layout.astro` maps it onto the
+  `dark` class shadcn uses; `localStorage` is the fallback (old visits hold `dark`/`light`).
+  Default is dark, not the system preference, to match the other sites. The cookie only gets
+  `domain=dermotdooley.com` on that domain, so localhost/previews keep their own. The site
+  header copies the main site's navbar (Nord base-200 `--navbar` token in `global.css`);
+  it's `sticky top-0 h-16`, so the dashboard tab bar sticks at `top-16` under it.
+- **Anything on the dashboard that depends on "now" must be a server island**
+  (`server:defer`) or computed in the browser. `index.astro` is prerendered, so
+  a plain component's frontmatter runs once, at build time — Tides, Sun, Moon and
+  Pollen all silently showed build-time data until 2026-09-25.
+- **Meteocons animate forever and in their own palette.** The site serves
+  Nord-recoloured copies from `web/public/weather-icons/` (`pnpm
+  weather-icons`). The still versions *freeze* each animation at 1.5 s rather
+  than delete it — raindrops rest at opacity 0 and only exist mid-animation, so
+  stripping `<animate>` leaves a bare cloud. The compass is the exception
+  (animation stripped, needle rotated by us). Add any new `lib/forecast.ts` icon
+  name to the script's list and re-run.
 - **The service worker only registers from a production build.**
   `ServiceWorker.astro` branches on `import.meta.env.PROD`; under `astro dev` it
   renders the opposite script, which unregisters any worker left behind by a

@@ -3,7 +3,7 @@ import { getHistory, type HistoryRange } from "../../lib/supabase";
 
 export const prerender = false;
 
-const VALID_RANGES: HistoryRange[] = ["24h", "7d", "30d"];
+const VALID_RANGES: HistoryRange[] = ["24h", "7d", "30d", "all"];
 
 export const GET: APIRoute = async ({ url }) => {
   const requested = url.searchParams.get("range");

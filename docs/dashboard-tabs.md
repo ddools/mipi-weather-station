@@ -51,6 +51,7 @@ Tab labels in the UI: `Now` · `History` · `Ahead`. (The user's words were
 | Rain today (today / last hour / 24h) | CurrentConditions | "today so far", but expected in the glance |
 | Air quality (conditional on `air_quality`) | CurrentConditions | |
 | **Tides — current height + state, next high/low, curve** | TidesSection | kept in Now (leads with a live height); already visual via its inline SVG wave |
+| **Bathing water** — EPA latest sample, annual ratings, active restrictions (Skerries, South Beach) | BathingSection | added 2026-09-25, stacked under Tides; see [bathing-water.md](bathing-water.md) |
 | Rain radar (Leaflet + RainViewer nowcast) | RainRadar | the "is it about to rain" tile; sits beside Tides on `lg` |
 
 ### → History
