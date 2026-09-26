@@ -9,7 +9,7 @@ domain may follow).
 
 ## Screenshots
 
-| Dashboard — "Now in detail" | History — 24h / 7d / 30d |
+| Dashboard — "Now in detail" | History — 24h / 7d / 30d / All time |
 |---|---|
 | [![Live dashboard](docs/screenshots/dashboard-light.png)](https://weather.dermotdooley.com) | [![History charts in dark mode](docs/screenshots/dashboard-history-dark.png)](https://weather.dermotdooley.com/#history) |
 
@@ -24,18 +24,26 @@ and a new reading reaches the site about 5s after the Pi records it.
 
 - Reads the full Oracle kit sensor set on a Raspberry Pi (see
   [docs/sensors.md](docs/sensors.md) for the verified chip-level reference):
-  - **BMP085/BMP180 + HTU21D** — temperature, humidity, pressure (I2C)
+  - **DS18B20** probe — air temperature (1-Wire; the onboard chips self-heat
+    next to the Pi, so the probe on its lead is the real thermometer)
+  - **BMP085/BMP180 + HTU21D** — pressure and humidity (I2C)
   - **Anemometer** — wind speed & gust (GPIO pulse counting)
   - **Rain gauge** — tipping bucket (GPIO pulse counting)
   - **Wind vane** — direction (MCP342X ADC over I2C)
+  - **TGS2600** — relative air-quality index (the kit's snap-off gas-sensor board)
 - Logs every archive record to a **local SQLite buffer first** (source of truth), so
   nothing is lost during network or power outages — uploaders replay the backlog
   automatically (store-and-forward).
 - Pushes readings to a **Supabase (Postgres)** cloud database that powers the website.
-- Optionally publishes to **Weather Underground**, **Windy** (Stations API v2),
-  **CWOP** (NOAA MADIS), **WOW-BE** (wow.meteo.be) and **WOW / WOW-IE**
-  (wow.met.ie) via pluggable uploader modules.
-- An **Astro** front end (on Vercel) renders live conditions and history charts.
+- Publishes to **Weather Underground**, **Windy** (Stations API v2), **CWOP**
+  (NOAA MADIS) and **WOW-BE** (wow.meteo.be) via pluggable uploader modules — all
+  four live from this station. A **WOW / WOW-IE** (wow.met.ie) uploader is built
+  but not enabled here, since the Met Office shuts WOW down late 2026.
+- An **Astro** front end (on Vercel) renders live conditions, history charts, a
+  forecast, tides, rain radar and bathing-water quality. Installable as an app.
+- **Alerting**: the Pi pings an external watcher on every reading (a dead man's
+  switch), and a GitHub Actions watchdog checks the cloud data — see
+  [docs/alerting.md](docs/alerting.md).
 
 ## Architecture
 
@@ -49,7 +57,7 @@ and a new reading reaches the site about 5s after the Pi records it.
 │                windy, cwop, wowbe, wow)    │──▶ Windy
 │                                            │──▶ CWOP / NOAA MADIS (APRS-IS)
 │                                            │──▶ WOW-BE (wow.meteo.be)
-│                                            │──▶ WOW / WOW-IE (wow.met.ie)
+│                                            │╌╌▶ WOW / WOW-IE (built, off)
 └────────────────────────────────────────────┘
                                                    │
                               Astro site on Vercel ┘
@@ -97,7 +105,8 @@ WS_MOCK_SENSORS=1 weatherstation
 - `config.yaml` — station metadata (lat/lon/elevation), GPIO pins, calibration
   constants, sample/archive intervals, which uploaders are enabled.
 - `.env` — secrets only (Supabase service key, WU station key, Windy password,
-  CWOP passcode, WOW-BE auth key, WOW auth key). Never committed; see `.env.example`.
+  CWOP passcode, WOW-BE auth key, WOW auth key) plus the optional `HEARTBEAT_URL`.
+  Never committed; see `.env.example`.
 
 ## Roadmap
 
@@ -108,12 +117,16 @@ WS_MOCK_SENSORS=1 weatherstation
       live at [weather.dermotdooley.com](https://weather.dermotdooley.com)
 - [x] Weather Underground upload
 - [x] Windy Stations API v2 upload
-- [x] Wind rose, gauges, dark mode
+- [x] Wind rose, dark mode, installable PWA
+- [ ] Gauge dials
 - [x] CWOP (APRS) upload — live; id `GW7965` (MADIS `G7965`), registered
       2026-08-31 and activated 2026-09-08 ([docs/cwop.md](docs/cwop.md))
-- [x] WOW-BE (wow.meteo.be) upload — code complete; needs a registered site ([docs/wowbe.md](docs/wowbe.md))
-- [x] WOW / WOW-IE (wow.met.ie) upload — code complete; needs a site registered at
-      wow.metoffice.gov.uk. Note WOW is decommissioning late 2026 ([docs/wow-ie.md](docs/wow-ie.md))
+- [x] WOW-BE (wow.meteo.be) upload — live since 2026-09-07 ([docs/wowbe.md](docs/wowbe.md))
+- [x] WOW / WOW-IE (wow.met.ie) upload — built, deliberately not enabled: WOW is
+      decommissioning late 2026 ([docs/wow-ie.md](docs/wow-ie.md))
+- [x] TGS2600 air quality — on the dashboard since 2026-08-28
+- [x] Offline alerting — heartbeat + GitHub watchdog ([docs/alerting.md](docs/alerting.md))
+- [ ] Store-and-forward soak test (a deliberate network-unplug run)
 
 ## Licence
 

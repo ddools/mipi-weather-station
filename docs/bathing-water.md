@@ -4,10 +4,11 @@ Plan for adding an EPA bathing-water card to the dashboard: the latest sample
 result, the annual rating, and any active bathing restriction at the designated
 bathing water nearest the station.
 
-Status: **implemented on branch `bathing-water`** 2026-09-25: `lib/bathing.ts`,
-`BathingSection.astro`, wired into *Now in detail*. Checked against the live API
-and in the browser (all six states in §4b forced via fixtures, light + dark,
-390 px and desktop). Not yet deployed. §5 (rain note) not done. Every API fact
+Status: **live** — merged in #27 (2026-09-25), with the card trimmed in #28
+(annual ratings and the EPA credit line removed; the rating greys out once the
+season has ended). `lib/bathing.ts`, `BathingSection.astro`, wired into *Now in
+detail*. Checked against the live API and in the browser (all six states in §4b
+forced via fixtures, light + dark, 390 px and desktop). §5 (rain note) not done. Every API fact
 below was checked against the live API on 2026-09-25.
 
 ---
@@ -294,7 +295,7 @@ watched a season of EPA alerts against our rain record.
 2. **`BathingSection.astro`**: all six states. Force each one temporarily with
    a hard-coded report to check the layout in light and dark.
 3. **Wire into `index.astro`** with the skeleton fallback.
-4. **Verify**: `npm run build`, serve `web/.vercel/output/static` (server
+4. **Verify**: `pnpm build`, serve `web/.vercel/output/static` (server
    islands need the build, see CLAUDE.md), check the card at phone width, and
    check the offline copy via the service worker.
 5. **Docs**: the "Now in detail" row in

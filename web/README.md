@@ -1,41 +1,51 @@
 # Web: standalone dashboard site (Astro + shadcn/ui, on Vercel)
 
-**Changed 2026-08-27:** this is now a standalone site on its own domain (TBD —
-not yet registered), not a `/weather` page inside the dermotdooley.com repo. This
-`web/` directory is the real, deployable Astro project — its own Vercel project,
-not integration notes for elsewhere. UI components use **shadcn/ui**.
+The public dashboard, live at **[weather.dermotdooley.com](https://weather.dermotdooley.com)**
+(a dedicated domain may come later). This `web/` directory is the whole deployable
+Astro project: Vercel project `mipi-weather`, Root Directory `web`, production
+branch `main` — every merge to `main` deploys. UI components are **shadcn/ui**
+(React + Tailwind + Radix), mounted as Astro React islands.
 
-## Setup
-1. Scaffold: `npm create astro@latest .` (run inside `web/`).
-2. Add adapters: `npx astro add vercel` (SSR for the dynamic bits), `npx astro add
-   react` (shadcn/ui components are React, mounted as Astro islands).
-3. `npx shadcn init` — sets up Tailwind + the component registry config. Add
-   components as needed, e.g. `npx shadcn add card tabs button` — each vendors
-   the component source into `src/components/ui/`, so it's yours to edit.
-4. Env vars in Vercel: `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY`
-   (anon key is safe client-side — RLS allows SELECT only).
-5. Page structure:
-   - `src/pages/index.astro` — static shell, hero card, grid layout.
-   - Live panel as a **server island** (`<CurrentConditions server:defer />`) that
-     fetches the newest row server-side; a small client timer re-fetches
-     `/api/current` every 60 s. It owns the whole top block: three rows on desktop
-     — temp/pressure/humidity, then wind + tides, then rain + rain radar — so
-     `TidesSection` and the `RainRadar` island render nested inside it (that's
-     why the radar's `client:visible` island sits within a server island).
-   - `src/pages/api/current.ts` and `src/pages/api/history.ts` with
-     `export const prerender = false` — thin Supabase queries returning JSON.
-   - Charts: **ECharts** client island — temp/pressure/humidity lines, rain bars,
-     wind rose (polar bar), gauge dials. Range tabs (shadcn `Tabs`): 24h / 7d / 30d / All time.
-   - Rain radar: `RainRadar.tsx` **Leaflet** client island (`client:visible`),
-     rendered in the third row of `CurrentConditions` next to the rain card.
-     Frames + tiles from the free, keyless [RainViewer](https://www.rainviewer.com/api/weather-maps-api.html)
-     Weather Maps API (past 2 h + short nowcast), basemap from keyless Esri Gray
-     Canvas. Attribution to RainViewer + Esri is required and shown on/under the
-     map. `leaflet` + `@types/leaflet` are the only added deps.
-6. Responsive: CSS grid, multi-column desktop → single column mobile; dark mode
-   via shadcn's `ThemeProvider` + CSS variable pattern.
-7. Once the domain is decided: register it, add as a custom domain on the Vercel
-   project, point DNS per Vercel's instructions.
+## Local development
+
+Node ≥22 and **pnpm** (the version is pinned by `packageManager` in `package.json`).
+
+```bash
+pnpm install
+cp .env.example .env    # PUBLIC_SUPABASE_URL / PUBLIC_SUPABASE_ANON_KEY
+pnpm dev                # or `astro dev --background` (see AGENTS.md)
+pnpm check              # astro check (TypeScript) — CI runs this
+pnpm build              # CI runs this too
+```
+
+The same two variables are set on the Vercel project (Production + Preview). The
+key is the Supabase **publishable** key: safe in the browser, since RLS limits it
+to `SELECT`. The secret key never goes near this project.
+
+pnpm 11 skips dependency build scripts unless they're listed under `allowBuilds`
+in `pnpm-workspace.yaml` (esbuild is); a new dependency that needs one fails
+install with `ERR_PNPM_IGNORED_BUILDS`.
+
+## How the page is built
+
+- `src/pages/index.astro` is **prerendered** — a static shell. Anything that
+  depends on "now" (current readings, tides, sun, moon, pollen, forecast, bathing
+  water) is a **server island** (`server:defer`), rendered per request, with a
+  `Skeleton` fallback sized to avoid layout shift. A plain component's
+  frontmatter would run once, at build time.
+- `src/pages/api/*.ts` (`prerender = false`) — `current`, `summary`, `recent`,
+  `history`, `tides`, `health`: thin Supabase / Open-Meteo queries returning JSON,
+  which the islands poll to stay live (`/api/current` every 45 s).
+- Charts: **ECharts** in the `HistoryCharts` client island — temperature,
+  pressure, humidity, wind, rain, air quality, wind rose. Range tabs (shadcn
+  `Tabs`): 24h / 7d / 30d / All time.
+- Rain radar: `RainRadar.tsx`, a **Leaflet** client island (`client:visible`)
+  beside Tides in the *Now* tab. Frames + tiles from the free, keyless
+  [RainViewer](https://www.rainviewer.com/api/weather-maps-api.html) Weather Maps
+  API (past 2 h + short nowcast), basemap from keyless Esri Gray Canvas.
+  Attribution to RainViewer + Esri is required and shown on/under the map.
+- Light/dark: a `dark` class on `<html>`, set before paint from a `theme` cookie
+  shared with the other dermotdooley.com sites (see `Layout.astro`).
 
 ## Example history query (PostgREST)
 ```
@@ -47,9 +57,9 @@ apikey: {ANON_KEY}
 ```
 7d/30d read hourly averages from `readings_hourly` and "All time" reads daily
 averages from the `readings_daily` view (both from `docs/supabase-retention.sql`),
-each topped up from raw rows for the hours the rollup hasn't reached. Until that
-SQL is run they fall back to bucketing raw rows in `lib/supabase.ts`, capped at
-the newest 20k (~14 days).
+each topped up from raw rows for the hours the rollup hasn't reached. Both are
+live on the project (checked 2026-09-26). If they're ever missing, `lib/supabase.ts`
+falls back to bucketing raw rows, capped at the newest 20k (~14 days).
 
 ## Dashboard tabs (added 2026-09-01)
 

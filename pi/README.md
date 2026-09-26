@@ -33,3 +33,10 @@ weatherstation-doctor --rain-watch    # live tip counter; needs the collector st
 
 `config.yaml` is found relative to the installation, so the command works from
 any directory.
+
+## Alerting
+
+Set `HEARTBEAT_URL` in `.env` and the collector pings it on every stored record,
+so an external service (healthchecks.io or similar) can email you when the
+station goes quiet. Empty means off. Setup and tuning:
+[docs/alerting.md](../docs/alerting.md).

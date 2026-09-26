@@ -10,6 +10,10 @@ happen on the Met Office side.
 
 Uploader: [`pi/src/weatherstation/upload/wow.py`](../pi/src/weatherstation/upload/wow.py).
 
+**Status: built, deliberately not enabled** (decided 2026-09-26). WOW shuts down
+late 2026 (below) and [WOW-BE](wowbe.md), which is live, covers the same ground.
+The code and tests stay in case that changes; nothing needs doing.
+
 ## ⚠️ Read this first: WOW is being switched off
 
 From [wow.met.ie/about-wow](https://wow.met.ie/about-wow):

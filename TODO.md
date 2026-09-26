@@ -8,89 +8,70 @@ one exists.
 ## Still open
 
 Everything in plan.MD's core path (sensors, store-and-forward, Supabase, the Astro
-site on Vercel, Weather Underground, Windy) is live as of 2026-08-27. Remaining:
+site on Vercel, Weather Underground, Windy) is live as of 2026-08-27; CWOP since
+2026-09-08 and WOW-BE since 2026-09-07. Remaining, as of 2026-09-26:
 
-- **Soak test** — data-integrity check **passed** 2026-08-28 (§1): local SQLite and
-  Supabase both hold 1032 contiguous readings with full parity, all uploader cursors
-  current, no gaps since the last stable restart. Still outstanding: a deliberate
-  network-partition (unplug) test, and a genuine 24h *uninterrupted* run — yesterday's
-  clean-run clock restarted at 2026-08-27 21:46 BST after a deploy-session restart storm.
-- ~~**Benchmarks**~~ — **both passed**, measured 2026-09-08 (§2).
-  *Live-update latency:* a new reading is visible on `/api/current` **1.7–7.1 s**
-  after the Pi records it (six consecutive readings sampled against production);
-  the page polls every 45 s, so worst case is ~50 s, inside the 60 s target.
-  *Lighthouse:* the first run against production scored **mobile 84 / desktop 92**.
-  After the PR #23 fixes, the preview deploy scores **mobile 96** — LCP 3.9 s →
-  **2.6 s**, CLS 0.119 → **0**, unused JS 338 KB → 28 KB, a11y 97,
-  best-practices 100. The LCP win was indirect: 386 KB of ECharts no longer
-  competes with the hero's sky icon for bandwidth, so the icon lands a second
-  earlier even though it still waits on the `server:defer` island to resolve
-  Supabase and Open-Meteo. That structural wait is the remaining headroom if the
-  score ever needs to go higher (drop the defer, or inline the icon — note
-  Meteocons' SVGs share `id`s, so inlining several on one page risks `<defs>`
-  collisions). **Re-measure against production after merge**: the preview's SEO
-  reads 66 only because Vercel serves previews with `x-robots-tag: noindex`;
-  production has no such header and scored 100.
-- **Wind spike fix — deploy + data repair.** The station published a 70.6 m/s
-  (254 km/h) gust at 2026-09-01T12:29:10Z. Cause: the sampler divided each pulse
-  count by the nominal sample window rather than real elapsed time, and uploads
-  ran inline, so a 119 s upload stall let ~125 s of pulses be scored as 5 s
-  (the record was preceded by a 185.4 s gap against a 66.2 s median — the only
-  gap over 90 s in 1,299 rows). Collector fixed: real elapsed timing, uploads on
-  a background thread, a 55 m/s plausibility ceiling, and reed-switch debounce on
-  both the anemometer and rain gauge (`pi/tests/test_sampler.py`).
-  **Data repair done** — verified 2026-09-08: row 3507 (2026-09-01T12:29:10Z) now
-  holds `wind_speed_ms: null, wind_gust_ms: null`, and no gust above 8.6 m/s
-  appears in the last 1,000 rows. **Remaining:** confirm the fixed collector is
-  actually deployed on the Pi. Circumstantial evidence says yes (a 65 s median
-  archive interval with no gap over 90 s in the last 1,000 records), but that is
-  not proof — check the running code and the service restart time on the Pi.
-- **Station elevation is 16 m** (confirmed 2026-09-08), corrected in
-  `config.example.yaml`. **Remaining:** set `station.elevation_m: 16` in the Pi's
-  own `pi/config.yaml` (gitignored, was 20) and restart the collector —
-  sea-level pressure is derived from it (`core/units.sea_level_pressure_hpa`),
-  so every network we upload to sees the change. CWOP's account record separately
-  says 5 m; fix that on their form (see the CWOP item below).
-- **CWOP uploader** — done. Code 2026-08-30 (`upload/cwop.py`, APRS-IS socket
-  client, 11 tests); id `GW7965` issued 2026-08-31; **site registered/activated
-  2026-09-08** (MADIS id `G7965`, DUBLIN/IE, lat/lon 53.58467/-6.13983 taken from
-  our own packets). Enabled on the Pi with passcode `-1` in `.env`. Only loose end:
-  CWOP records elevation as **5 m**; the site is **16 m** (now
-  `station.elevation_m` everywhere) — fix CWOP's copy. It is edited at
-  <https://madis.ncep.noaa.gov/cwop_signup.shtml> → *Existing Account Update*
-  (the old wxqa.com form is gone; email/call-sign changes still go through
-  cwop-support@noaa.gov), and edits only land on the weekly Wednesday
-  station-table build (cutoff Tuesday 02:00). See [docs/cwop.md](docs/cwop.md).
-- **WOW-BE uploader** — code done 2026-08-30 (`upload/wowbe.py`, 9 tests). JSON
-  REST `POST wow.meteo.be/api/v2/send/wow`, WU-protocol fields, endpoint probed
-  live (422 validation works). **Needs**: register a site at <https://wow.meteo.be>,
-  put the PIN in `.env` as `WOWBE_AUTH_KEY`, set `uploaders.wowbe.{enabled,station_id}`
-  + `station.timezone` on the Pi. See [docs/wowbe.md](docs/wowbe.md) (§5).
-- **WOW / WOW-IE uploader** — code done 2026-09-06 (`upload/wow.py`, 13 tests).
-  Query-string `GET wow.metoffice.gov.uk/automaticreading`, WU-protocol fields,
-  5-min client-side throttle. **Needs**: register a site at
-  <https://wow.metoffice.gov.uk> (*not* wow.met.ie — that's display only), put the
-  6-digit PIN in `.env` as `WOW_AUTH_KEY`, set `uploaders.wow.{enabled,station_id}`
-  + `station.timezone` on the Pi. **Time-boxed: WOW is decommissioning late 2026**,
-  so do it soon or not at all. See [docs/wow-ie.md](docs/wow-ie.md) (§5).
-- **Supabase retention job** — SQL written (`docs/supabase-retention.sql`), still
-  not run: confirmed 2026-09-08 by REST (`/rest/v1/readings_hourly` → 404,
-  `PGRST205`). 13,140 rows since 2026-08-27, ~1,100/day, so the free tier is not
-  at risk yet — but the 7d/30d and **All time** history charts now read
-  `readings_hourly` / `readings_daily` (2026-09-23) and, until the SQL is run,
-  fall back to the newest 20k raw rows (~14 days) — so 30d and All time are
-  both short of their range until then. Run the whole file, including §5.
-- ~~**README screenshots**~~ — done 2026-09-08. `docs/screenshots/` holds desktop
-  light, History-in-dark, and a phone shot, all captured from production; the
-  README leads with them and no longer claims the domain is undecided.
-- **TGS2600 air quality** — collector + dashboard support built (2026-08-27, §5);
-  **enabled and flowing** as of 2026-08-28 (`sensors.air_quality.enabled: true` on
-  the Pi, `air_quality` values landing in Supabase — schema column is live). Still
-  needs the **retention SQL** run, the daughterboard physically mounted, and a
-  warm-up/calibration sanity check on the trend.
+- **Station elevation on the Pi** — the site is 16 m (confirmed 2026-09-08) and
+  `config.example.yaml` says so, but the Pi's own `pi/config.yaml` (gitignored)
+  **still says 20**. Sea-level pressure is derived from it
+  (`core/units.sea_level_pressure_hpa`), so every network gets pressure ~0.5 hPa
+  high. Set `station.elevation_m: 16` and restart the collector.
+- **CWOP's elevation record** says 5 m; should be 16. Edit at
+  <https://madis.ncep.noaa.gov/cwop_signup.shtml> → *Existing Account Update*;
+  lands on the weekly Wednesday station-table build (cutoff Tue 02:00). See
+  [docs/cwop.md](docs/cwop.md).
+- **Heartbeat alerting** — code live on the Pi (2026-09-26), but off until
+  `HEARTBEAT_URL` is set in the Pi's `.env`. Create a check at healthchecks.io
+  (period 1 min, grace 1–5 min) — [docs/alerting.md](docs/alerting.md).
+- **Soak test** — data-integrity check **passed** 2026-08-28 (§1). Still
+  outstanding: a deliberate network-partition (unplug) test.
+- **Supabase retention** — the rollups are live: `readings_hourly` holds data
+  back to 2026-08-27 and `readings_daily` answers (checked via REST 2026-09-26),
+  so the 7d / 30d / All-time charts read them. Not checked: that the `pg_cron`
+  jobs are scheduled (hourly rollup at :05, daily purge 03:20 UTC) — run
+  `select jobname, schedule from cron.job;` in the SQL editor.
+- **Air-quality baseline** — the TGS2600 index drifted from ~62 to a ~69 median
+  in its first month; the dashboard bands were retuned to the last week's
+  percentiles on 2026-09-26 (`web/src/lib/air.ts`). Re-run the query in a few
+  weeks, or replace the fixed bands with a rolling baseline (compare each reading
+  with the station's own 24 h / 7 d median) so drift stops needing hand-tuning.
+- **EPA attribution** — the bathing-water card uses EPA data (CC BY 4.0), which
+  requires a credit; the "Source: EPA" line was removed on purpose (2026-09-25),
+  so the site currently has none. Add one somewhere (e.g. the footer).
+- **Gauge dials** for current temp/wind — in the original plan, never built.
 
 ## Done
 
+- [x] **Archive-interval drift fixed** (#29, deployed and verified 2026-09-26).
+      The collector archived every ~64.96 s against a configured 60 s, losing
+      ~110 records a day: each sensor read's cost was added to a fixed sleep. It
+      now sleeps to an absolute deadline. Verified on the live data after the
+      restart: every gap exactly 60 s (min = avg = max).
+- [x] **Heartbeat dead man's switch** (#29, 2026-09-26) — `core/heartbeat.py`;
+      see "Still open" for switching it on.
+- [x] **Wind spike fix deployed** — the fixed sampler (real elapsed timing,
+      uploads off the sampling thread, 55 m/s ceiling, reed debounce; see
+      2026-09-01 below) is confirmed running: the Pi pulled `main` at `40c300a`,
+      which includes it, and restarted 2026-09-26. The bad 70.6 m/s row (3507,
+      2026-09-01T12:29:10Z) was nulled out, verified 2026-09-08.
+- [x] **Benchmarks** — both passed, measured 2026-09-08. *Live-update latency:*
+      a new reading is on `/api/current` 1.7–7.1 s after the Pi records it; with
+      the 45 s poll the worst case is ~50 s, inside the 60 s target.
+      *Lighthouse:* production first scored mobile 84 / desktop 92; after the
+      PR #23 fixes the preview scored **mobile 96** (LCP 3.9 → 2.6 s, CLS 0.119 →
+      0, unused JS 338 → 28 KB). The remaining headroom is the hero waiting on its
+      `server:defer` island. Not re-measured since the 2026-09-25 design pass.
+- [x] **Dashboard design-review pass** (#28, 2026-09-26) — stale build-time
+      panels made server islands, one countdown rule, stale-feed chip, one icon
+      set, reworked tablet/desktop grid, `og.png` share image. `web/README.md`.
+- [x] **README screenshots** — 2026-09-08, `docs/screenshots/` (desktop light,
+      History in dark, phone), captured from production; re-shot 2026-09-26
+      after the design pass.
+- [x] **WOW-BE** — site registered and uploading since 2026-09-07.
+- [x] **WOW / WOW-IE** — decided 2026-09-26 **not** to enable: WOW shuts down
+      late 2026 and WOW-BE covers the same ground. Code and tests stay.
+- [x] **TGS2600 air quality** — enabled on the Pi 2026-08-28, board mounted away
+      from the Pi; rollup SQL live. Baseline follow-up in "Still open".
 - [x] **Offline alerting** (2026-09-15) — `.github/workflows/station-watchdog.yml`
       runs on GitHub every ~15 min (independent of the Pi), queries Supabase for
       the newest `recorded_at`, and opens/closes a single `station-down` GitHub
@@ -149,7 +130,7 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27. Remaining:
       The service has only been continuously up since 2026-08-27 21:46 BST (the
       earlier "since 11:01 BST" note was wrong — it was restarted repeatedly
       during the evening deploy session). No gaps >150s since that restart;
-      nominal archive interval measures ~66s.
+      nominal archive interval measured ~66s — a bug, fixed 2026-09-26 (see Done).
 
 ## 2. Astro standalone site with shadcn/ui (plan.MD Details/C — now lives in this repo's `web/`)
 
@@ -218,6 +199,10 @@ domain may come later).
       shadcn's `CardHeader` is `grid` by default, so `flex-row` alone does
       nothing without `flex` first; tailwind-merge resolves the conflict once
       `flex` is actually there).
+      **Superseded 2026-09-25 (#28):** card headers now use Lucide icons at one
+      size; Meteocons remain only for weather conditions, served as
+      Nord-recoloured copies from `public/weather-icons/`, still except the hero's
+      (`pnpm weather-icons`).
 - [x] Tides section — Balbriggan, Co. Dublin (nearest coastal town), via
       **Open-Meteo Marine API** (`marine-api.open-meteo.com`, free, no key,
       non-commercial). `src/lib/tides.ts` fetches hourly `sea_level_height_msl`
@@ -241,6 +226,8 @@ domain may come later).
       internal SVG markup staying the same shape, but degrades gracefully
       (falls back to the default unrotated-but-still-wobbling icon) if a
       future release changes it, rather than erroring.
+      **Since changed:** the compass lives in the Wind card, and its wobble is
+      stripped (2026-09-25) — only the hero icon animates now.
 - [x] Domain — **`weather.dermotdooley.com` for now** (2026-08-27), a subdomain of
       the existing personal domain; a dedicated domain may be bought later. `site:`
       in `astro.config.mjs` set to `https://weather.dermotdooley.com`.
@@ -398,7 +385,7 @@ domain may come later).
       Update*) and only land on the weekly Wednesday build (cutoff Tue 02:00).
       International ids use the `GW` prefix; the uploader never inspects it. Full
       notes: [docs/cwop.md](docs/cwop.md).
-- [~] WOW-BE uploader — **code done 2026-08-30** (`upload/wowbe.py`, 9 tests).
+- [x] WOW-BE uploader — **live since 2026-09-07**; code done 2026-08-30 (`upload/wowbe.py`, 9 tests).
       RMI Belgium's WOW reboot (`wow.meteo.be`) — the migration path now that the
       UK/IE WOW instances are being decommissioned. v2 is a JSON REST API
       (`POST /api/v2/send/wow`, not the old query-string GET), auth = Site ID +
@@ -407,10 +394,9 @@ domain may come later).
       throttle needed). `rainin` (last hour) + `dailyrainin` (since local
       midnight) summed from the SQLite buffer via the shared `upload/_rain.py`
       helper (also refactored CWOP onto it). Endpoint probed live — 422 validation
-      responses confirm shape. **Needs**: register a site at <https://wow.meteo.be>,
-      `WOWBE_AUTH_KEY` in `.env`, `uploaders.wowbe.{enabled,station_id}` +
-      `station.timezone` on the Pi. Full notes: [docs/wowbe.md](docs/wowbe.md).
-- [~] WOW / WOW-IE uploader — **code done 2026-09-06** (`upload/wow.py`, 13 tests).
+      responses confirm shape. Full notes: [docs/wowbe.md](docs/wowbe.md).
+- [-] WOW / WOW-IE uploader — **code done 2026-09-06, deliberately not enabled**
+      (decided 2026-09-26; WOW shuts down late 2026) (`upload/wow.py`, 13 tests).
       wow.met.ie is Met Éireann's *display* front-end onto the UK Met Office WOW
       network — registration and uploads both happen on wow.metoffice.gov.uk, and
       `wow.met.ie/automaticreading` just serves the HTML shell (a 200 that uploads
@@ -423,9 +409,9 @@ domain may come later).
       delivered; `400` is WOW's blanket rejection for unknown site / wrong PIN /
       bad field, with an empty body (probed live 2026-09-06 — no differentiated
       validation, unlike WOW-BE's 422s). Shares `upload/_rain.py` with CWOP/WOW-BE.
-      **Needs**: a site registered at <https://wow.metoffice.gov.uk>, `WOW_AUTH_KEY`
-      in `.env`, `uploaders.wow.{enabled,station_id}` + `station.timezone` on the
-      Pi; then allow ~2 h for the WOW-IE map to show it.
+      To enable it anyway: a site registered at <https://wow.metoffice.gov.uk>,
+      `WOW_AUTH_KEY` in `.env`, `uploaders.wow.{enabled,station_id}` +
+      `station.timezone` on the Pi; then allow ~2 h for the WOW-IE map to show it.
       **Caveat: the Met Office began retiring WOW in Jan 2026, full decommissioning
       late 2026** — this is a deliberately short-lived destination, run alongside
       WOW-BE (the successor) and switched off when it stops answering. Full notes:
@@ -441,16 +427,17 @@ domain may come later).
     after module docstrings, re-wrapping lines that now fit in 100).
   - **web**: `pnpm install --frozen-lockfile` + `astro build` on Node 22, with dummy `PUBLIC_SUPABASE_*`
     env (build never hits Supabase; the live data paths are all request-time).
-  - Not yet: `astro check` (TS typecheck) — needs `@astrojs/check` + `typescript`
-    added as web devDeps first.
-- [~] Retention/downsampling job in Supabase — keep 1-minute data ~90 days, hourly
+  - `astro check` (TS typecheck) added in #23 (2026-09-08); the job runs
+    `pnpm run check` then `pnpm run build`.
+- [x] Retention/downsampling job in Supabase — keep 1-minute data ~90 days, hourly
       averages beyond that, to stay inside the 500MB free tier. **SQL written**
       (`docs/supabase-retention.sql`, 2026-08-27): `readings_hourly` rollup table
       + `roll_up_readings_hourly()` / `purge_old_readings()` functions +
       `pg_cron` schedules (rollup at :05, purge daily 03:20 UTC). Wind direction
-      is vector-averaged, rain summed. **Not yet run against the live project** —
-      needs the Supabase SQL editor. Follow-up after it has data: repoint the
-      site's 7d/30d queries at `readings_hourly` (see §2 note).
+      is vector-averaged, rain summed. **Run on the live project** — the rollups
+      answer over REST (checked 2026-09-26) and the site's 7d / 30d / All-time
+      charts read them (#26). The `pg_cron` schedule is unverified — see
+      "Still open".
 - [x] Rain-radar map on the dashboard (2026-08-27) — `web/src/components/RainRadar.tsx`,
       a Leaflet client island. Radar frames + tiles from the free, keyless
       **RainViewer** Weather Maps API (past 2 h + short nowcast, play/scrub
@@ -468,7 +455,7 @@ domain may come later).
 - [x] README screenshots — done 2026-09-08, captured from production with a
       headless browser into `docs/screenshots/` (desktop light, History in dark,
       phone). Regenerate them the same way after any visual change.
-- [~] TGS2600 air quality sensor (MCP342X @ `0x6A`, channel 0) — **code done**
+- [x] TGS2600 air quality sensor (MCP342X @ `0x6A`, channel 0) — **code done**
       (2026-08-27). `i2cdetect` confirms the ADC at `0x6a` is present and
       unclaimed. `sensors/air_quality.py` ports the Foundation kit's relative
       index (`100 × (max − adc) / max`, uncalibrated — higher = more reducing
@@ -477,10 +464,9 @@ domain may come later).
       SQLite → Supabase. `air_quality` column added to `docs/supabase-schema.sql`
       + `docs/supabase-retention.sql` (averaged in the hourly rollup). Dashboard:
       a conditional "Air quality" card on the live panel + a history line chart,
-      both hidden until real data lands. **Remaining:** run the two updated SQL
-      files on the live project; fit the snap-off board; set `enabled: true` on
-      the Pi; let it warm up and sanity-check the trend. Not sent to WU/Windy —
-      neither accepts a non-calibrated index.
+      both hidden until real data lands. **Live:** enabled on the Pi 2026-08-28,
+      board mounted away from the Pi, SQL run. Not sent to WU/Windy — neither
+      accepts a non-calibrated index.
 
 ## Housekeeping
 

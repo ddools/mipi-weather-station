@@ -8,6 +8,10 @@ Belgium.
 
 Uploader: [`pi/src/weatherstation/upload/wowbe.py`](../pi/src/weatherstation/upload/wowbe.py).
 
+**Status: live.** Site registered and uploading since 2026-09-07; the public
+station page is linked from the dashboard footer (`web/src/lib/stations.ts`).
+The setup steps below are kept for reference.
+
 ## How it works
 
 Unlike the old WOW (a query-string `GET automaticreading?...`), WOW-BE v2 is a
