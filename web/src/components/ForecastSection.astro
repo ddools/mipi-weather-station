@@ -2,32 +2,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { getForecast } from "@/lib/forecast";
 import { degToCompass } from "@/lib/format";
-
-import clearDay from "@meteocons/svg/flat/clear-day.svg?url";
-import partlyCloudyDay from "@meteocons/svg/flat/partly-cloudy-day.svg?url";
-import partlyCloudyDayRain from "@meteocons/svg/flat/partly-cloudy-day-rain.svg?url";
-import overcastDay from "@meteocons/svg/flat/overcast-day.svg?url";
-import fogDay from "@meteocons/svg/flat/fog-day.svg?url";
-import drizzle from "@meteocons/svg/flat/drizzle.svg?url";
-import sleet from "@meteocons/svg/flat/sleet.svg?url";
-import rain from "@meteocons/svg/flat/rain.svg?url";
-import snow from "@meteocons/svg/flat/snow.svg?url";
-import thunderstormsDay from "@meteocons/svg/flat/thunderstorms-day.svg?url";
-import thunderstormsDayRain from "@meteocons/svg/flat/thunderstorms-day-rain.svg?url";
-
-const ICONS: Record<string, string> = {
-  "clear-day": clearDay,
-  "partly-cloudy-day": partlyCloudyDay,
-  "partly-cloudy-day-rain": partlyCloudyDayRain,
-  "overcast-day": overcastDay,
-  "fog-day": fogDay,
-  drizzle,
-  sleet,
-  rain,
-  snow,
-  "thunderstorms-day": thunderstormsDay,
-  "thunderstorms-day-rain": thunderstormsDayRain,
-};
+import SkyIcon from "@/components/SkyIcon.astro";
 
 const days = await getForecast();
 
@@ -57,7 +32,7 @@ function temp(v: number | null): string {
                 ]}
               >
                 <span class="text-sm font-medium">{d.weekday}</span>
-                <img src={ICONS[d.icon] ?? overcastDay} alt={d.label} class="my-1 h-14 w-14" />
+                <SkyIcon name={d.icon} alt={d.label} class="my-1 h-14 w-14" />
                 <span class="text-xs text-muted-foreground">{d.label}</span>
                 <span class="mt-1.5 tabular-nums">
                   <span class="font-semibold">{temp(d.tempMax)}</span>

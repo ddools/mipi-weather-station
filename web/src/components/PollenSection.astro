@@ -1,7 +1,8 @@
 ---
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Flower2 } from "lucide-react";
 import { getPollen, type PollenLevel } from "@/lib/pollen";
-import pollenIcon from "@meteocons/svg/flat/pollen.svg?url";
+import { cn, CARD_ICON } from "@/lib/utils";
 
 interface Props {
   class?: string;
@@ -19,16 +20,23 @@ const LEVEL_STYLE: Record<PollenLevel, { label: string; dot: string; text: strin
 };
 
 const overall = report ? LEVEL_STYLE[report.overall] : null;
+// Out of season there's nothing to list, so the card collapses to its header
+// row (and stops stretching to match its neighbours' height).
+const quiet = report?.overall === "none";
+const SOURCE = "CAMS European model via Open-Meteo · updates hourly";
 ---
 
-<Card className={className}>
+<Card className={cn(className, quiet && "self-start")}>
   <CardHeader className="flex items-center gap-2">
-    <img src={pollenIcon} alt="" class="h-10 w-10" />
+    <Flower2 className={CARD_ICON} aria-hidden="true" />
     <CardTitle>Pollen</CardTitle>
+    {quiet && <span class="ml-auto text-sm text-muted-foreground">None in the air</span>}
   </CardHeader>
   <CardContent>
     {
-      !report ? (
+      quiet ? (
+        <p class="text-xs text-muted-foreground">{SOURCE}</p>
+      ) : !report ? (
         <p class="text-sm text-muted-foreground">Pollen data unavailable.</p>
       ) : (
         <>
@@ -62,9 +70,7 @@ const overall = report ? LEVEL_STYLE[report.overall] : null;
             </dl>
           )}
 
-          <p class="mt-3 text-xs text-muted-foreground">
-            CAMS European model via Open-Meteo · updates hourly
-          </p>
+          <p class="mt-3 text-xs text-muted-foreground">{SOURCE}</p>
         </>
       )
     }

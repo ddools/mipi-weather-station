@@ -1,8 +1,9 @@
 ---
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { WavesArrowDown, WavesArrowUp } from "lucide-react";
 import { getTideStatus, nextTurn, TIDE_STAGE_LABEL } from "@/lib/tides";
-import tideHighIcon from "@meteocons/svg/flat/water-tide-high.svg?url";
-import tideLowIcon from "@meteocons/svg/flat/water-tide-low.svg?url";
+import { untilLabel } from "@/lib/format";
+import { CARD_ICON } from "@/lib/utils";
 
 interface Props {
   class?: string;
@@ -22,20 +23,18 @@ function formatTime(iso: string | undefined): string {
   });
 }
 
-function untilLabel(iso: string | undefined): string {
-  if (!iso) return "";
-  const mins = Math.round((new Date(iso).getTime() - Date.now()) / 60_000);
-  if (mins <= 0) return "now";
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return h ? `${h}h ${m}m` : `${m}m`;
-}
-
 // --- Glance state: where are we in the cycle right now? ---------------------
 const stateLabel = status ? TIDE_STAGE_LABEL[status.stage] : "";
 const target = status ? nextTurn(status) : null;
-const icon =
-  status && (status.stage === "high" || status.trend === "rising") ? tideHighIcon : tideLowIcon;
+const TideIcon =
+  status && (status.stage === "high" || status.trend === "rising") ? WavesArrowUp : WavesArrowDown;
+
+// The next high and low, whichever comes first listed first.
+const upcoming = status
+  ? [status.nextHigh, status.nextLow]
+      .filter((e) => e !== null)
+      .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
+  : [];
 
 // --- Tide curve geometry (zero-JS inline SVG, stretched to card width) ------
 const VB_W = 300;
@@ -51,6 +50,9 @@ let linePath = "";
 let areaPath = "";
 let nowDot: XY | null = null;
 let extremaMarkers: (XY & { label: string; type: "high" | "low" })[] = [];
+// Where the "now" caption goes: under the curve unless a low-tide label is
+// already there, then over it; dropped (the dot stays) if both edges are taken.
+let nowLabelEdge: "top" | "bottom" | null = "bottom";
 
 if (status && status.curve.length >= 2) {
   const t0 = new Date(status.curve[0].time).getTime();
@@ -87,7 +89,7 @@ if (status && status.curve.length >= 2) {
   const now = Date.now();
   nowDot = { x: px(now), y: py(status.currentHeightM) };
 
-  for (const e of [status.nextHigh, status.nextLow]) {
+  for (const e of upcoming) {
     if (!e) continue;
     const et = new Date(e.time).getTime();
     if (et < t0 || et > t1) continue;
@@ -101,11 +103,16 @@ if (status && status.curve.length >= 2) {
 }
 
 const nowPct = nowDot ? (nowDot.x / VB_W) * 100 : 0;
+// Labels are ~12% of a phone-width card wide; closer than this, they touch.
+const LABEL_CLEARANCE_PCT = 16;
+const edgeTaken = (type: "high" | "low") =>
+  extremaMarkers.some((m) => m.type === type && Math.abs((m.x / VB_W) * 100 - nowPct) < LABEL_CLEARANCE_PCT);
+nowLabelEdge = !edgeTaken("low") ? "bottom" : !edgeTaken("high") ? "top" : null;
 ---
 
 <Card className={className}>
   <CardHeader className="flex items-center gap-2">
-    <img src={icon} alt="" class="h-10 w-10" />
+    <TideIcon className={CARD_ICON} aria-hidden="true" />
     <CardTitle>Tides — Skerries</CardTitle>
   </CardHeader>
   <CardContent>
@@ -119,11 +126,16 @@ const nowPct = nowDot ? (nowDot.x / VB_W) * 100 : 0;
             <span class="text-base font-medium text-sky-600 dark:text-sky-400">{stateLabel}</span>
           </div>
           <p class="mt-0.5 text-sm text-muted-foreground tabular-nums">
-            {target
-              ? `${target.type === "high" ? "High" : "Low"} tide ${formatTime(target.time)} · in ${untilLabel(target.time)}`
-              : status.trend === "rising"
-                ? "Rising"
-                : "Falling"}
+            {target ? (
+              <>
+                {`${target.type === "high" ? "High" : "Low"} tide ${formatTime(target.time)} · `}
+                <span data-until={target.time}>{untilLabel(target.time)}</span>
+              </>
+            ) : status.trend === "rising" ? (
+              "Rising"
+            ) : (
+              "Falling"
+            )}
           </p>
 
           <div class="relative mt-4">
@@ -176,7 +188,7 @@ const nowPct = nowDot ? (nowDot.x / VB_W) * 100 : 0;
                       m.type === "high" ? "top:-3px" : "bottom:-3px"
                     }`}
                   >
-                    {m.type === "high" ? "▲" : "▼"} {m.label}
+                    {m.type === "high" ? "▲" : "▼"} {m.label}{" "}
                   </span>
                 </>
               ))}
@@ -186,30 +198,28 @@ const nowPct = nowDot ? (nowDot.x / VB_W) * 100 : 0;
                   style={`left:${nowPct}%;top:${(nowDot.y / VB_H) * 100}%`}
                 />
               )}
-              <span
-                class="absolute bottom-0 -translate-x-1/2 font-medium text-foreground/70"
-                style={`left:${Math.min(94, Math.max(6, nowPct))}%`}
-              >
-                now
-              </span>
+              {nowLabelEdge && (
+                <span
+                  class="absolute -translate-x-1/2 font-medium text-foreground/70"
+                  style={`left:${Math.min(94, Math.max(6, nowPct))}%;${
+                    nowLabelEdge === "top" ? "top:-3px" : "bottom:-3px"
+                  }`}
+                >
+                  now
+                </span>
+              )}
             </div>
           </div>
 
           <div class="mt-5 grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <p class="text-muted-foreground">Next high</p>
-              <p class="font-medium tabular-nums">
-                {formatTime(status.nextHigh?.time)}
-                {status.nextHigh && ` · ${status.nextHigh.heightM.toFixed(1)} m`}
-              </p>
-            </div>
-            <div>
-              <p class="text-muted-foreground">Next low</p>
-              <p class="font-medium tabular-nums">
-                {formatTime(status.nextLow?.time)}
-                {status.nextLow && ` · ${status.nextLow.heightM.toFixed(1)} m`}
-              </p>
-            </div>
+            {upcoming.map((e) => (
+              <div>
+                <p class="text-muted-foreground">Next {e.type}</p>
+                <p class="font-medium tabular-nums">
+                  {formatTime(e.time)} · {e.heightM.toFixed(1)} m
+                </p>
+              </div>
+            ))}
           </div>
 
         </>

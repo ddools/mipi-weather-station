@@ -73,6 +73,9 @@ const tabs = [
         hidden={i !== 0}
         tabindex="0"
       >
+        {/* Names each panel in the document outline, so the sections inside
+            sit under "Ahead" rather than under whatever heading came before. */}
+        <h2 class="sr-only">{t.label}</h2>
         <slot name={t.id} />
       </div>
     ))

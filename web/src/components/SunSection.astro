@@ -1,8 +1,9 @@
 ---
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Sunrise, Sunset } from "lucide-react";
 import { getSunTimes, humanDuration } from "@/lib/sun";
-import sunriseIcon from "@meteocons/svg/flat/sunrise.svg?url";
-import sunsetIcon from "@meteocons/svg/flat/sunset.svg?url";
+import { untilLabel } from "@/lib/format";
+import { CARD_ICON } from "@/lib/utils";
 
 interface Props {
   class?: string;
@@ -28,12 +29,10 @@ const isDay = !beforeSunrise && !afterSunset;
 
 // Next event to count down to.
 const next = beforeSunrise
-  ? { word: "Sunrise", time: sun.sunrise, icon: sunriseIcon, tomorrow: false }
+  ? { word: "Sunrise", time: sun.sunrise, Icon: Sunrise, tomorrow: false }
   : isDay
-    ? { word: "Sunset", time: sun.sunset, icon: sunsetIcon, tomorrow: false }
-    : { word: "Sunrise", time: getSunTimes(new Date(now.getTime() + 86_400_000)).sunrise, icon: sunriseIcon, tomorrow: true };
-
-const untilNext = humanDuration((next.time.getTime() - now.getTime()) / 1000);
+    ? { word: "Sunset", time: sun.sunset, Icon: Sunset, tomorrow: false }
+    : { word: "Sunrise", time: getSunTimes(new Date(now.getTime() + 86_400_000)).sunrise, Icon: Sunrise, tomorrow: true };
 
 // Position of the sun along the daylight span (0 = sunrise, 1 = sunset).
 const dayFraction = Math.max(
@@ -51,7 +50,7 @@ const deltaText =
 
 <Card className={className}>
   <CardHeader className="flex items-center gap-2">
-    <img src={next.icon} alt="" class="h-10 w-10" />
+    <next.Icon className={CARD_ICON} aria-hidden="true" />
     <CardTitle>Sun — Skerries</CardTitle>
   </CardHeader>
   <CardContent>
@@ -61,7 +60,9 @@ const deltaText =
         {next.word}{next.tomorrow ? " tomorrow" : ""}
       </span>
     </div>
-    <p class="mt-0.5 text-sm text-muted-foreground tabular-nums">in {untilNext}</p>
+    <p class="mt-0.5 text-sm text-muted-foreground tabular-nums" data-until={next.time.toISOString()}>
+      {untilLabel(next.time, now.getTime())}
+    </p>
 
     <div class="relative mt-4 h-2 rounded-full bg-gradient-to-r from-indigo-400/40 via-amber-300 to-orange-500/70">
       {

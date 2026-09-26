@@ -439,7 +439,7 @@ domain may come later).
     set and a drifting formatter, which would make CI non-reproducible. One-time
     `ruff format` reformat of 21 files came with this (mechanical: blank line
     after module docstrings, re-wrapping lines that now fit in 100).
-  - **web**: `npm ci` + `astro build` on Node 22, with dummy `PUBLIC_SUPABASE_*`
+  - **web**: `pnpm install --frozen-lockfile` + `astro build` on Node 22, with dummy `PUBLIC_SUPABASE_*`
     env (build never hits Supabase; the live data paths are all request-time).
   - Not yet: `astro check` (TS typecheck) — needs `@astrojs/check` + `typescript`
     added as web devDeps first.

@@ -57,8 +57,6 @@ export interface BathingAlert {
 
 export interface BathingReport {
   beachName: string;
-  /** Annual classifications, newest first, up to four years. */
-  annual: { year: number; rating: Rating | null }[];
   lastSample: BathingSample | null;
   /** Active incident at this beach — /alerts only ever lists live ones. */
   alert: BathingAlert | null;
@@ -67,7 +65,6 @@ export interface BathingReport {
   inSeason: boolean;
   nextSampleDate: string | null;
   shortTermPollutionRisk: boolean;
-  profileUrl: string | null;
 }
 
 interface Page<T> {
@@ -81,15 +78,6 @@ interface LocationRecord {
   short_term_pollution_risk: string | null;
   has_all_season_bathing_restriction_in_place: string | null;
   reason_for_all_season_bathing_restriction: string | null;
-  beach_profile_url: string | null;
-  current_annual_water_quality_classification: string | null;
-  current_annual_classification_year: number | null;
-  year1_annual_water_quality_classification: string | null;
-  year1_annual_classification_year: number | null;
-  year2_annual_water_quality_classification: string | null;
-  year2_annual_classification_year: number | null;
-  year3_annual_water_quality_classification: string | null;
-  year3_annual_classification_year: number | null;
 }
 
 interface MeasurementRecord {
@@ -193,20 +181,9 @@ export async function getBathingReport(): Promise<BathingReport | null> {
     getLatestSample(),
     getActiveAlerts(),
   ]);
-  // The beach record carries the name and annual ratings — without it there's
-  // no card worth drawing.
+  // The beach record carries the name and season/restriction flags — without it
+  // there's no card worth drawing.
   if (!loc) return null;
-
-  const annual = (
-    [
-      [loc.current_annual_classification_year, loc.current_annual_water_quality_classification],
-      [loc.year1_annual_classification_year, loc.year1_annual_water_quality_classification],
-      [loc.year2_annual_classification_year, loc.year2_annual_water_quality_classification],
-      [loc.year3_annual_classification_year, loc.year3_annual_water_quality_classification],
-    ] as const
-  )
-    .filter(([year]) => year !== null)
-    .map(([year, raw]) => ({ year: year!, rating: normaliseRating(raw) }));
 
   const a = alerts?.find(
     (x) => x.beach_id === BEACH_ID && !x.incident_end_date && yes(x.has_bathing_restriction_in_place),
@@ -229,7 +206,6 @@ export async function getBathingReport(): Promise<BathingReport | null> {
 
   return {
     beachName: loc.beach_name,
-    annual,
     lastSample,
     alert,
     allSeasonRestriction: yes(loc.has_all_season_bathing_restriction_in_place)
@@ -238,6 +214,5 @@ export async function getBathingReport(): Promise<BathingReport | null> {
     inSeason,
     nextSampleDate,
     shortTermPollutionRisk: yes(loc.short_term_pollution_risk),
-    profileUrl: loc.beach_profile_url,
   };
 }
