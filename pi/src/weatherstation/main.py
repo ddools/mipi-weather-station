@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from . import config
+from .core.heartbeat import build_heartbeat
 from .core.sampler import Sampler
 from .sensors import build_sensors
 from .store import LocalBuffer
@@ -19,6 +20,7 @@ def main() -> None:
     air, anemometer, rain, vane, air_quality = build_sensors(cfg)
     buffer = LocalBuffer(cfg.storage.sqlite_path)
     uploaders = build_uploaders(cfg)
+    heartbeat = build_heartbeat(cfg)
     logging.info(
         "station '%s' starting (mock=%s, uploaders=%s)",
         cfg.station.name,
@@ -26,7 +28,15 @@ def main() -> None:
         [u.name for u in uploaders] or "none",
     )
     Sampler(
-        cfg, air, anemometer, rain, vane, buffer, uploaders, air_quality=air_quality
+        cfg,
+        air,
+        anemometer,
+        rain,
+        vane,
+        buffer,
+        uploaders,
+        air_quality=air_quality,
+        heartbeat=heartbeat,
     ).run_forever()
 
 
