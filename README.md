@@ -36,9 +36,9 @@ and a new reading reaches the site about 5s after the Pi records it.
   automatically (store-and-forward).
 - Pushes readings to a **Supabase (Postgres)** cloud database that powers the website.
 - Publishes to **Weather Underground**, **Windy** (Stations API v2), **CWOP**
-  (NOAA MADIS) and **WOW-BE** (wow.meteo.be) via pluggable uploader modules — all
-  four live from this station. A **WOW / WOW-IE** (wow.met.ie) uploader is built
-  but not enabled here, since the Met Office shuts WOW down late 2026.
+  (NOAA MADIS), **WOW-BE** (wow.meteo.be) and **WOW / WOW-IE** (wow.met.ie) via
+  pluggable uploader modules — all live from this station. WOW-IE runs until the
+  Met Office shuts WOW down late 2026.
 - An **Astro** front end (on Vercel) renders live conditions, history charts, a
   forecast, tides, rain radar and bathing-water quality. Installable as an app.
 - **Alerting**: the Pi pings an external watcher on every reading (a dead man's
@@ -57,7 +57,7 @@ and a new reading reaches the site about 5s after the Pi records it.
 │                windy, cwop, wowbe, wow)    │──▶ Windy
 │                                            │──▶ CWOP / NOAA MADIS (APRS-IS)
 │                                            │──▶ WOW-BE (wow.meteo.be)
-│                                            │╌╌▶ WOW / WOW-IE (built, off)
+│                                            │──▶ WOW / WOW-IE (until late 2026)
 └────────────────────────────────────────────┘
                                                    │
                               Astro site on Vercel ┘
@@ -121,8 +121,8 @@ WS_MOCK_SENSORS=1 weatherstation
 - [x] CWOP (APRS) upload — live; id `GW7965` (MADIS `G7965`), registered
       2026-08-31 and activated 2026-09-08 ([docs/cwop.md](docs/cwop.md))
 - [x] WOW-BE (wow.meteo.be) upload — live since 2026-09-07 ([docs/wowbe.md](docs/wowbe.md))
-- [x] WOW / WOW-IE (wow.met.ie) upload — built, deliberately not enabled: WOW is
-      decommissioning late 2026 ([docs/wow-ie.md](docs/wow-ie.md))
+- [x] WOW / WOW-IE (wow.met.ie) upload — live until WOW is decommissioned late 2026
+      ([docs/wow-ie.md](docs/wow-ie.md))
 - [x] TGS2600 air quality — on the dashboard since 2026-08-28
 - [x] Offline alerting — heartbeat + GitHub watchdog ([docs/alerting.md](docs/alerting.md))
 - [x] Store-and-forward soak test — 10-minute network outage, full backfill, no gaps (2026-09-26)

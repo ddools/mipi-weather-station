@@ -28,7 +28,7 @@ sensors → core/sampler → store (SQLite, source of truth) → upload/* (per-d
                                                              ├→ Windy (Stations API v2)
                                                              ├→ CWOP / NOAA MADIS (APRS-IS socket)
                                                              ├→ WOW-BE (wow.meteo.be JSON API)
-                                                             └┄ WOW / WOW-IE (built, not enabled)
+                                                             └→ WOW / WOW-IE (until WOW shuts, late 2026)
 ```
 
 Key decisions already made — do not re-litigate without asking:
@@ -52,9 +52,9 @@ Key decisions already made — do not re-litigate without asking:
   [docs/cwop.md](docs/cwop.md)).
   **Met Office / Met Éireann WOW** (wow.met.ie) — uploader done 2026-09-06
   (`upload/wow.py`), query-string `GET wow.metoffice.gov.uk/automaticreading`.
-  **Decided 2026-09-26 not to enable it**: the Met Office began retiring WOW in
-  Jan 2026 and decommissions it late 2026, and WOW-BE (live) covers the same
-  ground. Code and tests stay. wow.met.ie is display-only — registration and
+  **Live**, and kept running until it dies: the Met Office began retiring WOW in
+  Jan 2026 and decommissions it late 2026. When it stops answering, set
+  `uploaders.wow.enabled: false` on the Pi; WOW-BE covers the same ground. wow.met.ie is display-only — registration and
   uploads both go to wow.metoffice.gov.uk. See [docs/wow-ie.md](docs/wow-ie.md).
   **WOW-BE** (wow.meteo.be, RMI Belgium's WOW reboot) — uploader done 2026-08-30
   (`upload/wowbe.py`), JSON REST `POST /api/v2/send/wow`, WU-protocol field set.
@@ -195,8 +195,8 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   `.env`, empty = disabled): the Pi pings an external watcher on every stored
   record and that service emails when pings stop (~2 min). Provider-agnostic —
   healthchecks.io, Cronitor, Better Stack all take a ping URL; period/grace live
-  on the service, so retuning needs no deploy. **Code is live on the Pi
-  (2026-09-26) but off: `HEARTBEAT_URL` isn't set yet.** Beats on the **stored record**,
+  on the service, so retuning needs no deploy. **Live 2026-09-26** (healthchecks.io
+  URL in the Pi's `.env`); the soak test proved it end to end. Beats on the **stored record**,
   not a successful upload, and `beat()` only sets an Event (network I/O on the
   sampling thread is what caused the 70.6 m/s gust). Plus the older
   **station watchdog** (`.github/workflows/station-watchdog.yml`) which polls
@@ -235,7 +235,7 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   with `siteid` + `siteAuthenticationKey` (6-digit PIN) as query params, WU field
   set minus `absbaromin`. Self-throttles to one reading per 5 min (WOW 429s past
   that), so WOW gets one record in five and no backfill. Shares `upload/_rain.py`
-  with CWOP/WOW-BE. **Deliberately not enabled** (see above). See
+  with CWOP/WOW-BE. **Live** until WOW shuts down (see above). See
   [docs/wow-ie.md](docs/wow-ie.md).
 - **TGS2600 air quality live** (`sensors/air_quality.py`,
   `sensors.air_quality.enabled` — off by default in the example config; uncalibrated
@@ -295,8 +295,8 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
    ~~README screenshots~~ (re-shot 2026-09-26), ~~offline alerting~~ (#29),
    ~~soak test~~ (passed 2026-09-26); gauge dials dropped.
 7. **Open, as of 2026-09-26** (details in TODO.md "Still open"): fix CWOP's 5 m
-   elevation record (and the surname it truncated); set `HEARTBEAT_URL` on the Pi;
-   check the purge job after ~2026-11-25.
+   elevation record (and the surname it truncated); check the purge job after
+   ~2026-11-25; switch the WOW uploader off once WOW stops answering.
 
 ## Gotchas
 

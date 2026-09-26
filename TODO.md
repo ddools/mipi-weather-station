@@ -15,9 +15,10 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27; CWOP since
   <https://madis.ncep.noaa.gov/cwop_signup.shtml> → *Existing Account Update*;
   lands on the weekly Wednesday station-table build (cutoff Tue 02:00). See
   [docs/cwop.md](docs/cwop.md).
-- **Heartbeat alerting** — code live on the Pi (2026-09-26), but off until
-  `HEARTBEAT_URL` is set in the Pi's `.env`. Create a check at healthchecks.io
-  (period 1 min, grace 1–5 min) — [docs/alerting.md](docs/alerting.md).
+- **Switch WOW / WOW-IE off when it dies.** It's live on the Pi, kept running
+  until the Met Office decommissions WOW (late 2026). Once it stops answering,
+  set `uploaders.wow.enabled: false` in the Pi's `config.yaml` and restart, or
+  its cursor will sit in the doctor's "uploads" section collecting errors.
 - **Supabase purge job** — the hourly rollup is verified running (2026-09-26:
   the newest `readings_hourly` bucket was the last complete hour, 60 samples
   each). The daily purge only deletes raw rows older than 90 days, and the
@@ -32,8 +33,10 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27; CWOP since
       ~110 records a day: each sensor read's cost was added to a fixed sleep. It
       now sleeps to an absolute deadline. Verified on the live data after the
       restart: every gap exactly 60 s (min = avg = max).
-- [x] **Heartbeat dead man's switch** (#29, 2026-09-26) — `core/heartbeat.py`;
-      see "Still open" for switching it on.
+- [x] **Heartbeat dead man's switch** (#29) — **live 2026-09-26**:
+      `HEARTBEAT_URL` (a healthchecks.io ping URL) is in the Pi's `.env` and the
+      collector pings every minute. Proven end to end by the soak test: 0 failed
+      pings before, one per minute during the 10-minute block, 0 after.
 - [x] **Wind spike fix deployed** — the fixed sampler (real elapsed timing,
       uploads off the sampling thread, 55 m/s ceiling, reed debounce; see
       2026-09-01 below) is confirmed running: the Pi pulled `main` at `40c300a`,
@@ -84,8 +87,9 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27; CWOP since
       2026-09-26 over SSH and from the live data (station vs sea-level pressure
       implies exactly 16.0 m).
 - [x] **WOW-BE** — site registered and uploading since 2026-09-07.
-- [x] **WOW / WOW-IE** — decided 2026-09-26 **not** to enable: WOW shuts down
-      late 2026 and WOW-BE covers the same ground. Code and tests stay.
+- [x] **WOW / WOW-IE** — live on the Pi (site registered at wow.metoffice.gov.uk,
+      `WOW_AUTH_KEY` set, uploading without errors as of 2026-09-26). Kept running
+      until WOW is decommissioned late 2026 — see "Still open".
 - [x] **TGS2600 air quality** — enabled on the Pi 2026-08-28, board mounted away
       from the Pi; rollup SQL live. Baseline follow-up in "Still open".
 - [x] **Offline alerting** (2026-09-15) — `.github/workflows/station-watchdog.yml`
@@ -411,8 +415,8 @@ domain may come later).
       midnight) summed from the SQLite buffer via the shared `upload/_rain.py`
       helper (also refactored CWOP onto it). Endpoint probed live — 422 validation
       responses confirm shape. Full notes: [docs/wowbe.md](docs/wowbe.md).
-- [-] WOW / WOW-IE uploader — **code done 2026-09-06, deliberately not enabled**
-      (decided 2026-09-26; WOW shuts down late 2026) (`upload/wow.py`, 13 tests).
+- [x] WOW / WOW-IE uploader — **live**; code done 2026-09-06 (`upload/wow.py`,
+      13 tests); running until WOW shuts down late 2026.
       wow.met.ie is Met Éireann's *display* front-end onto the UK Met Office WOW
       network — registration and uploads both happen on wow.metoffice.gov.uk, and
       `wow.met.ie/automaticreading` just serves the HTML shell (a 200 that uploads
