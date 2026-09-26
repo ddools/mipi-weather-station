@@ -5,7 +5,13 @@ import { WindTrend } from "@/components/WindTrend";
 import { getLatestReading, getTodaySummary } from "@/lib/supabase";
 import { degToCompass, fmt, beaufort, msToKmh, pressureTrend, rainIntensity, trend as changeTrend } from "@/lib/format";
 import { feelsLike, dewPointComfort } from "@/lib/derived";
-import { airQualityBand, AIR_USUAL_RANGE, type AirBand } from "@/lib/air";
+import {
+  airQualityBand,
+  AIR_GOOD_MAX,
+  AIR_MODERATE_MAX,
+  AIR_USUAL_RANGE,
+  type AirBand,
+} from "@/lib/air";
 import { nordify, stripAnimation } from "@/lib/meteocons.js";
 import { cn, CARD_ICON } from "@/lib/utils";
 import { CloudRain, Droplets, Gauge, Leaf, Thermometer, Wind } from "lucide-react";
@@ -131,6 +137,8 @@ const windSparkRange = sparkRange(
   id="current-conditions"
   data-recorded-at={latestReading?.recorded_at ?? ""}
   data-wind-dir-deg={reading?.wind_dir_deg ?? ""}
+  data-air-good-max={AIR_GOOD_MAX}
+  data-air-moderate-max={AIR_MODERATE_MAX}
 >
 
   {/* Phone: one column, in source order. Tablet and up: the two tall cards
@@ -483,14 +491,15 @@ const windSparkRange = sparkRange(
     return (DEWPOINT_BANDS.find(([max]) => dp < max) ?? DEWPOINT_BANDS[DEWPOINT_BANDS.length - 1])[1];
   }
 
-  // Mirrors lib/air.ts. Class lists must match the AIR_STYLE map in the frontmatter
-  // so Tailwind keeps them in the build.
+  // Mirrors lib/air.ts. The thresholds come from it via data attributes, so they
+  // are only ever set there. Class lists must match the AIR_STYLE map in the
+  // frontmatter so Tailwind keeps them in the build.
   const AIR_BANDS = [
-    { max: 63, label: "Normal", note: "about usual for this spot",
+    { key: "airGoodMax", label: "Normal", note: "about usual for this spot",
       dot: "bg-emerald-500", text: ["text-emerald-600", "dark:text-emerald-400"] },
-    { max: 64.5, label: "Slightly raised", note: "a little above usual — cooking or a car idling nearby",
+    { key: "airModerateMax", label: "Slightly raised", note: "a little above usual — cooking or a car idling nearby",
       dot: "bg-amber-500", text: ["text-amber-600", "dark:text-amber-400"] },
-    { max: Infinity, label: "Raised", note: "well above usual — smoke or fumes close to the station",
+    { key: null, label: "Raised", note: "well above usual — smoke or fumes close to the station",
       dot: "bg-orange-500", text: ["text-orange-600", "dark:text-orange-400"] },
   ];
   const AIR_UNKNOWN = { label: "—", note: "sensor warming up", dot: "bg-muted-foreground/40", text: ["text-muted-foreground"] };
@@ -500,7 +509,9 @@ const windSparkRange = sparkRange(
     "text-orange-600", "dark:text-orange-400", "text-muted-foreground",
   ];
   function setAirQuality(v: number | null) {
-    const b = v === null ? AIR_UNKNOWN : (AIR_BANDS.find((x) => v <= x.max) ?? AIR_BANDS[2]);
+    // Band upper bounds, read when needed (the island's markup carries them).
+    const max = (key: string | null) => (key ? Number(root()?.dataset[key]) : Infinity);
+    const b = v === null ? AIR_UNKNOWN : (AIR_BANDS.find((x) => v <= max(x.key)) ?? AIR_BANDS[2]);
     set("air_quality", b.label);
     set("air_note", b.note);
     set("air_index", fmt(v, 1, ""));
