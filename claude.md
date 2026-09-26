@@ -178,15 +178,16 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   one size; Meteocons only for weather, Nord-recoloured and still except the
   hero's (see Gotchas); tablet/desktop card grid reworked; air-quality card shows
   the raw index + what the sensor measures; `og.png` share image. Details in
-  `web/README.md`. Air-quality bands retuned 2026-09-26 to the sensor's drifted
-  baseline (p90 70.9 / p98 71.5 of the last week; query in `web/src/lib/air.ts`).
+  `web/README.md`. Air-quality bands are margins above a **rolling 7-day median**
+  of the sensor's own readings (2026-09-26; `lib/air.ts` + `getAirBaseline` in
+  `lib/supabase.ts`), so the TGS2600's drift no longer needs hand-tuning.
 - **Bathing water card** (2026-09-25) — `components/BathingSection.astro`
   (`server:defer`) + `lib/bathing.ts`, from the EPA Bathing Water Open Data API
   (keyless, CC BY 4.0). Skerries, South Beach (`IEEABWC020_0000_0500`): latest
   sample, red banner for an active restriction,
   "Season ended" outside 1 Jun – 15 Sep. The annual ratings and the "Source:
-  EPA" line were removed from the card at Dermot's request, so there's **no EPA
-  credit on the site right now** even though CC BY 4.0 requires one. First non-Open-Meteo data dependency
+  EPA" line were removed from the card at Dermot's request; the CC BY 4.0 credit
+  (EPA and Open-Meteo) lives in the site footer instead. First non-Open-Meteo data dependency
   in `web/`. Plan + API notes: [docs/bathing-water.md](docs/bathing-water.md).
 - **Alerting** — two independent alarms, see [docs/alerting.md](docs/alerting.md).
   A **heartbeat** dead man's switch (`core/heartbeat.py`, `HEARTBEAT_URL` in
@@ -294,8 +295,7 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
    gauge dials (not built).
 7. **Open, as of 2026-09-26** (details in TODO.md "Still open"): fix CWOP's 5 m
    elevation record; set `HEARTBEAT_URL` on the Pi; the network-unplug soak test;
-   check the purge job after ~2026-11-25; an EPA credit for the bathing card; a
-   rolling air-quality baseline instead of hand-tuned bands.
+   check the purge job after ~2026-11-25.
 
 ## Gotchas
 

@@ -122,7 +122,20 @@ const ogImage = new URL("/og.png", canonical).href;
           href="https://dermotdooley.com"
           rel="noopener">Dermot Dooley</a>.
       </p>
-
+      {/* Open-Meteo and the EPA both publish under CC BY 4.0, which requires this
+          credit. It lives here rather than on each card to keep the cards quiet. */}
+      <p class="mt-2">
+        Data: forecast, tides, pollen and sky conditions from <a
+          class="underline underline-offset-2 hover:text-foreground"
+          href="https://open-meteo.com"
+          rel="noopener">Open-Meteo</a>; bathing water quality from the <a
+          class="underline underline-offset-2 hover:text-foreground"
+          href="https://www.epa.ie"
+          rel="noopener">Environmental Protection Agency</a>. Both under <a
+          class="underline underline-offset-2 hover:text-foreground"
+          href="https://creativecommons.org/licenses/by/4.0/"
+          rel="noopener">CC BY 4.0</a>. Radar © RainViewer.
+      </p>
     </footer>
     <script>
       import { startLiveTimes } from "@/lib/live-times";

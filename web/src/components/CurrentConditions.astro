@@ -2,22 +2,21 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Sparkline from "@/components/Sparkline.astro";
 import { WindTrend } from "@/components/WindTrend";
-import { getLatestReading, getTodaySummary } from "@/lib/supabase";
+import { getAirBaseline, getLatestReading, getTodaySummary } from "@/lib/supabase";
 import { degToCompass, fmt, beaufort, msToKmh, pressureTrend, rainIntensity, trend as changeTrend } from "@/lib/format";
 import { feelsLike, dewPointComfort } from "@/lib/derived";
-import {
-  airQualityBand,
-  AIR_GOOD_MAX,
-  AIR_MODERATE_MAX,
-  AIR_USUAL_RANGE,
-  type AirBand,
-} from "@/lib/air";
+import { airQualityBand, airThresholds, airUsualRange, type AirBand } from "@/lib/air";
 import { nordify, stripAnimation } from "@/lib/meteocons.js";
 import { cn, CARD_ICON } from "@/lib/utils";
 import { CloudRain, Droplets, Gauge, Leaf, Thermometer, Wind } from "lucide-react";
 import compassSvgRaw from "@meteocons/svg/flat/compass.svg?raw";
 
-const [latestReading, summary] = await Promise.all([getLatestReading(), getTodaySummary()]);
+const [latestReading, summary, airBaseline] = await Promise.all([
+  getLatestReading(),
+  getTodaySummary(),
+  // Only sets the air-quality bands; a failed lookup falls back to a fixed baseline.
+  getAirBaseline().catch(() => null),
+]);
 
 // Live-data status from the age of the newest reading. The collector archives
 // every ~60s, so anything within a few minutes is "live"; a longer gap means
@@ -64,7 +63,8 @@ function humidityNote(rh: number | null | undefined): string {
   return "relative humidity";
 }
 
-const air = airQualityBand(reading?.air_quality);
+const airBands = airThresholds(airBaseline);
+const air = airQualityBand(reading?.air_quality, airBands);
 const AIR_STYLE: Record<AirBand, { dot: string; text: string }> = {
   good: { dot: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400" },
   moderate: { dot: "bg-amber-500", text: "text-amber-600 dark:text-amber-400" },
@@ -137,8 +137,8 @@ const windSparkRange = sparkRange(
   id="current-conditions"
   data-recorded-at={latestReading?.recorded_at ?? ""}
   data-wind-dir-deg={reading?.wind_dir_deg ?? ""}
-  data-air-good-max={AIR_GOOD_MAX}
-  data-air-moderate-max={AIR_MODERATE_MAX}
+  data-air-good-max={airBands.goodMax}
+  data-air-moderate-max={airBands.moderateMax}
 >
 
   {/* Phone: one column, in source order. Tablet and up: the two tall cards
@@ -415,7 +415,7 @@ const windSparkRange = sparkRange(
             <p class="mt-1 text-sm text-muted-foreground" data-field="air_note">{air.note}</p>
             <p class="mt-3 text-xs text-muted-foreground">
               A gas sensor at the station: it picks up smoke, cooking and solvent fumes, not
-              particles (PM2.5). No absolute scale — it usually reads {AIR_USUAL_RANGE}.
+              particles (PM2.5). No absolute scale — lately it usually reads {airUsualRange(airBands)}.
             </p>
           </CardContent>
         </Card>

@@ -23,17 +23,9 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27; CWOP since
 - **Supabase purge job** — the hourly rollup is verified running (2026-09-26:
   the newest `readings_hourly` bucket was the last complete hour, 60 samples
   each). The daily purge only deletes raw rows older than 90 days, and the
-  oldest is 2026-08-27, so it has nothing to do until ~2026-11-25. Check then that
-  rows before ~2026-08-27 + 90 days are gone (or run
+  oldest is 2026-08-27, so it has nothing to do until ~2026-11-25. After that,
+  check the oldest raw row in `readings` is never more than ~90 days old (or run
   `select jobname, schedule from cron.job;` in the SQL editor any time).
-- **Air-quality baseline** — the TGS2600 index drifted from ~62 to a ~69 median
-  in its first month; the dashboard bands were retuned to the last week's
-  percentiles on 2026-09-26 (`web/src/lib/air.ts`). Re-run the query in a few
-  weeks, or replace the fixed bands with a rolling baseline (compare each reading
-  with the station's own 24 h / 7 d median) so drift stops needing hand-tuning.
-- **EPA attribution** — the bathing-water card uses EPA data (CC BY 4.0), which
-  requires a credit; the "Source: EPA" line was removed on purpose (2026-09-25),
-  so the site currently has none. Add one somewhere (e.g. the footer).
 - **Gauge dials** for current temp/wind — in the original plan, never built.
 
 ## Done
@@ -63,6 +55,15 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27; CWOP since
 - [x] **README screenshots** — 2026-09-08, `docs/screenshots/` (desktop light,
       History in dark, phone), captured from production; re-shot 2026-09-26
       after the design pass.
+- [x] **Rolling air-quality baseline** (2026-09-26) — the TGS2600 index drifted
+      from ~62 to a ~69 median in its first month, so fixed bands kept going
+      stale. The card's bands are now margins above the station's own 7-day
+      median (`lib/supabase.ts:getAirBaseline`, from `readings_hourly`, 1-h memo):
+      Normal ≤ +1.5, Slightly raised ≤ +2.1, from the week's p90/p98 gaps. On the
+      day it shipped that gave 70.86 / 71.46 against the hand-tuned 70.9 / 71.5.
+- [x] **Data credits** (2026-09-26) — a footer line credits Open-Meteo and the
+      EPA (both CC BY 4.0, which requires it) and RainViewer. The EPA line had
+      been removed from the bathing card on purpose, so it lives in the footer.
 - [x] **Station elevation** — 16 m in the Pi's `config.yaml`, confirmed
       2026-09-26 over SSH and from the live data (station vs sea-level pressure
       implies exactly 16.0 m).

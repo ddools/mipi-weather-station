@@ -131,7 +131,7 @@ outline matches the tabs.
 | `lib/pollen.ts` | air-quality-api (CAMS pollen) | Pollen |
 | `lib/forecast.ts` | forecast (`/v1/forecast` daily) | 5-day forecast — 30-min in-memory cache |
 | `lib/forecast.ts:getCurrentSky` | forecast (`/v1/forecast` `current`) | Now-tab hero sky icon + condition — 15-min in-memory cache |
-| `lib/bathing.ts` | **EPA** Bathing Water API (`data.epa.ie/bw/api/v1`, CC BY 4.0, attribution required but **not currently shown** anywhere on the site) | Bathing water — beach record + latest sample cached 6 h, active alerts 30 min. See [docs/bathing-water.md](../docs/bathing-water.md) |
+| `lib/bathing.ts` | **EPA** Bathing Water API (`data.epa.ie/bw/api/v1`, CC BY 4.0, attribution required — credited in the site footer, `Layout.astro`) | Bathing water — beach record + latest sample cached 6 h, active alerts 30 min. See [docs/bathing-water.md](../docs/bathing-water.md) |
 
 Everything above is Open-Meteo except the EPA row.
 
