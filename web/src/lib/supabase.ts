@@ -147,6 +147,38 @@ async function getHourlyHistory(sinceISO: string): Promise<Reading[]> {
   return renumber([...hourly, ...tail]);
 }
 
+let airBaselineCache: { at: number; value: number | null } | null = null;
+
+/**
+ * The air-quality sensor's own recent "normal": the median of the last 7 days
+ * of hourly means from readings_hourly (168 rows — the raw table would be
+ * ~10k). The TGS2600 drifts, so the dashboard's bands sit a fixed margin above
+ * this rather than at fixed numbers (see lib/air.ts). The median shrugs off a
+ * smoky evening or two. null if there are under a day's worth of hours (sensor
+ * off, or the rollup missing) — callers fall back to a fixed baseline. 1-h memo.
+ */
+export async function getAirBaseline(): Promise<number | null> {
+  if (airBaselineCache && Date.now() - airBaselineCache.at < 3600_000) {
+    return airBaselineCache.value;
+  }
+  const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const res = await restFetch(
+    `readings_hourly?select=air_quality&bucket=gte.${since}&air_quality=not.is.null`
+  );
+  if (!res.ok) throw new Error(`Supabase error ${res.status}`);
+  const rows: { air_quality: number }[] = await res.json();
+  const values = rows.map((r) => r.air_quality).sort((a, b) => a - b);
+  const mid = values.length >> 1;
+  const value =
+    values.length < 24
+      ? null
+      : values.length % 2
+        ? values[mid]
+        : (values[mid - 1] + values[mid]) / 2;
+  airBaselineCache = { at: Date.now(), value };
+  return value;
+}
+
 /**
  * Daily averages over the station's whole life: the readings_daily view for
  * every finished Irish day, then today (and anything the view is missing)

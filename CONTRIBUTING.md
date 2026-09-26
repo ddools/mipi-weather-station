@@ -11,11 +11,21 @@ Thanks for your interest! This is a hobby project, but PRs and issues are welcom
 - Add/adjust tests under `pi/tests/` for any behaviour change.
 
 ## Dev setup
+Collector (Python ≥3.9):
 ```bash
 cd pi
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-pytest
+ruff check . && ruff format --check . && pytest
+```
+
+Dashboard (Node ≥22, **pnpm** — the version is pinned in `web/package.json`):
+```bash
+cd web
+pnpm install
+cp .env.example .env   # PUBLIC_SUPABASE_URL / PUBLIC_SUPABASE_ANON_KEY
+pnpm dev
+pnpm check && pnpm build   # what CI runs
 ```
 
 ## Adding an uploader

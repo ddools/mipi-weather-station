@@ -17,7 +17,7 @@ against the [official kit driver source](https://github.com/RaspberryPiFoundatio
 | `0x77` | **BMP085/BMP180** (chip ID `0x55`) | temperature, pressure | `sensors/bmp085.py` |
 | `0x40` | **HTU21D** | humidity (+ its own temp, used only for compensation) | `sensors/humidity.py` |
 | `0x69` | **MCP342X** ADC, "main HAT board" | wind vane (channel 0) | `sensors/mcp342x.py` + `sensors/wind_vane.py` |
-| `0x6A` | **MCP342X** ADC, "air quality snap-off board" | TGS2600 air quality sensor (channel 0) | not implemented — see below |
+| `0x6A` | **MCP342X** ADC, "air quality snap-off board" | TGS2600 air quality sensor (channel 0) | `sensors/mcp342x.py` + `sensors/air_quality.py` |
 | `0x68` | unidentified | — | likely an onboard RTC (common on education HATs); not used by this project |
 
 `temp_c`/`humidity_pct`/`pressure_hpa` are combined into one reading by
@@ -103,6 +103,13 @@ for BMP085/180 (a BME280 would read `0x60`, a BMP280 `0x58`).
 - Heater needs to stabilise after power-on, so the driver suppresses readings for
   `sensors.air_quality.warmup_s` (default 300 s) after start. Disabled by default
   (`sensors.air_quality.enabled`); the collector runs fine without the board.
+- **On this station:** enabled since 2026-08-28, and the board is mounted away
+  from the Pi body. The index sat ~56–65 at first and drifted up to a ~69 median
+  within a month, as new gas sensors do — so the dashboard's Normal / Slightly
+  raised / Raised bands are fixed margins above a rolling 7-day median of the
+  station's own readings (since 2026-09-26), and follow the drift on their own.
+  If "Raised" fires too often or never, the margins and the query to re-derive
+  them are in `web/src/lib/air.ts`.
 - Stored as `Record.air_quality` → SQLite → Supabase (`readings.air_quality`, and
   averaged in `readings_hourly`). Shown on the dashboard as an "Air quality" card
   and a history line, both hidden until real data exists. Not uploaded to

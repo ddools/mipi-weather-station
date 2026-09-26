@@ -9,8 +9,9 @@ Dermot and his son in Dublin, Ireland. Two deliverables:
 
 1. **Pi collector** (`pi/`) — Python service reading the kit's sensors, buffering
    locally, pushing to cloud + weather services.
-2. **Public dashboard** — a **standalone site on its own domain** (name TBD, not
-   yet registered — was originally planned as dermotdooley.com/weather, changed
+2. **Public dashboard** — a **standalone site**, live at
+   **weather.dermotdooley.com** (a subdomain for now; a dedicated domain may come
+   later — was originally planned as dermotdooley.com/weather, changed
    2026-08-27). Built in **Astro** with **shadcn/ui** (React/Tailwind/Radix
    components mounted as Astro React islands), hosted on **Vercel** as its own
    project. The Astro app lives fully in **this repo's `web/`** — it's the real
@@ -26,7 +27,8 @@ sensors → core/sampler → store (SQLite, source of truth) → upload/* (per-d
                                                              ├→ Weather Underground
                                                              ├→ Windy (Stations API v2)
                                                              ├→ CWOP / NOAA MADIS (APRS-IS socket)
-                                                             └→ WOW-BE (wow.meteo.be JSON API)
+                                                             ├→ WOW-BE (wow.meteo.be JSON API)
+                                                             └→ WOW / WOW-IE (until WOW shuts, late 2026)
 ```
 
 Key decisions already made — do not re-litigate without asking:
@@ -38,7 +40,7 @@ Key decisions already made — do not re-litigate without asking:
   with service-role key. Schema in `docs/supabase-schema.sql`.
 - **Astro**: static shell + server island (`server:defer`) live panel + SSR API routes
   (`/api/current`, `/api/history`, `prerender = false`) + **ECharts** client island for
-  charts (lines, rain bars, wind rose, gauges). `@astrojs/vercel` adapter.
+  charts (lines, rain bars, wind rose). `@astrojs/vercel` adapter.
 - **UI**: **shadcn/ui** (changed 2026-08-27) — React components (Tailwind + Radix)
   vendored into `web/src/components/ui/` via the shadcn CLI, mounted as Astro React
   islands (`@astrojs/react`). Not shadcn's native pairing (that's Next.js), but
@@ -50,9 +52,9 @@ Key decisions already made — do not re-litigate without asking:
   [docs/cwop.md](docs/cwop.md)).
   **Met Office / Met Éireann WOW** (wow.met.ie) — uploader done 2026-09-06
   (`upload/wow.py`), query-string `GET wow.metoffice.gov.uk/automaticreading`.
-  Deliberately short-lived: the Met Office began retiring WOW in Jan 2026 and
-  decommissions it late 2026, so this runs *alongside* WOW-BE and gets switched
-  off when it stops answering. wow.met.ie is display-only — registration and
+  **Live**, and kept running until it dies: the Met Office began retiring WOW in
+  Jan 2026 and decommissions it late 2026. When it stops answering, set
+  `uploaders.wow.enabled: false` on the Pi; WOW-BE covers the same ground. wow.met.ie is display-only — registration and
   uploads both go to wow.metoffice.gov.uk. See [docs/wow-ie.md](docs/wow-ie.md).
   **WOW-BE** (wow.meteo.be, RMI Belgium's WOW reboot) — uploader done 2026-08-30
   (`upload/wowbe.py`), JSON REST `POST /api/v2/send/wow`, WU-protocol field set.
@@ -89,7 +91,8 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
 
 ## Current state (verified working)
 
-- `pip install -e ".[dev]"` clean; **8/8 pytest pass** (`pi/tests/`).
+- `pip install -e ".[dev]"` clean; **120 pytest pass** (`pi/tests/`, 2026-09-26),
+  ruff clean.
 - Full pipeline smoke-tested with `WS_MOCK_SENSORS=1 weatherstation` — mock sensors
   produce records through sampler → SQLite.
 - **All four sensors verified on real hardware** (2026-08-27, over SSH to the Pi):
@@ -98,21 +101,28 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   register GPIO pulses when triggered by hand. See [docs/sensors.md](docs/sensors.md).
 - **BMP085/HTU21D self-heating confirmed** (2026-08-27): both onboard chips read
   ~27.5 °C against a true ~17 °C; DS18B20 (`28-000006e2639a`) on its lead reads
-  18.9 °C. Collector now defaults to the DS18B20 for air temp. Still to do:
-  deploy the change to the Pi and mount the air board away from the Pi body.
+  18.9 °C. The collector takes air temperature from the DS18B20, and the air
+  board is now mounted away from the Pi body (confirmed 2026-09-26).
+- **Archive interval fixed** (#29, deployed + verified 2026-09-26): the sampler
+  slept a fixed interval and *then* read the sensors, so every read's cost
+  (~270 ms vane ADC, ~750 ms DS18B20) was added on — records landed ~64.96 s
+  apart, losing ~110 a day, silently. It now sleeps to an absolute deadline; a
+  sample whose window would be ~0 s is skipped (its pulses carry into the next)
+  rather than scored as a false calm. After the restart every gap in Supabase
+  was exactly 60 s.
 - **Supabase live** (2026-08-27): project created, schema applied, real sensor
   data confirmed flowing end-to-end (sensors → SQLite → Supabase). RLS verified
   via direct REST calls (publishable key can SELECT, can't INSERT). Collector
   runs as a systemd service on the Pi (`ddools` user), enabled on boot.
-  Store-and-forward soak test (24h, network-unplug) not yet done — needs elapsed
-  real time, not blocked on anything.
+  Data-integrity check passed 2026-08-28; **network-outage soak test passed
+  2026-09-26** — 10 min with uploads blocked, sampling unaffected, full backfill
+  within ~60 s of reconnecting, no gaps (details + repro in TODO.md).
 - **Weather Underground live** (2026-08-27): station "DDools Pi Station"
   (Holmpatrick), ID `IHOLMP2`. Real data confirmed landing via WU's history
   table. Hit and resolved a gotcha: a freshly-created device returned a bare
   `unauthorized` even with correct credentials until Edit→Save on the device
-  in WU's dashboard; after that, uploads succeed immediately. The live
-  "current conditions" tile still shows "Offline" — believed to be normal
-  new-station dashboard lag, not a real failure (see TODO.md).
+  in WU's dashboard; after that, uploads succeed immediately. (The "Offline"
+  tile a new station shows cleared on 2026-08-28 — normal new-station lag.)
 - **Windy live** (2026-08-27), station `C9fexco`. `upload/windy.py` was
   substantially wrong (POST/JSON to a made-up endpoint) and got rewritten
   against Windy's real API reference — real endpoint is
@@ -137,10 +147,11 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   destination's cursor, backlog, oldest unsent record and last error;
   `upload_state` carries `last_error`/`last_error_at`, cleared on the next
   successful send. Buffers predating those columns are migrated at startup.
-- **Astro site live in `web/`** (2026-08-27) — full dashboard with server
-  islands, ECharts, shadcn/ui, Meteocons, tides, and a **rain-radar** map
-  (`components/RainRadar.tsx`, Leaflet island + RainViewer tiles — see below).
-  Not yet deployed to Vercel.
+- **Astro site live** at weather.dermotdooley.com (2026-08-27) — Vercel project
+  `mipi-weather`, Root Directory `web`, every merge to `main` deploys. Full
+  dashboard with server islands, ECharts, shadcn/ui, Meteocons, tides, and a
+  **rain-radar** map (`components/RainRadar.tsx`, Leaflet island + RainViewer
+  tiles — see below).
 - **Dashboard split into three tabs** (2026-09-01) — `Now in detail` / `History` /
   `Ahead` via `components/DashboardTabs.astro` (Astro named-slot wrapper + inline
   script; per-tab Lucide icon; hash + `localStorage` state).
@@ -168,21 +179,24 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   one size; Meteocons only for weather, Nord-recoloured and still except the
   hero's (see Gotchas); tablet/desktop card grid reworked; air-quality card shows
   the raw index + what the sensor measures; `og.png` share image. Details in
-  `web/README.md`.
+  `web/README.md`. Air-quality bands are margins above a **rolling 7-day median**
+  of the sensor's own readings (2026-09-26; `lib/air.ts` + `getAirBaseline` in
+  `lib/supabase.ts`), so the TGS2600's drift no longer needs hand-tuning.
 - **Bathing water card** (2026-09-25) — `components/BathingSection.astro`
   (`server:defer`) + `lib/bathing.ts`, from the EPA Bathing Water Open Data API
   (keyless, CC BY 4.0). Skerries, South Beach (`IEEABWC020_0000_0500`): latest
   sample, red banner for an active restriction,
   "Season ended" outside 1 Jun – 15 Sep. The annual ratings and the "Source:
-  EPA" line were removed from the card at Dermot's request, so there's **no EPA
-  credit on the site right now** even though CC BY 4.0 requires one. First non-Open-Meteo data dependency
+  EPA" line were removed from the card at Dermot's request; the CC BY 4.0 credit
+  (EPA and Open-Meteo) lives in the site footer instead. First non-Open-Meteo data dependency
   in `web/`. Plan + API notes: [docs/bathing-water.md](docs/bathing-water.md).
 - **Alerting** — two independent alarms, see [docs/alerting.md](docs/alerting.md).
   A **heartbeat** dead man's switch (`core/heartbeat.py`, `HEARTBEAT_URL` in
   `.env`, empty = disabled): the Pi pings an external watcher on every stored
   record and that service emails when pings stop (~2 min). Provider-agnostic —
   healthchecks.io, Cronitor, Better Stack all take a ping URL; period/grace live
-  on the service, so retuning needs no deploy. Beats on the **stored record**,
+  on the service, so retuning needs no deploy. **Live 2026-09-26** (healthchecks.io
+  URL in the Pi's `.env`); the soak test proved it end to end. Beats on the **stored record**,
   not a successful upload, and `beat()` only sets an Event (network I/O on the
   sampling thread is what caused the 70.6 m/s gust). Plus the older
   **station watchdog** (`.github/workflows/station-watchdog.yml`) which polls
@@ -199,8 +213,9 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   content-hashed `/_astro/*`, and cross-origin requests are left alone. Full
   table in `web/README.md`.
 - **CI live** (2026-08-27) — `.github/workflows/ci.yml`: `pi` job (ruff check +
-  ruff format check + pytest on Py 3.9 & 3.13) and `web` job (`pnpm install --frozen-lockfile` + `astro
-  build`). Runs on push-to-`main` and every PR.
+  ruff format check + pytest on Py 3.9 & 3.13) and `web` job (`pnpm install
+  --frozen-lockfile` + `astro check` + `astro build`). Runs on push-to-`main` and
+  every PR. Plus `station-watchdog.yml` (scheduled; see Alerting).
 - **CWOP uploader written** (2026-08-30, `upload/cwop.py` + `tests/test_cwop.py`,
   11 tests) — APRS-IS socket client. **Id `GW7965`** issued 2026-08-31 (MADIS
   `G7965`; international sites get a `GW` prefix, not `CW`/`DW`/`EW` — the
@@ -208,28 +223,33 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   2026-09-08 after the packets showed at findu and we replied to
   cwop-support@noaa.gov. Passcode `-1` (in `.env` as `CWOP_PASSCODE`). Account
   details, the account-edit form and the open elevation fix (CWOP's record says
-  5 m; the site is 16 m) are in [docs/cwop.md](docs/cwop.md).
-- **WOW-BE uploader written** (2026-08-30, `upload/wowbe.py` + `tests/test_wowbe.py`,
-  9 tests) — JSON REST `POST wow.meteo.be/api/v2/send/wow`, WU-protocol field set,
-  Site ID + `WOWBE_AUTH_KEY` (PIN). Shares rain-accumulation code with CWOP in
-  `upload/_rain.py`. Not wired live: register at wow.meteo.be, then
-  `uploaders.wowbe.{enabled,station_id}` + `station.timezone`. See
-  [docs/wowbe.md](docs/wowbe.md).
+  5 m; the site is 16 m, which the Pi's `config.yaml` already uses) are in
+  [docs/cwop.md](docs/cwop.md).
+- **WOW-BE live** (code 2026-08-30, `upload/wowbe.py` + `tests/test_wowbe.py`;
+  site registered and uploading since 2026-09-07) — JSON REST
+  `POST wow.meteo.be/api/v2/send/wow`, WU-protocol field set, Site ID +
+  `WOWBE_AUTH_KEY` (PIN). Shares rain-accumulation code with CWOP in
+  `upload/_rain.py`. See [docs/wowbe.md](docs/wowbe.md).
 - **WOW/WOW-IE uploader written** (2026-09-06, `upload/wow.py` + `tests/test_wow.py`,
   13 tests) — old-style WOW protocol: `GET wow.metoffice.gov.uk/automaticreading`
   with `siteid` + `siteAuthenticationKey` (6-digit PIN) as query params, WU field
   set minus `absbaromin`. Self-throttles to one reading per 5 min (WOW 429s past
   that), so WOW gets one record in five and no backfill. Shares `upload/_rain.py`
-  with CWOP/WOW-BE. Not wired live: register a site at wow.metoffice.gov.uk, then
-  `WOW_AUTH_KEY` in `.env` + `uploaders.wow.{enabled,station_id}` +
-  `station.timezone`. See [docs/wow-ie.md](docs/wow-ie.md).
-- **TGS2600 air quality** now has collector + dashboard support
-  (`sensors/air_quality.py`, `sensors.air_quality.enabled` — off by default,
-  uncalibrated 0–100 relative index; see docs/sensors.md "TGS2600 air quality");
-  still needs the daughterboard fitted, `enabled: true` on the Pi, and the
-  updated schema/retention SQL run on the live Supabase project. The DS18B20
+  with CWOP/WOW-BE. **Live** until WOW shuts down (see above). See
+  [docs/wow-ie.md](docs/wow-ie.md).
+- **TGS2600 air quality live** (`sensors/air_quality.py`,
+  `sensors.air_quality.enabled` — off by default in the example config; uncalibrated
+  0–100 relative index, see docs/sensors.md "TGS2600 air quality"). Enabled on the
+  Pi since 2026-08-28, board mounted away from the Pi. The index drifted from ~62
+  to ~69 in its first month, which is why the dashboard bands are percentiles of
+  recent data rather than fixed numbers. The DS18B20
   1-Wire probe **is** used — as the air-temperature source (see Gotchas), not as
   a separate ground-temp field.
+- **Supabase rollups live** — `readings_hourly` (data back to 2026-08-27) and the
+  `readings_daily` view answer over REST (checked 2026-09-26); the 7d / 30d /
+  All-time charts read them. The hourly rollup job is verified running (newest
+  bucket = last complete hour); the 90-day purge has nothing to do until
+  ~2026-11-25.
 
 ## Dev conventions
 
@@ -262,20 +282,21 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
    gpiozero's `lgpio` backend on trixie).
 2. ~~**Supabase live**~~ — done 2026-08-27: project created, schema applied, keys
    in `.env`, real data flowing, RLS verified, systemd service enabled and running.
-   Remaining: the 24h network-unplug soak test (needs elapsed time, not blocked).
-3. ~~**Astro site in `web/`**~~ — done 2026-08-27: server-island live panel,
+   Network-outage soak test passed 2026-09-26.
+3. ~~**Astro site in `web/`**~~ — done and live 2026-08-27: server-island live panel,
    `/api/history` (24h raw, 7d/30d hourly from `readings_hourly`, "all" = station lifetime, daily from the `readings_daily` view), ECharts charts + wind rose,
-   shadcn/ui, Meteocons icons, Tides section, dark mode. Not yet deployed —
-   still needs a domain (undecided) and a Vercel project wired to `web/`.
-   Details in `web/README.md` and TODO.md.
+   shadcn/ui, Meteocons icons, Tides section, dark mode. Deployed on Vercel at
+   weather.dermotdooley.com. Details in `web/README.md` and TODO.md.
 4. ~~**Weather Underground**~~ — done 2026-08-27: station live, `success`
    responses confirmed, real data visible in WU's history table.
 5. ~~**Windy v2**~~ — done 2026-08-27, see above.
-6. **Polish** — ~~GitHub Actions CI~~ (done 2026-08-27), ~~CWOP uploader~~ (code
-   done 2026-08-30, id `GW7965` live and activated 2026-09-08 — see
-   docs/cwop.md), gauge dials,
-   retention/downsampling job in Supabase (SQL written in
-   `docs/supabase-retention.sql`, not yet applied), README screenshots.
+6. **Polish** — ~~GitHub Actions CI~~ (done 2026-08-27), ~~CWOP uploader~~ (live
+   2026-09-08), ~~WOW-BE~~ (live 2026-09-07), ~~retention/rollup SQL~~ (live),
+   ~~README screenshots~~ (re-shot 2026-09-26), ~~offline alerting~~ (#29),
+   ~~soak test~~ (passed 2026-09-26); gauge dials dropped.
+7. **Open, as of 2026-09-26** (details in TODO.md "Still open"): fix CWOP's 5 m
+   elevation record (and the surname it truncated); check the purge job after
+   ~2026-11-25; switch the WOW uploader off once WOW stops answering.
 
 ## Gotchas
 

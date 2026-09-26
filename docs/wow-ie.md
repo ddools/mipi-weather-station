@@ -10,6 +10,11 @@ happen on the Met Office side.
 
 Uploader: [`pi/src/weatherstation/upload/wow.py`](../pi/src/weatherstation/upload/wow.py).
 
+**Status: live** — uploading from this station without errors (checked
+2026-09-26), and kept running until WOW shuts down late 2026 (below). When it
+stops answering, set `uploaders.wow.enabled: false` in the Pi's `config.yaml` and
+restart; [WOW-BE](wowbe.md), also live, covers the same ground after that.
+
 ## ⚠️ Read this first: WOW is being switched off
 
 From [wow.met.ie/about-wow](https://wow.met.ie/about-wow):

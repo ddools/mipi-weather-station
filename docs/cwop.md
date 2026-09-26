@@ -77,10 +77,11 @@ takes the site location from the data, not from the signup form, so
 `station.latitude` / `station.longitude` in `pi/config.yaml` is what is plotted.
 
 **The site is 16 m above sea level.** That is what `station.elevation_m` is set
-to (and what the sea-level pressure we upload is corrected for), but CWOP's own
-record still says 5 m — a leftover from the signup form. It only affects CWOP's
-metadata, since the pressure is already corrected on the Pi, but the two should
-agree: fix CWOP's copy with the account form below.
+to (and what the sea-level pressure we upload is corrected for — confirmed from
+the live data 2026-09-26), but CWOP's own record still says 5 m, a leftover from
+the signup form. It only affects CWOP's metadata, since the pressure is already
+corrected on the Pi, but the two should agree: fix CWOP's copy with the account
+form below.
 
 International sites get a `GW####` id rather than the `CW`/`DW`/`EW` prefixes most
 CWOP documentation mentions. Nothing in the protocol treats it differently and the

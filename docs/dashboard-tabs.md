@@ -4,9 +4,9 @@ Plan for splitting the single-scroll dashboard into **Now / History / Ahead**,
 adding a **5-day forecast** to *Ahead*, and a **last-5-minute wind trend** to the
 Wind tile in *Now*.
 
-Status: **implemented on branch `dashboard-tabs`** 2026-09-01 (phases 1–4; smoke-
-tested in a headless browser — tabs switch, forecast + wind-trend render, no
-console errors). Not yet deployed. Written 2026-09-01.
+Status: **live** — merged in #14 (2026-09-01; phases 1–4, smoke-tested in a
+headless browser). Written 2026-09-01. This is the plan as built; the layout has
+moved on since (see `web/README.md` for the current page).
 
 ---
 
