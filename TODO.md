@@ -15,26 +15,16 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27; CWOP since
   <https://madis.ncep.noaa.gov/cwop_signup.shtml> → *Existing Account Update*;
   lands on the weekly Wednesday station-table build (cutoff Tue 02:00). See
   [docs/cwop.md](docs/cwop.md).
-- **Heartbeat alerting** — code live on the Pi (2026-09-26), but off until
-  `HEARTBEAT_URL` is set in the Pi's `.env`. Create a check at healthchecks.io
-  (period 1 min, grace 1–5 min) — [docs/alerting.md](docs/alerting.md).
-- **Soak test** — data-integrity check **passed** 2026-08-28 (§1). Still
-  outstanding: a deliberate network-partition (unplug) test.
+- **Switch WOW / WOW-IE off when it dies.** It's live on the Pi, kept running
+  until the Met Office decommissions WOW (late 2026). Once it stops answering,
+  set `uploaders.wow.enabled: false` in the Pi's `config.yaml` and restart, or
+  its cursor will sit in the doctor's "uploads" section collecting errors.
 - **Supabase purge job** — the hourly rollup is verified running (2026-09-26:
   the newest `readings_hourly` bucket was the last complete hour, 60 samples
   each). The daily purge only deletes raw rows older than 90 days, and the
-  oldest is 2026-08-27, so it has nothing to do until ~2026-11-25. Check then that
-  rows before ~2026-08-27 + 90 days are gone (or run
+  oldest is 2026-08-27, so it has nothing to do until ~2026-11-25. After that,
+  check the oldest raw row in `readings` is never more than ~90 days old (or run
   `select jobname, schedule from cron.job;` in the SQL editor any time).
-- **Air-quality baseline** — the TGS2600 index drifted from ~62 to a ~69 median
-  in its first month; the dashboard bands were retuned to the last week's
-  percentiles on 2026-09-26 (`web/src/lib/air.ts`). Re-run the query in a few
-  weeks, or replace the fixed bands with a rolling baseline (compare each reading
-  with the station's own 24 h / 7 d median) so drift stops needing hand-tuning.
-- **EPA attribution** — the bathing-water card uses EPA data (CC BY 4.0), which
-  requires a credit; the "Source: EPA" line was removed on purpose (2026-09-25),
-  so the site currently has none. Add one somewhere (e.g. the footer).
-- **Gauge dials** for current temp/wind — in the original plan, never built.
 
 ## Done
 
@@ -43,8 +33,10 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27; CWOP since
       ~110 records a day: each sensor read's cost was added to a fixed sleep. It
       now sleeps to an absolute deadline. Verified on the live data after the
       restart: every gap exactly 60 s (min = avg = max).
-- [x] **Heartbeat dead man's switch** (#29, 2026-09-26) — `core/heartbeat.py`;
-      see "Still open" for switching it on.
+- [x] **Heartbeat dead man's switch** (#29) — **live 2026-09-26**:
+      `HEARTBEAT_URL` (a healthchecks.io ping URL) is in the Pi's `.env` and the
+      collector pings every minute. Proven end to end by the soak test: 0 failed
+      pings before, one per minute during the 10-minute block, 0 after.
 - [x] **Wind spike fix deployed** — the fixed sampler (real elapsed timing,
       uploads off the sampling thread, 55 m/s ceiling, reed debounce; see
       2026-09-01 below) is confirmed running: the Pi pulled `main` at `40c300a`,
@@ -63,12 +55,41 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27; CWOP since
 - [x] **README screenshots** — 2026-09-08, `docs/screenshots/` (desktop light,
       History in dark, phone), captured from production; re-shot 2026-09-26
       after the design pass.
+- [x] **Network-outage soak test — passed 2026-09-26.** Cut the Pi's outbound
+      HTTP/HTTPS/APRS for 10 minutes with an nftables drop rule (SSH untouched;
+      auto-lifted by a `systemd-run` timer), 20:12–20:22 UTC. Results:
+      - the Pi kept archiving every 60 s throughout (ids 37452–37467 contiguous)
+        while every upload cursor froze — no sampling stall from hung uploads;
+      - the site showed "Delayed · last reading 6m ago";
+      - within ~60 s of the rule lifting every destination was back to 0 behind;
+      - Supabase holds all 16 rows of the window, gaps 59.9999–60.0001 s, no wind
+        spike (max gust 3.07 m/s).
+      To repeat it (needs sudo on the Pi):
+      ```
+      sudo nft add table inet soak
+      sudo nft add chain inet soak out '{ type filter hook output priority 0; }'
+      sudo nft add rule inet soak out tcp dport '{ 80, 443, 14580 }' drop
+      sudo systemd-run --on-active=10m --unit=soak-unblock nft delete table inet soak
+      ```
+- [x] **Gauge dials — dropped** (2026-09-26). In the original plan, never built;
+      the cards already show the values and the design pass pushed toward less
+      on the page.
+- [x] **Rolling air-quality baseline** (2026-09-26) — the TGS2600 index drifted
+      from ~62 to a ~69 median in its first month, so fixed bands kept going
+      stale. The card's bands are now margins above the station's own 7-day
+      median (`lib/supabase.ts:getAirBaseline`, from `readings_hourly`, 1-h memo):
+      Normal ≤ +1.5, Slightly raised ≤ +2.1, from the week's p90/p98 gaps. On the
+      day it shipped that gave 70.86 / 71.46 against the hand-tuned 70.9 / 71.5.
+- [x] **Data credits** (2026-09-26) — a footer line credits Open-Meteo and the
+      EPA (both CC BY 4.0, which requires it) and RainViewer. The EPA line had
+      been removed from the bathing card on purpose, so it lives in the footer.
 - [x] **Station elevation** — 16 m in the Pi's `config.yaml`, confirmed
       2026-09-26 over SSH and from the live data (station vs sea-level pressure
       implies exactly 16.0 m).
 - [x] **WOW-BE** — site registered and uploading since 2026-09-07.
-- [x] **WOW / WOW-IE** — decided 2026-09-26 **not** to enable: WOW shuts down
-      late 2026 and WOW-BE covers the same ground. Code and tests stay.
+- [x] **WOW / WOW-IE** — live on the Pi (site registered at wow.metoffice.gov.uk,
+      `WOW_AUTH_KEY` set, uploading without errors as of 2026-09-26). Kept running
+      until WOW is decommissioned late 2026 — see "Still open".
 - [x] **TGS2600 air quality** — enabled on the Pi 2026-08-28, board mounted away
       from the Pi; rollup SQL live. Baseline follow-up in "Still open".
 - [x] **Offline alerting** (2026-09-15) — `.github/workflows/station-watchdog.yml`
@@ -124,8 +145,8 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27; CWOP since
       backlog. Notably the pipeline lost **no** data across yesterday evening's
       30+ restarts (a `config.yaml`-missing crash loop, one `readonly database`
       crash, the air-quality deploy) — every id is present locally and upstream.
-- [ ] Store-and-forward soak test — the *remaining* pieces: a deliberate
-      network-unplug test (never done), and a genuine 24h uninterrupted run.
+- [x] Store-and-forward soak test — network-outage test **passed 2026-09-26**
+      (see Done).
       The service has only been continuously up since 2026-08-27 21:46 BST (the
       earlier "since 11:01 BST" note was wrong — it was restarted repeatedly
       during the evening deploy session). No gaps >150s since that restart;
@@ -165,8 +186,8 @@ domain may come later).
       at 20k rows — the `readings_hourly` rollup is still the real fix.
 - [x] ECharts: temp/humidity/pressure line chart, rain bar chart, wind rose (polar
       bar, averaged by 16-point compass bucket) — all in `HistoryCharts.tsx`
-      (client island). **Gauge dials for current temp/wind are not built** —
-      only the three charts above exist so far.
+      (client island). Gauge dials for current temp/wind were planned but
+      dropped (2026-09-26).
 - [x] Derived + external dashboard panels (2026-08-31, PR #11): **Feels like**
       (wind chill / humidex, `lib/derived.ts`), **trend arrows** on temp/humidity
       + "vs 24h ago" (`lib/format.ts` `trend()`), **Records** card — all-time +
@@ -394,8 +415,8 @@ domain may come later).
       midnight) summed from the SQLite buffer via the shared `upload/_rain.py`
       helper (also refactored CWOP onto it). Endpoint probed live — 422 validation
       responses confirm shape. Full notes: [docs/wowbe.md](docs/wowbe.md).
-- [-] WOW / WOW-IE uploader — **code done 2026-09-06, deliberately not enabled**
-      (decided 2026-09-26; WOW shuts down late 2026) (`upload/wow.py`, 13 tests).
+- [x] WOW / WOW-IE uploader — **live**; code done 2026-09-06 (`upload/wow.py`,
+      13 tests); running until WOW shuts down late 2026.
       wow.met.ie is Met Éireann's *display* front-end onto the UK Met Office WOW
       network — registration and uploads both happen on wow.metoffice.gov.uk, and
       `wow.met.ie/automaticreading` just serves the HTML shell (a 200 that uploads

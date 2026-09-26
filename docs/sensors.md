@@ -106,9 +106,10 @@ for BMP085/180 (a BME280 would read `0x60`, a BMP280 `0x58`).
 - **On this station:** enabled since 2026-08-28, and the board is mounted away
   from the Pi body. The index sat ~56–65 at first and drifted up to a ~69 median
   within a month, as new gas sensors do — so the dashboard's Normal / Slightly
-  raised / Raised bands are percentiles of the station's own last week (p90 /
-  p98), retuned 2026-09-26. The query to re-tune them is in
-  `web/src/lib/air.ts`; re-run it if the card sits on "Raised" for no reason.
+  raised / Raised bands are fixed margins above a rolling 7-day median of the
+  station's own readings (since 2026-09-26), and follow the drift on their own.
+  If "Raised" fires too often or never, the margins and the query to re-derive
+  them are in `web/src/lib/air.ts`.
 - Stored as `Record.air_quality` → SQLite → Supabase (`readings.air_quality`, and
   averaged in `readings_hourly`). Shown on the dashboard as an "Air quality" card
   and a history line, both hidden until real data exists. Not uploaded to

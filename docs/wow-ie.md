@@ -10,9 +10,10 @@ happen on the Met Office side.
 
 Uploader: [`pi/src/weatherstation/upload/wow.py`](../pi/src/weatherstation/upload/wow.py).
 
-**Status: built, deliberately not enabled** (decided 2026-09-26). WOW shuts down
-late 2026 (below) and [WOW-BE](wowbe.md), which is live, covers the same ground.
-The code and tests stay in case that changes; nothing needs doing.
+**Status: live** — uploading from this station without errors (checked
+2026-09-26), and kept running until WOW shuts down late 2026 (below). When it
+stops answering, set `uploaders.wow.enabled: false` in the Pi's `config.yaml` and
+restart; [WOW-BE](wowbe.md), also live, covers the same ground after that.
 
 ## ⚠️ Read this first: WOW is being switched off
 

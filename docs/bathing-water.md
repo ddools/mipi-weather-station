@@ -5,7 +5,8 @@ result, the annual rating, and any active bathing restriction at the designated
 bathing water nearest the station.
 
 Status: **live** — merged in #27 (2026-09-25), with the card trimmed in #28
-(annual ratings and the EPA credit line removed; the rating greys out once the
+(annual ratings and the card's EPA credit line removed — the credit is in the
+site footer since 2026-09-26; the rating greys out once the
 season has ended). `lib/bathing.ts`, `BathingSection.astro`, wired into *Now in
 detail*. Checked against the live API and in the browser (all six states in §4b
 forced via fixtures, light + dark, 390 px and desktop). §5 (rain note) not done. Every API fact
