@@ -221,7 +221,7 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   2026-09-08 after the packets showed at findu and we replied to
   cwop-support@noaa.gov. Passcode `-1` (in `.env` as `CWOP_PASSCODE`). Account
   details, the account-edit form and the open elevation fix (CWOP's record says
-  5 m; the site is 16 m — and the Pi's own `config.yaml` still says 20 m) are in
+  5 m; the site is 16 m, which the Pi's `config.yaml` already uses) are in
   [docs/cwop.md](docs/cwop.md).
 - **WOW-BE live** (code 2026-08-30, `upload/wowbe.py` + `tests/test_wowbe.py`;
   site registered and uploading since 2026-09-07) — JSON REST
@@ -245,7 +245,9 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   a separate ground-temp field.
 - **Supabase rollups live** — `readings_hourly` (data back to 2026-08-27) and the
   `readings_daily` view answer over REST (checked 2026-09-26); the 7d / 30d /
-  All-time charts read them. The `pg_cron` schedule itself is unverified.
+  All-time charts read them. The hourly rollup job is verified running (newest
+  bucket = last complete hour); the 90-day purge has nothing to do until
+  ~2026-11-25.
 
 ## Dev conventions
 
@@ -290,11 +292,10 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
    2026-09-08), ~~WOW-BE~~ (live 2026-09-07), ~~retention/rollup SQL~~ (live),
    ~~README screenshots~~ (re-shot 2026-09-26), ~~offline alerting~~ (#29),
    gauge dials (not built).
-7. **Open, as of 2026-09-26** (details in TODO.md "Still open"): set
-   `station.elevation_m: 16` in the Pi's `config.yaml` (still 20); fix CWOP's
-   5 m elevation record; set `HEARTBEAT_URL` on the Pi; the network-unplug soak
-   test; verify the `pg_cron` jobs; an EPA credit for the bathing card; a rolling
-   air-quality baseline instead of hand-tuned bands.
+7. **Open, as of 2026-09-26** (details in TODO.md "Still open"): fix CWOP's 5 m
+   elevation record; set `HEARTBEAT_URL` on the Pi; the network-unplug soak test;
+   check the purge job after ~2026-11-25; an EPA credit for the bathing card; a
+   rolling air-quality baseline instead of hand-tuned bands.
 
 ## Gotchas
 

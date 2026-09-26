@@ -11,11 +11,6 @@ Everything in plan.MD's core path (sensors, store-and-forward, Supabase, the Ast
 site on Vercel, Weather Underground, Windy) is live as of 2026-08-27; CWOP since
 2026-09-08 and WOW-BE since 2026-09-07. Remaining, as of 2026-09-26:
 
-- **Station elevation on the Pi** — the site is 16 m (confirmed 2026-09-08) and
-  `config.example.yaml` says so, but the Pi's own `pi/config.yaml` (gitignored)
-  **still says 20**. Sea-level pressure is derived from it
-  (`core/units.sea_level_pressure_hpa`), so every network gets pressure ~0.5 hPa
-  high. Set `station.elevation_m: 16` and restart the collector.
 - **CWOP's elevation record** says 5 m; should be 16. Edit at
   <https://madis.ncep.noaa.gov/cwop_signup.shtml> → *Existing Account Update*;
   lands on the weekly Wednesday station-table build (cutoff Tue 02:00). See
@@ -25,11 +20,12 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27; CWOP since
   (period 1 min, grace 1–5 min) — [docs/alerting.md](docs/alerting.md).
 - **Soak test** — data-integrity check **passed** 2026-08-28 (§1). Still
   outstanding: a deliberate network-partition (unplug) test.
-- **Supabase retention** — the rollups are live: `readings_hourly` holds data
-  back to 2026-08-27 and `readings_daily` answers (checked via REST 2026-09-26),
-  so the 7d / 30d / All-time charts read them. Not checked: that the `pg_cron`
-  jobs are scheduled (hourly rollup at :05, daily purge 03:20 UTC) — run
-  `select jobname, schedule from cron.job;` in the SQL editor.
+- **Supabase purge job** — the hourly rollup is verified running (2026-09-26:
+  the newest `readings_hourly` bucket was the last complete hour, 60 samples
+  each). The daily purge only deletes raw rows older than 90 days, and the
+  oldest is 2026-08-27, so it has nothing to do until ~2026-11-25. Check then that
+  rows before ~2026-08-27 + 90 days are gone (or run
+  `select jobname, schedule from cron.job;` in the SQL editor any time).
 - **Air-quality baseline** — the TGS2600 index drifted from ~62 to a ~69 median
   in its first month; the dashboard bands were retuned to the last week's
   percentiles on 2026-09-26 (`web/src/lib/air.ts`). Re-run the query in a few
@@ -67,6 +63,9 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27; CWOP since
 - [x] **README screenshots** — 2026-09-08, `docs/screenshots/` (desktop light,
       History in dark, phone), captured from production; re-shot 2026-09-26
       after the design pass.
+- [x] **Station elevation** — 16 m in the Pi's `config.yaml`, confirmed
+      2026-09-26 over SSH and from the live data (station vs sea-level pressure
+      implies exactly 16.0 m).
 - [x] **WOW-BE** — site registered and uploading since 2026-09-07.
 - [x] **WOW / WOW-IE** — decided 2026-09-26 **not** to enable: WOW shuts down
       late 2026 and WOW-BE covers the same ground. Code and tests stay.
@@ -436,8 +435,8 @@ domain may come later).
       `pg_cron` schedules (rollup at :05, purge daily 03:20 UTC). Wind direction
       is vector-averaged, rain summed. **Run on the live project** — the rollups
       answer over REST (checked 2026-09-26) and the site's 7d / 30d / All-time
-      charts read them (#26). The `pg_cron` schedule is unverified — see
-      "Still open".
+      charts read them (#26). The hourly rollup job is verified running
+      (2026-09-26); the purge can't act before ~2026-11-25 — see "Still open".
 - [x] Rain-radar map on the dashboard (2026-08-27) — `web/src/components/RainRadar.tsx`,
       a Leaflet client island. Radar frames + tiles from the free, keyless
       **RainViewer** Weather Maps API (past 2 h + short nowcast, play/scrub
