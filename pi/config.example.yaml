@@ -60,6 +60,20 @@ sensors:
     enabled: false
     warmup_s: 300   # suppress readings this long after start (heater stabilising)
 
+# weatherstation-doctor tuning. Optional — omit the whole block (or any key) and
+# the built-in defaults shown here apply, so existing config.yaml files keep
+# working unchanged.
+diagnostics:
+  rain_gauge:
+    # A tipping bucket that fails looks exactly like dry weather in the data, so
+    # the doctor warns when the gauge has gone silent *despite* conditions that
+    # should have produced rain. It uses humidity as the "should have rained"
+    # proxy and only warns when BOTH of these hold:
+    stuck_hours: 24          # no tip for at least this many hours, AND
+    wet_samples: 120         # at least this many samples in the no-tip period
+                             # (~2h at the 60s archive interval) were humid...
+    wet_humidity_pct: 95     # ...i.e. at or above this relative humidity (%).
+
 storage:
   sqlite_path: "data/weather.sqlite3"
   retention_days: 0      # 0 = keep forever locally

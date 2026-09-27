@@ -50,6 +50,14 @@ _BACKLOG_STALL_S = 600
 # config can't be read.
 _DEFAULT_BUCKET_MM = 0.2794
 
+# Stuck/blocked rain-gauge heuristic. A tipping bucket that fails looks exactly
+# like dry weather, so we cross-check against humidity: a long run with no tips
+# is only suspicious if conditions were wet enough that it should have rained.
+# These are fallbacks for when config.yaml omits them or can't be read at all.
+_DEFAULT_STUCK_HOURS = 24.0  # warn only after this long with no tip
+_DEFAULT_WET_SAMPLES = 120  # and only with this many wet samples (~2h at 60s)
+_DEFAULT_WET_HUMIDITY_PCT = 95.0  # a sample counts as "wet" at or above this RH
+
 
 # --------------------------------------------------------------------------- config
 
@@ -258,21 +266,29 @@ class RainSummary:
     tips: int = 0
     last_tip: datetime | None = None
     hourly: list[tuple[datetime, float, int]] = field(default_factory=list)
+    # Humidity readings (percent) from the records after the last tip — i.e. the
+    # no-tip period. Used to tell a legitimately dry gauge from a stuck one.
+    nontip_humidities: list[float] = field(default_factory=list)
 
 
 def summarise_rain(rows, bucket_mm: float, tz: ZoneInfo) -> RainSummary:
     """Fold archive rows into per-hour rain totals.
 
-    `rows` is an iterable of (recorded_at ISO string, rain_mm or None), as stored
-    by the collector. Rows without a rain figure are counted as records (the
-    collector was alive) but contribute no rain, which is the honest reading of a
-    failed sensor cycle.
+    `rows` is an iterable of (recorded_at ISO string, rain_mm or None) or
+    (recorded_at, rain_mm, humidity or None), as stored by the collector. Rows
+    without a rain figure are counted as records (the collector was alive) but
+    contribute no rain, which is the honest reading of a failed sensor cycle.
+    Humidity, when present, is kept so the stuck-gauge check can ask whether it
+    was even wet enough for the gauge to have tipped.
     """
     summary = RainSummary()
     buckets: dict[datetime, float] = {}
     stamps: list[datetime] = []
+    humidity_samples: list[tuple[datetime, float]] = []
 
-    for recorded_at, rain_mm in rows:
+    for row in rows:
+        recorded_at, rain_mm = row[0], row[1]
+        humidity = row[2] if len(row) > 2 else None
         try:
             when = datetime.fromisoformat(recorded_at)
         except (TypeError, ValueError):
@@ -281,6 +297,8 @@ def summarise_rain(rows, bucket_mm: float, tz: ZoneInfo) -> RainSummary:
             when = when.replace(tzinfo=timezone.utc)
         summary.records += 1
         stamps.append(when)
+        if humidity is not None:
+            humidity_samples.append((when, float(humidity)))
         if rain_mm is None:
             continue
         mm = float(rain_mm)
@@ -292,6 +310,12 @@ def summarise_rain(rows, bucket_mm: float, tz: ZoneInfo) -> RainSummary:
 
     if stamps:
         summary.span_h = (max(stamps) - min(stamps)).total_seconds() / 3600.0
+    # Humidity over the no-tip period only: everything after the last tip, or the
+    # whole window if it never tipped. A high reading before the last tip says
+    # nothing about whether the gauge is stuck now.
+    summary.nontip_humidities = [
+        rh for when, rh in humidity_samples if summary.last_tip is None or when > summary.last_tip
+    ]
     # Tip counts are derived, not stored: the collector only records millimetres.
     summary.tips = round(summary.total_mm / bucket_mm) if bucket_mm else 0
     summary.hourly = [
@@ -305,7 +329,8 @@ def _read_rain_rows(db_path: Path, since: datetime):
     db = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=5)
     try:
         return db.execute(
-            "SELECT recorded_at, json_extract(payload, '$.rain_mm') FROM readings "
+            "SELECT recorded_at, json_extract(payload, '$.rain_mm'), "
+            "json_extract(payload, '$.humidity') FROM readings "
             "WHERE recorded_at >= ? ORDER BY recorded_at",
             (since.isoformat(),),
         ).fetchall()
@@ -336,6 +361,46 @@ def _rain_verdict(summary: RainSummary, bucket_mm: float) -> list[str]:
     ]
 
 
+def _stuck_gauge_verdict(
+    summary: RainSummary,
+    now: datetime,
+    window_start: datetime,
+    *,
+    stuck_hours: float,
+    wet_samples: int,
+    wet_humidity_pct: float,
+) -> list[str]:
+    """A stronger warning than the plain 'no tips' line: a gauge that has gone
+    quiet *while it was wet enough to rain* is probably blocked or broken.
+
+    Returns warning lines only when both hold, otherwise an empty list (a long
+    dry spell in dry air is a healthy gauge, not a fault, so it stays silent):
+
+    * no tip for at least ``stuck_hours``, and
+    * at least ``wet_samples`` records in that no-tip period read humidity of at
+      least ``wet_humidity_pct``.
+    """
+    if summary.last_tip is not None:
+        no_tip_hours = (now - summary.last_tip).total_seconds() / 3600.0
+    else:
+        # Never tipped in the window: it has been at least this long, measured
+        # from the oldest record we looked at.
+        no_tip_hours = (now - window_start).total_seconds() / 3600.0
+    if no_tip_hours < stuck_hours:
+        return []
+
+    wet = [rh for rh in summary.nontip_humidities if rh >= wet_humidity_pct]
+    if len(wet) < wet_samples:
+        return []
+
+    peak = max(wet)
+    return [
+        f"WARNING: rain gauge may be stuck or blocked — no tips in {no_tip_hours:.1f}h, but",
+        f"humidity reached {peak:.0f}% on {len(wet)} samples in that time. Check the",
+        "funnel/bucket/reed switch (see --rain-watch).",
+    ]
+
+
 _RAIN_TEST_NOTES = [
     "",
     "To tell a blocked gauge from a dead switch, stop the collector and tip the",
@@ -358,6 +423,9 @@ def print_rain(cfg, cfg_path: Path | None) -> None:
     bucket_mm = _DEFAULT_BUCKET_MM
     tz = timezone.utc
     db_path = None
+    stuck_hours = _DEFAULT_STUCK_HOURS
+    wet_samples = _DEFAULT_WET_SAMPLES
+    wet_humidity_pct = _DEFAULT_WET_HUMIDITY_PCT
     if cfg:
         bucket_mm = cfg.calibration.get("rain_bucket_mm", _DEFAULT_BUCKET_MM)
         tz_name = cfg.station.get("timezone", "UTC")
@@ -368,6 +436,11 @@ def print_rain(cfg, cfg_path: Path | None) -> None:
             # a table an hour out is worse than one that admits it.
             print(f"  note    : unknown timezone {tz_name!r}; hours shown in UTC")
         db_path = _buffer_path(cfg, cfg_path)
+        # Optional; absent keys fall back to the defaults so old configs still work.
+        rain_gauge = cfg.get("diagnostics", {}).get("rain_gauge", {}) or {}
+        stuck_hours = rain_gauge.get("stuck_hours", _DEFAULT_STUCK_HOURS)
+        wet_samples = rain_gauge.get("wet_samples", _DEFAULT_WET_SAMPLES)
+        wet_humidity_pct = rain_gauge.get("wet_humidity_pct", _DEFAULT_WET_HUMIDITY_PCT)
 
     if db_path is None or not db_path.exists():
         print(f"  buffer  : not found ({db_path or 'no config'})")
@@ -375,7 +448,8 @@ def print_rain(cfg, cfg_path: Path | None) -> None:
         print("  Without the collector's SQLite buffer there is nothing to read here.")
         return
 
-    since = datetime.now(timezone.utc) - timedelta(hours=_RAIN_WINDOW_H)
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(hours=_RAIN_WINDOW_H)
     try:
         rows = _read_rain_rows(db_path, since)
     except sqlite3.Error as e:
@@ -396,12 +470,20 @@ def print_rain(cfg, cfg_path: Path | None) -> None:
     plural = "" if summary.tips == 1 else "s"
     print(f"  total   : {summary.total_mm:.2f} mm in {summary.tips} tip{plural}")
     if summary.last_tip is not None:
-        ago = (datetime.now(timezone.utc) - summary.last_tip).total_seconds() / 3600.0
+        ago = (now - summary.last_tip).total_seconds() / 3600.0
         print(f"  last tip: {summary.last_tip.astimezone(tz):%a %H:%M} ({ago:.1f}h ago)")
     else:
         print("  last tip: none in this window")
     print()
-    for line in _rain_verdict(summary, bucket_mm) + _RAIN_TEST_NOTES:
+    stuck = _stuck_gauge_verdict(
+        summary,
+        now,
+        since,
+        stuck_hours=stuck_hours,
+        wet_samples=wet_samples,
+        wet_humidity_pct=wet_humidity_pct,
+    )
+    for line in _rain_verdict(summary, bucket_mm) + stuck + _RAIN_TEST_NOTES:
         print(f"  {line}".rstrip())
 
 
