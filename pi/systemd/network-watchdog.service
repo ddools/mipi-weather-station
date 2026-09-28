@@ -1,0 +1,11 @@
+[Unit]
+Description=Weather station network watchdog (repairs a dead Wi-Fi link)
+After=NetworkManager.service
+
+# One check per run; the timer fires it every 2 minutes. Runs as root because
+# restarting Wi-Fi, NetworkManager or the driver needs it. See docs/network.md.
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/network-watchdog.sh
+# Uncomment to log what it would do without changing anything:
+#Environment=WATCHDOG_DRY_RUN=1
