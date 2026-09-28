@@ -30,7 +30,9 @@ thing being what failed.
 1. Make an account at [healthchecks.io](https://healthchecks.io) (free tier is
    ample — this needs one check). Cronitor, Better Stack and UptimeRobot expose
    the same "GET this URL on a schedule" contract and work identically.
-2. Create a check:
+2. Create a check. **Change its schedule straight away** — a new check starts on
+   a 1-day period with 1 hour's grace, so it won't notice an outage for a day
+   (it didn't, on 2026-09-27):
    - **Period** `1 minute` — how often we promise to ping (the archive interval).
    - **Grace** `1 minute` — extra silence tolerated before it alarms.
    - Period + grace is the real threshold, so this alerts at **~2 minutes**.

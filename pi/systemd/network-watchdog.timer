@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the weather station network watchdog every 2 minutes
+
+[Timer]
+# First check 5 minutes after boot, so Wi-Fi gets a fair chance to come up.
+OnBootSec=5min
+OnUnitActiveSec=2min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target
