@@ -421,6 +421,10 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   `domain=dermotdooley.com` on that domain, so localhost/previews keep their own. The site
   header copies the main site's navbar (Nord base-200 `--navbar` token in `global.css`);
   it's `sticky top-0 h-16`, so the dashboard tab bar sticks at `top-16` under it.
+  The train app is now **My Train**, public-facing at **mytrain.fyi** (public beta from
+  2026-09-28; repo `ddools/Skerries-train`). train.dermotdooley.com keeps serving it with the
+  DD branding, and only that host shares the theme cookie — mytrain.fyi is another domain, so
+  it keeps its own.
 - **A healthchecks.io check starts on a 1-day period + 1-hour grace.** Set it to
   minutes (period 1 min, grace ~5 min) or it's useless: the 2026-09-27 overnight
   outage sent no email because the new check was still on the defaults. The
