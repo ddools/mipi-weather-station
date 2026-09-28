@@ -40,3 +40,10 @@ Set `HEARTBEAT_URL` in `.env` and the collector pings it on every stored record,
 so an external service (healthchecks.io or similar) can email you when the
 station goes quiet. Empty means off. Setup and tuning:
 [docs/alerting.md](../docs/alerting.md).
+
+## Network watchdog
+
+The Pi sits at the edge of the house Wi-Fi. `systemd/network-watchdog.*` checks
+the router every 2 minutes and, if it stops answering, reconnects, restarts the
+Wi-Fi stack and finally reboots. Install steps and background:
+[docs/network.md](../docs/network.md).

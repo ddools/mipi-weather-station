@@ -190,6 +190,15 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   EPA" line were removed from the card at Dermot's request; the CC BY 4.0 credit
   (EPA and Open-Meteo) lives in the site footer instead. First non-Open-Meteo data dependency
   in `web/`. Plan + API notes: [docs/bathing-water.md](docs/bathing-water.md).
+- **Network (the Pi is in the shed)** — Wi-Fi to the house router is marginal:
+  −85 dBm, 1–6.5 Mbit/s. On 2026-09-27 it dropped at 22:51 and NetworkManager
+  never reconnected; the collector buffered all night (nothing lost) but nothing
+  uploaded for 10.5 h until a power cycle. Fixes (2026-09-28): Wi-Fi power saving
+  off in NetworkManager (packet loss 40% → 0%), and a **network watchdog**
+  (`pi/systemd/network-watchdog.{sh,service,timer}`, every 2 min, root) that
+  escalates reconnect → radio toggle → NetworkManager restart → driver reload →
+  reboot at ~30 min (never within 1 h of boot, max once per 6 h). Install steps
+  and hardware options in [docs/network.md](docs/network.md).
 - **Alerting** — two independent alarms, see [docs/alerting.md](docs/alerting.md).
   A **heartbeat** dead man's switch (`core/heartbeat.py`, `HEARTBEAT_URL` in
   `.env`, empty = disabled): the Pi pings an external watcher on every stored
@@ -412,6 +421,10 @@ plan draft assumed BME280 + MCP3008 (SPI), which are the wrong chips. Corrected:
   `domain=dermotdooley.com` on that domain, so localhost/previews keep their own. The site
   header copies the main site's navbar (Nord base-200 `--navbar` token in `global.css`);
   it's `sticky top-0 h-16`, so the dashboard tab bar sticks at `top-16` under it.
+- **A healthchecks.io check starts on a 1-day period + 1-hour grace.** Set it to
+  minutes (period 1 min, grace ~5 min) or it's useless: the 2026-09-27 overnight
+  outage sent no email because the new check was still on the defaults. The
+  GitHub watchdog was the only alarm, and GitHub delayed its cron by 2+ h.
 - **Anything on the dashboard that depends on "now" must be a server island**
   (`server:defer`) or computed in the browser. `index.astro` is prerendered, so
   a plain component's frontmatter runs once, at build time — Tides, Sun, Moon and

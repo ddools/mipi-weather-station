@@ -15,6 +15,11 @@ site on Vercel, Weather Underground, Windy) is live as of 2026-08-27; CWOP since
   <https://madis.ncep.noaa.gov/cwop_signup.shtml> → *Existing Account Update*;
   lands on the weekly Wednesday station-table build (cutoff Tue 02:00). See
   [docs/cwop.md](docs/cwop.md).
+- **Install the network watchdog on the Pi** (needs sudo; steps in
+  [docs/network.md](docs/network.md)). Written 2026-09-28 after the shed Pi's
+  Wi-Fi dropped overnight and never reconnected. Also set the healthchecks.io
+  check to period 1 min / grace ~5 min if not done — it was on the 1-day default
+  and sent nothing that night.
 - **Switch WOW / WOW-IE off when it dies.** It's live on the Pi, kept running
   until the Met Office decommissions WOW (late 2026). Once it stops answering,
   set `uploaders.wow.enabled: false` in the Pi's `config.yaml` and restart, or
